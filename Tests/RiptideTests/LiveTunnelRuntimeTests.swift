@@ -104,4 +104,53 @@ struct LiveTunnelRuntimeTests {
         #expect(await proxyDialer.openRequests.count == 1)
         #expect(await directDialer.openRequests.count == 0)
     }
+
+    @Test("direct mode bypasses rules and proxies")
+    func directModeBypassesRulesAndProxies() async throws {
+        let config = RiptideConfig(
+            mode: .direct,
+            proxies: [],
+            rules: []
+        )
+        let profile = TunnelProfile(name: "direct-mode", config: config)
+
+        let directSession = MockTransportSession(receiveQueue: [])
+        let directDialer = LiveRuntimeMockDialer([directSession])
+        let proxyDialer = LiveRuntimeMockDialer([])
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+
+        try await runtime.start(profile: profile)
+        let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
+
+        #expect(context.node.name == "DIRECT")
+        #expect(await directDialer.openRequests.count == 1)
+        #expect(await proxyDialer.openRequests.count == 0)
+    }
+
+    @Test("global mode uses first configured proxy when rules are absent")
+    func globalModeUsesFirstProxy() async throws {
+        let first = ProxyNode(name: "first-node", kind: .socks5, server: "10.0.0.2", port: 1080)
+        let second = ProxyNode(name: "second-node", kind: .http, server: "10.0.0.3", port: 8080)
+        let config = RiptideConfig(
+            mode: .global,
+            proxies: [first, second],
+            rules: []
+        )
+        let profile = TunnelProfile(name: "global-mode", config: config)
+
+        let proxySession = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let proxyDialer = LiveRuntimeMockDialer([proxySession])
+        let directDialer = LiveRuntimeMockDialer([])
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+
+        try await runtime.start(profile: profile)
+        let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
+
+        #expect(context.node.name == "first-node")
+        #expect(await proxyDialer.openRequests.count == 1)
+        #expect(await directDialer.openRequests.count == 0)
+    }
 }

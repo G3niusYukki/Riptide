@@ -14,8 +14,10 @@ Current state: **library-first foundation with runnable CLI/App demos and live T
   - `TunnelLifecycleManager` for lifecycle state transitions
   - `LiveTunnelRuntime` for real policy execution (`DIRECT` / `REJECT` / proxy path)
   - `InProcessTunnelControlChannel` for command/response/event control abstraction
+- **Local proxy ingress**:
+  - `LocalHTTPConnectProxyServer` for real local HTTP CONNECT traffic and relay
 - **Entrypoints**:
-  - `riptide` CLI (`validate`, `run`, `smoke`)
+  - `riptide` CLI (`validate`, `run`, `smoke`, `serve`)
   - `RiptideApp` minimal SwiftUI shell
 
 ## Project Structure
@@ -72,7 +74,10 @@ Examples:
 swift run riptide validate --config ./example.yaml
 swift run riptide run --config ./example.yaml
 swift run riptide smoke --config ./example.yaml --host example.com --port 443
+swift run riptide serve --config ./Examples/direct-mode.yaml --port 6152
 ```
+
+`serve` starts a local HTTP CONNECT proxy so macOS apps, browsers, or CLI tools can send real traffic through the live runtime.
 
 ### 4. Run the demo app
 
@@ -115,9 +120,10 @@ Default resolver is `.none` (no country match). Production integration (e.g., MM
 ## Roadmap (next priorities)
 
 1. Native NetworkExtension target integration (PacketTunnelProvider/XPC boundary)
-2. Shadowsocks AEAD data-path encryption/decryption (beyond current target preamble framing)
-3. DNS subsystem baseline (UDP/TCP/DoH) + richer policy depth
-4. Proxy groups, health checks, and broader observability
+2. DNS subsystem baseline (UDP/TCP/DoH) + richer policy depth
+3. Proxy groups, health checks, and broader observability
+4. MITM / rewrite / dashboard / external controller surfaces
+5. Shadowsocks AEAD data-path encryption/decryption (beyond current target preamble framing)
 
 ## Contributing
 

@@ -76,4 +76,35 @@ struct ClashConfigParserTests {
             _ = try ClashConfigParser.parse(yaml: yaml)
         }
     }
+
+    @Test("direct mode allows empty proxies and rules")
+    func directModeAllowsEmptyRuntimeSections() throws {
+        let yaml = """
+        mode: direct
+        """
+
+        let config = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.mode == .direct)
+        #expect(config.proxies.isEmpty)
+        #expect(config.rules.isEmpty)
+    }
+
+    @Test("global mode allows proxy list without explicit rules")
+    func globalModeAllowsProxyOnlyConfig() throws {
+        let yaml = """
+        mode: global
+        proxies:
+          - name: "global-node"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        """
+
+        let config = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.mode == .global)
+        #expect(config.proxies.count == 1)
+        #expect(config.rules.isEmpty)
+    }
 }
