@@ -13,9 +13,18 @@ let package = Package(
             name: "Riptide",
             targets: ["Riptide"]
         ),
+        .executable(
+            name: "riptide",
+            targets: ["RiptideCLI"]
+        ),
+        .executable(
+            name: "RiptideApp",
+            targets: ["RiptideApp"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.1"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
     ],
     targets: [
         .target(
@@ -24,9 +33,28 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
             ]
         ),
+        .executableTarget(
+            name: "RiptideCLI",
+            dependencies: [
+                "Riptide",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"]),
+            ]
+        ),
+        .executableTarget(
+            name: "RiptideApp",
+            dependencies: [
+                "Riptide",
+            ]
+        ),
         .testTarget(
             name: "RiptideTests",
-            dependencies: ["Riptide"]
+            dependencies: [
+                "Riptide",
+                "RiptideCLI",
+            ]
         ),
     ]
 )
