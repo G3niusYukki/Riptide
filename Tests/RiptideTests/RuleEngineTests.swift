@@ -47,6 +47,30 @@ struct RuleEngineTests {
         #expect(outside == .direct)
     }
 
+    @Test("matches geoip with injected country resolver")
+    func matchesGeoIP() {
+        let rules: [ProxyRule] = [
+            .geoIP(countryCode: "CN", policy: .proxyNode(name: "cn-proxy")),
+            .final(policy: .direct),
+        ]
+        let engine = RuleEngine(
+            rules: rules,
+            geoIPResolver: .init(resolveCountryCode: { ip in
+                if ip == "1.1.1.1" { return "CN" }
+                if ip == "8.8.8.8" { return "US" }
+                return nil
+            })
+        )
+
+        let cnPolicy = engine.resolve(target: RuleTarget(domain: nil, ipAddress: "1.1.1.1"))
+        let usPolicy = engine.resolve(target: RuleTarget(domain: nil, ipAddress: "8.8.8.8"))
+        let unknownPolicy = engine.resolve(target: RuleTarget(domain: nil, ipAddress: "9.9.9.9"))
+
+        #expect(cnPolicy == .proxyNode(name: "cn-proxy"))
+        #expect(usPolicy == .direct)
+        #expect(unknownPolicy == .direct)
+    }
+
     @Test("falls back to reject when no final is configured")
     func defaultRejectWithoutFinalRule() {
         let rules: [ProxyRule] = [

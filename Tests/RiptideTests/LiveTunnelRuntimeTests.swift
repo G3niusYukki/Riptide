@@ -69,4 +69,39 @@ struct LiveTunnelRuntimeTests {
         #expect(await proxyDialer.openRequests.count == 1)
         #expect(await directDialer.openRequests.count == 0)
     }
+
+    @Test("GEOIP policy uses proxy path with injected resolver")
+    func geoIPPolicyUsesResolver() async throws {
+        let node = ProxyNode(name: "socks-node", kind: .socks5, server: "10.0.0.2", port: 1080)
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [
+                .geoIP(countryCode: "CN", policy: .proxyNode(name: "socks-node")),
+                .final(policy: .direct),
+            ]
+        )
+        let profile = TunnelProfile(name: "geoip-proxy", config: config)
+
+        let proxySession = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let proxyDialer = LiveRuntimeMockDialer([proxySession])
+        let directDialer = LiveRuntimeMockDialer([])
+        let runtime = LiveTunnelRuntime(
+            proxyDialer: proxyDialer,
+            directDialer: directDialer,
+            geoIPResolver: GeoIPResolver(resolveCountryCode: { ip in
+                if ip == "1.1.1.1" { return "CN" }
+                return nil
+            })
+        )
+
+        try await runtime.start(profile: profile)
+        _ = try await runtime.openConnection(target: ConnectionTarget(host: "1.1.1.1", port: 443))
+
+        #expect(await proxyDialer.openRequests.count == 1)
+        #expect(await directDialer.openRequests.count == 0)
+    }
 }

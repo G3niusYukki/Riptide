@@ -12,9 +12,11 @@ public struct RuleTarget: Equatable, Sendable {
 
 public struct RuleEngine: Sendable {
     private let rules: [ProxyRule]
+    private let geoIPResolver: GeoIPResolver
 
-    public init(rules: [ProxyRule]) {
+    public init(rules: [ProxyRule], geoIPResolver: GeoIPResolver = .none) {
         self.rules = rules
+        self.geoIPResolver = geoIPResolver
     }
 
     public func resolve(target: RuleTarget) -> RoutingPolicy {
@@ -65,8 +67,14 @@ public struct RuleEngine: Sendable {
             }
             return network.contains(ipValue) ? policy : nil
 
-        case .geoIP:
-            return nil
+        case .geoIP(let countryCode, let policy):
+            guard
+                let ipAddress = target.ipAddress,
+                let resolvedCountryCode = geoIPResolver.resolveCountryCode(ipAddress)?.uppercased()
+            else {
+                return nil
+            }
+            return resolvedCountryCode == countryCode.uppercased() ? policy : nil
 
         case .final(let policy):
             return policy

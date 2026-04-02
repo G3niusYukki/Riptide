@@ -9,13 +9,19 @@ public enum LiveTunnelRuntimeError: Error, Equatable, Sendable {
 public actor LiveTunnelRuntime: TunnelRuntime {
     private let proxyDialer: any TransportDialer
     private let directDialer: any TransportDialer
+    private let geoIPResolver: GeoIPResolver
     private var currentProfile: TunnelProfile?
     private var currentStatus: TunnelRuntimeStatus
     private var activeConnections: [UUID: ConnectedProxyContext]
 
-    public init(proxyDialer: any TransportDialer, directDialer: any TransportDialer) {
+    public init(
+        proxyDialer: any TransportDialer,
+        directDialer: any TransportDialer,
+        geoIPResolver: GeoIPResolver = .none
+    ) {
         self.proxyDialer = proxyDialer
         self.directDialer = directDialer
+        self.geoIPResolver = geoIPResolver
         self.currentProfile = nil
         self.currentStatus = TunnelRuntimeStatus()
         self.activeConnections = [:]
@@ -92,7 +98,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private func resolvePolicy(profile: TunnelProfile, target: ConnectionTarget) -> RoutingPolicy {
         let ipAddress = IPv4AddressParser.parse(target.host) != nil ? target.host : nil
         let ruleTarget = RuleTarget(domain: target.host, ipAddress: ipAddress)
-        let engine = RuleEngine(rules: profile.config.rules)
+        let engine = RuleEngine(rules: profile.config.rules, geoIPResolver: geoIPResolver)
         return engine.resolve(target: ruleTarget)
     }
 }
