@@ -39,7 +39,7 @@ struct LiveTunnelRuntimeTests {
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
-        #expect(context.node.kind == .http)
+        #expect(context.node.name == "DIRECT")
         #expect(await directDialer.openRequests.count == 1)
         #expect(await proxyDialer.openRequests.count == 0)
     }
@@ -152,5 +152,33 @@ struct LiveTunnelRuntimeTests {
         #expect(context.node.name == "first-node")
         #expect(await proxyDialer.openRequests.count == 1)
         #expect(await directDialer.openRequests.count == 0)
+    }
+
+    @Test("runtime uses shared pool so close then acquire reuses connection")
+    func runtimeUsesSharedPool() async throws {
+        let node = ProxyNode(name: "socks-node", kind: .socks5, server: "10.0.0.2", port: 1080)
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .proxyNode(name: "socks-node"))]
+        )
+        let profile = TunnelProfile(name: "shared-pool", config: config)
+
+        let session = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let proxyDialer = LiveRuntimeMockDialer([session])
+        let directDialer = LiveRuntimeMockDialer([])
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+
+        try await runtime.start(profile: profile)
+        let ctx1 = try await runtime.openConnection(target: ConnectionTarget(host: "a.com", port: 443))
+        await runtime.closeConnection(id: ctx1.connection.id)
+
+        let ctx2 = try await runtime.openConnection(target: ConnectionTarget(host: "b.com", port: 443))
+
+        #expect(await proxyDialer.openRequests.count == 1)
+        #expect(ctx1.connection.id == ctx2.connection.id)
     }
 }

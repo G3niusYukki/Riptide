@@ -10,6 +10,10 @@ public enum ProxyKind: Equatable, Sendable {
     case http
     case socks5
     case shadowsocks
+    case vmess
+    case vless
+    case trojan
+    case hysteria2
 }
 
 public struct ProxyNode: Equatable, Sendable {
@@ -48,7 +52,16 @@ public enum ProxyRule: Equatable, Sendable {
     case domainSuffix(suffix: String, policy: RoutingPolicy)
     case domainKeyword(keyword: String, policy: RoutingPolicy)
     case ipCIDR(cidr: String, policy: RoutingPolicy)
+    case ipCIDR6(cidr: String, policy: RoutingPolicy)
+    case srcIPCIDR(cidr: String, policy: RoutingPolicy)
+    case srcPort(port: Int, policy: RoutingPolicy)
+    case dstPort(port: Int, policy: RoutingPolicy)
+    case processName(name: String, policy: RoutingPolicy)
     case geoIP(countryCode: String, policy: RoutingPolicy)
+    case ipASN(asn: Int, policy: RoutingPolicy)
+    case geoSite(code: String, category: String, policy: RoutingPolicy)
+    case ruleSet(name: String, policy: RoutingPolicy)
+    case matchAll
     case final(policy: RoutingPolicy)
 }
 
@@ -56,10 +69,12 @@ public struct RiptideConfig: Equatable, Sendable {
     public let mode: ProxyMode
     public let proxies: [ProxyNode]
     public let rules: [ProxyRule]
+    public let proxyGroups: [ProxyGroup]
 
-    public init(mode: ProxyMode, proxies: [ProxyNode], rules: [ProxyRule]) {
+    public init(mode: ProxyMode, proxies: [ProxyNode], rules: [ProxyRule], proxyGroups: [ProxyGroup] = []) {
         self.mode = mode
         self.proxies = proxies
         self.rules = rules
+        self.proxyGroups = proxyGroups
     }
 }

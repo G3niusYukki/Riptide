@@ -20,6 +20,47 @@ struct TransportIntegrationTests {
         #expect(await dialer.openCount == 1)
     }
 
+    @Test("pool enforces max idle connections per node")
+    func poolMaxIdlePerNode() async throws {
+        let node = ProxyNode(name: "test", kind: .socks5, server: "1.2.3.4", port: 1080)
+        let sessions = (0..<7).map { _ in MockTransportSession(receiveQueue: []) }
+        let dialer = MockTransportDialer(sessions)
+        let pool = TransportConnectionPool(dialer: dialer, maxIdlePerNode: 3)
+
+        var connections: [PooledTransportConnection] = []
+        for _ in 0..<7 {
+            let conn = try await pool.acquire(for: node)
+            connections.append(conn)
+        }
+
+        for conn in connections {
+            await pool.release(conn)
+        }
+
+        let _ = try await pool.acquire(for: node)
+        #expect(await dialer.openCount == 7)
+
+        let _ = try await pool.acquire(for: node)
+        #expect(await dialer.openCount == 8)
+    }
+
+    @Test("pool discards stale connections on acquire")
+    func poolEvictsStaleConnections() async throws {
+        let node = ProxyNode(name: "test", kind: .socks5, server: "1.2.3.4", port: 1080)
+        let session = MockTransportSession(receiveQueue: [])
+        let dialer = MockTransportDialer([session])
+        let pool = TransportConnectionPool(dialer: dialer, maxIdlePerNode: 5, maxIdleLifetime: .milliseconds(50))
+
+        let conn = try await pool.acquire(for: node)
+        await pool.release(conn)
+
+        try await Task.sleep(for: .milliseconds(100))
+
+        let reused = try await pool.acquire(for: node)
+        #expect(reused.id != conn.id)
+        #expect(await dialer.openCount == 2)
+    }
+
     @Test("HTTP connector performs request response handshake")
     func httpConnectFlow() async throws {
         let node = ProxyNode(name: "http-node", kind: .http, server: "10.0.0.1", port: 8080)
@@ -67,8 +108,8 @@ struct TransportIntegrationTests {
         #expect(await session.isClosed)
     }
 
-    @Test("Shadowsocks connector sends preamble once")
-    func shadowsocksFlow() async throws {
+    @Test("Shadowsocks connector sends encrypted handshake (salt + AEAD chunk)")
+    func shadowsocksEncryptedHandshake() async throws {
         let node = ProxyNode(
             name: "ss-node",
             kind: .shadowsocks,
@@ -82,8 +123,17 @@ struct TransportIntegrationTests {
         let pool = TransportConnectionPool(dialer: dialer)
         let connector = ProxyConnector(pool: pool)
 
-        _ = try await connector.connect(via: node, to: ConnectionTarget(host: "example.com", port: 443))
+        let context = try await connector.connect(via: node, to: ConnectionTarget(host: "example.com", port: 443))
 
-        #expect(await session.sentFrames.count == 1)
+        let sent = await session.sentFrames
+        #expect(sent.count == 1)
+
+        let frame = sent[0]
+        #expect(frame.count > 32)
+
+        let salt = frame.prefix(32)
+        #expect(salt.count == 32)
+
+        #expect(context.encryptedStream != nil)
     }
 }
