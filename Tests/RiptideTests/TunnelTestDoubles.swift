@@ -1,0 +1,46 @@
+import Foundation
+
+@testable import Riptide
+
+actor MockTunnelRuntime: TunnelRuntime {
+    private let startError: TunnelRuntimeError?
+    private let stopError: TunnelRuntimeError?
+    private let updateError: TunnelRuntimeError?
+    private let statusValue: TunnelRuntimeStatus
+
+    init(
+        startError: TunnelRuntimeError? = nil,
+        stopError: TunnelRuntimeError? = nil,
+        updateError: TunnelRuntimeError? = nil,
+        statusOverride: TunnelRuntimeStatus = TunnelRuntimeStatus()
+    ) {
+        self.startError = startError
+        self.stopError = stopError
+        self.updateError = updateError
+        self.statusValue = statusOverride
+    }
+
+    func start(profile: TunnelProfile) async throws {
+        _ = profile
+        if let startError {
+            throw startError
+        }
+    }
+
+    func stop() async throws {
+        if let stopError {
+            throw stopError
+        }
+    }
+
+    func update(profile: TunnelProfile) async throws {
+        _ = profile
+        if let updateError {
+            throw updateError
+        }
+    }
+
+    func status() async -> TunnelRuntimeStatus {
+        statusValue
+    }
+}
