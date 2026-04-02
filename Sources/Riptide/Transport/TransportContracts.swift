@@ -24,4 +24,8 @@ public struct PooledTransportConnection: Sendable {
 
 public enum TransportError: Error, Equatable, Sendable {
     case noSessionAvailable
+    case unsupportedSessionOperation(String)
+    case dialFailed(String)
+    case sendFailed(String)
+    case receiveFailed(String)
 }

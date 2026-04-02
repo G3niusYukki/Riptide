@@ -44,3 +44,21 @@ actor MockTunnelRuntime: TunnelRuntime {
         statusValue
     }
 }
+
+actor LiveRuntimeMockDialer: TransportDialer {
+    private var sessions: [MockTransportSession]
+    private(set) var openRequests: [ProxyNode]
+
+    init(_ sessions: [MockTransportSession]) {
+        self.sessions = sessions
+        self.openRequests = []
+    }
+
+    func openSession(to node: ProxyNode) async throws -> any TransportSession {
+        openRequests.append(node)
+        if sessions.isEmpty {
+            throw TransportError.noSessionAvailable
+        }
+        return sessions.removeFirst()
+    }
+}
