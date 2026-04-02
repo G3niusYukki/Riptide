@@ -1,0 +1,32 @@
+// swift-tools-version: 6.2
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
+import PackageDescription
+
+let package = Package(
+    name: "Riptide",
+    platforms: [
+        .macOS(.v14),
+    ],
+    products: [
+        .library(
+            name: "Riptide",
+            targets: ["Riptide"]
+        ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.1"),
+    ],
+    targets: [
+        .target(
+            name: "Riptide",
+            dependencies: [
+                .product(name: "Yams", package: "Yams"),
+            ]
+        ),
+        .testTarget(
+            name: "RiptideTests",
+            dependencies: ["Riptide"]
+        ),
+    ]
+)
