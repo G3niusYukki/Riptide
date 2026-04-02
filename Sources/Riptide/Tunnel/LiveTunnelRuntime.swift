@@ -95,7 +95,44 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         }
     }
 
+    public func recordTransfer(connectionID: UUID, bytesUp: UInt64 = 0, bytesDown: UInt64 = 0) {
+        guard activeConnections[connectionID] != nil else {
+            return
+        }
+
+        currentStatus = TunnelRuntimeStatus(
+            bytesUp: currentStatus.bytesUp + bytesUp,
+            bytesDown: currentStatus.bytesDown + bytesDown,
+            activeConnections: activeConnections.count
+        )
+    }
+
+    public func closeConnection(id: UUID) async {
+        guard let context = activeConnections.removeValue(forKey: id) else {
+            return
+        }
+
+        await context.connection.session.close()
+        currentStatus = TunnelRuntimeStatus(
+            bytesUp: currentStatus.bytesUp,
+            bytesDown: currentStatus.bytesDown,
+            activeConnections: activeConnections.count
+        )
+    }
+
     private func resolvePolicy(profile: TunnelProfile, target: ConnectionTarget) -> RoutingPolicy {
+        switch profile.config.mode {
+        case .direct:
+            return .direct
+        case .global:
+            guard let firstProxy = profile.config.proxies.first else {
+                return .reject
+            }
+            return .proxyNode(name: firstProxy.name)
+        case .rule:
+            break
+        }
+
         let ipAddress = IPv4AddressParser.parse(target.host) != nil ? target.host : nil
         let ruleTarget = RuleTarget(domain: target.host, ipAddress: ipAddress)
         let engine = RuleEngine(rules: profile.config.rules, geoIPResolver: geoIPResolver)

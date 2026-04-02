@@ -23,7 +23,8 @@ public enum ClashConfigParser {
         let mode = try parseMode(raw.mode)
         let proxies = try parseProxies(raw.proxies)
         let proxyNameSet = Set(proxies.map(\.name))
-        let rules = try parseRules(raw.rules, knownProxies: proxyNameSet)
+        let rules = try parseRules(raw.rules, knownProxies: proxyNameSet, mode: mode)
+        try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
 
         return RiptideConfig(mode: mode, proxies: proxies, rules: rules)
     }
@@ -45,7 +46,7 @@ public enum ClashConfigParser {
 
     private static func parseProxies(_ rawProxies: [ClashRawProxy]?) throws -> [ProxyNode] {
         guard let rawProxies, !rawProxies.isEmpty else {
-            throw ClashConfigError.missingProxies
+            return []
         }
 
         return try rawProxies.enumerated().map { index, proxy in
@@ -101,9 +102,18 @@ public enum ClashConfigParser {
         }
     }
 
-    private static func parseRules(_ rawRules: [String]?, knownProxies: Set<String>) throws -> [ProxyRule] {
+    private static func parseRules(
+        _ rawRules: [String]?,
+        knownProxies: Set<String>,
+        mode: ProxyMode
+    ) throws -> [ProxyRule] {
         guard let rawRules, !rawRules.isEmpty else {
-            throw ClashConfigError.missingRules
+            switch mode {
+            case .rule:
+                throw ClashConfigError.missingRules
+            case .global, .direct:
+                return []
+            }
         }
 
         return try rawRules.enumerated().map { index, rawRule in
@@ -188,6 +198,25 @@ public enum ClashConfigParser {
                 throw ClashConfigError.unknownProxyReference(normalized)
             }
             return .proxyNode(name: normalized)
+        }
+    }
+
+    private static func validateModeRequirements(
+        mode: ProxyMode,
+        proxies: [ProxyNode],
+        rules: [ProxyRule]
+    ) throws {
+        switch mode {
+        case .rule:
+            guard !rules.isEmpty else {
+                throw ClashConfigError.missingRules
+            }
+        case .global:
+            guard !proxies.isEmpty else {
+                throw ClashConfigError.missingProxies
+            }
+        case .direct:
+            break
         }
     }
 }
