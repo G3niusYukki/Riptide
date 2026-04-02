@@ -58,6 +58,35 @@ struct AppShellWorkflowTests {
         #expect(stopped.state == .stopped)
     }
 
+    @Test("control channel status command mirrors lifecycle status")
+    func controlChannelStatus() async throws {
+        let runtime = MockTunnelRuntime(statusOverride: TunnelRuntimeStatus(bytesUp: 10, bytesDown: 20, activeConnections: 1))
+        let manager = TunnelLifecycleManager(runtime: runtime)
+        let channel = InProcessTunnelControlChannel(lifecycleManager: manager)
+        let profile = TunnelProfile(name: "demo", config: sampleConfig())
+
+        _ = try await channel.send(.start(profile))
+        let response = try await channel.send(.status)
+
+        if case .status(let snapshot) = response {
+            #expect(snapshot.state == .running)
+            #expect(snapshot.activeProfileName == "demo")
+            #expect(snapshot.bytesUp == 10)
+            #expect(snapshot.bytesDown == 20)
+            #expect(snapshot.activeConnections == 1)
+        } else {
+            Issue.record("Expected status response from control channel")
+        }
+    }
+
+    private func sampleConfig() -> RiptideConfig {
+        RiptideConfig(
+            mode: .rule,
+            proxies: [ProxyNode(name: "demo", kind: .socks5, server: "127.0.0.1", port: 1080)],
+            rules: [.final(policy: .proxyNode(name: "demo"))]
+        )
+    }
+
     private func validYAML() -> String {
         """
         mode: rule

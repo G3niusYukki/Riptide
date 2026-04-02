@@ -53,6 +53,32 @@ struct CLICommandTests {
         #expect(text.contains("profile=test"))
     }
 
+    @Test("run command surfaces control channel start failure")
+    func runReportsControlChannelFailure() async throws {
+        let yaml = """
+        mode: rule
+        proxies:
+          - name: "my-socks"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        rules:
+          - MATCH,my-socks
+        """
+        let runtime = MockTunnelRuntime(startError: .startFailed("boom"))
+
+        do {
+            _ = try await CLICommandRunner.runConfig(
+                yamlContent: yaml,
+                profileName: "test",
+                runtime: runtime
+            )
+            Issue.record("Expected runConfig to throw on control-channel start failure")
+        } catch let error as CLICommandRunnerError {
+            #expect(error == .startFailed("startFailed(\"boom\")"))
+        }
+    }
+
     @Test("smoke command helper reports success text")
     func smokeReportsSuccess() async throws {
         let yaml = """
