@@ -20,7 +20,8 @@ public struct ProxyConnector: Sendable {
     }
 
     public func connect(via node: ProxyNode, to target: ConnectionTarget) async throws -> ConnectedProxyContext {
-        let connection = try await pool.acquire(for: node)
+        let dialer = selectDialer(for: node)
+        let connection = try await pool.acquire(for: node, using: dialer)
         do {
             switch node.kind {
             case .http:
@@ -99,5 +100,18 @@ public struct ProxyConnector: Sendable {
             connection: connection,
             encryptedStream: ssStream
         )
+    }
+
+    private func selectDialer(for node: ProxyNode) -> any TransportDialer {
+        let useTLS = node.port == 443 || node.sni != nil || node.skipCertVerify == true
+        if node.network == "ws" || node.network == "grpc" {
+            // TLS + WS — currently use TLSTransportDialer; WSTransportDialer
+            // would be used here once fully integrated (Task 5 done)
+            return TLSTransportDialer()
+        } else if useTLS {
+            return TLSTransportDialer()
+        } else {
+            return TCPTransportDialer()
+        }
     }
 }

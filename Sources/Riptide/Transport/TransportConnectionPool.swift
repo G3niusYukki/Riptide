@@ -48,6 +48,11 @@ public actor TransportConnectionPool {
         return PooledTransportConnection(node: node, session: session)
     }
 
+    public func acquire(for node: ProxyNode, using dialer: any TransportDialer) async throws -> PooledTransportConnection {
+        let session = try await dialer.openSession(to: node)
+        return PooledTransportConnection(node: node, session: session)
+    }
+
     public func release(_ connection: PooledTransportConnection) {
         let key = PoolKey(from: connection.node)
         let pooled = PooledConnection(connection: connection, releasedAt: ContinuousClock.now)
