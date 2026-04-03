@@ -43,3 +43,13 @@ public enum RuntimeEvent: Sendable, Equatable, Codable {
     case connectionClosed(UUID)
     case error(RuntimeErrorSnapshot)
 }
+
+/// A lightweight surface carrying runtime mode and configuration context.
+/// Used by the app shell to expose mode-aware diagnostics.
+public struct RuntimeControlSurface: Sendable, Equatable {
+    public let mode: RuntimeMode
+
+    public init(mode: RuntimeMode) {
+        self.mode = mode
+    }
+}
