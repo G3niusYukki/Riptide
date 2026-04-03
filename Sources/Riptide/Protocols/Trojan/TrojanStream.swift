@@ -11,6 +11,7 @@ public enum TrojanError: Error, Equatable, Sendable {
 public actor TrojanStream: Sendable {
     private let session: any TransportSession
     private let passwordHash: String
+    private var recvBuffer = Data()
 
     public init(session: any TransportSession, password: String) throws {
         self.session = session
@@ -45,35 +46,39 @@ public actor TrojanStream: Sendable {
     }
 
     public func receive() async throws -> Data {
-        // 1. Read hex-length + CRLF
-        var lenBuf = Data()
+        // 1. Read hex-length + CRLF by draining the buffer.
+        // If the buffer doesn't contain a full line yet, fetch more data.
         while true {
-            let b = try await session.receive()
-            if b.count == 1 && b[0] == 0x0D {
-                // \r — next must be \n
-                let n = try await session.receive()
-                if n.count == 1 && n[0] == 0x0A { break }
-                lenBuf.append(b)
-                lenBuf.append(n)
-                continue
+            if let crlfIndex = recvBuffer.range(of: Data([0x0D, 0x0A])) {
+                // Found CRLF — extract the hex length
+                let lenData = recvBuffer[..<crlfIndex.lowerBound]
+                recvBuffer.removeSubrange(...crlfIndex.upperBound)
+                guard let count = Int(String(data: lenData, encoding: .utf8) ?? "", radix: 16) else {
+                    throw TrojanError.malformedResponse
+                }
+
+                // 2. Read `count` bytes from the buffer, fetching more if needed.
+                while recvBuffer.count < count {
+                    let more = try await session.receive()
+                    recvBuffer.append(more)
+                }
+                let body = recvBuffer.prefix(count)
+                recvBuffer.removeFirst(count)
+
+                // 3. Read and discard trailing CRLF
+                while recvBuffer.count < 2 {
+                    let more = try await session.receive()
+                    recvBuffer.append(more)
+                }
+                recvBuffer.removeFirst(2)
+
+                return Data(body)
+            } else {
+                // Buffer doesn't contain CRLF yet — fetch more data.
+                let more = try await session.receive()
+                recvBuffer.append(more)
             }
-            lenBuf.append(b)
         }
-        guard let count = Int(String(data: lenBuf, encoding: .utf8) ?? "", radix: 16) else {
-            throw TrojanError.malformedResponse
-        }
-        // 2. Read `count` bytes of payload
-        var body = Data()
-        var remaining = count
-        while remaining > 0 {
-            let chunk = try await session.receive()
-            body.append(chunk)
-            remaining -= chunk.count
-        }
-        // 3. Read trailing CRLF
-        _ = try await session.receive() // \r
-        _ = try await session.receive() // \n
-        return body
     }
 
     public func close() async {

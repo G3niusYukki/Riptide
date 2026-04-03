@@ -16,6 +16,7 @@ public enum TunnelControlResponse: Equatable, Sendable {
 public enum TunnelControlEvent: Equatable, Sendable {
     case statusChanged(TunnelStatusSnapshot)
     case error(String)
+    case runtimeEvent(RuntimeEvent)
 }
 
 public actor InProcessTunnelControlChannel {
@@ -34,18 +35,21 @@ public actor InProcessTunnelControlChannel {
                 try await lifecycleManager.start(profile: profile)
                 let snapshot = await lifecycleManager.status()
                 broadcast(.statusChanged(snapshot))
+                broadcast(.runtimeEvent(.stateChanged(snapshot.state)))
                 return .ack
 
             case .stop:
                 try await lifecycleManager.stop()
                 let snapshot = await lifecycleManager.status()
                 broadcast(.statusChanged(snapshot))
+                broadcast(.runtimeEvent(.stateChanged(snapshot.state)))
                 return .ack
 
             case .update(let profile):
                 try await lifecycleManager.update(profile: profile)
                 let snapshot = await lifecycleManager.status()
                 broadcast(.statusChanged(snapshot))
+                broadcast(.runtimeEvent(.stateChanged(snapshot.state)))
                 return .ack
 
             case .status:

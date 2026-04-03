@@ -26,7 +26,9 @@ public final class TCPDNSClient: Sendable {
         }
         let connection = NWConnection(host: NWEndpoint.Host(serverHost), port: port, using: .tcp)
 
-        // Await connection readiness
+        defer { connection.cancel() }
+
+        // Await connection readiness, handling all terminal states.
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             connection.stateUpdateHandler = { state in
                 switch state {
@@ -34,6 +36,11 @@ public final class TCPDNSClient: Sendable {
                     cont.resume()
                 case .failed(let error):
                     cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                case .waiting(let error):
+                    cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                case .cancelled:
+                    // Already cancelled — do not resume.
+                    break
                 default:
                     break
                 }

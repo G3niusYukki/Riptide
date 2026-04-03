@@ -1,47 +1,113 @@
 import Foundation
 
+/// Errors from proxy group resolution.
+public enum ProxyGroupResolverError: Error, Equatable, Sendable {
+    case groupNotFound(String)
+    case noHealthyNode(String)
+    case unknownNode(String)
+    case wrongGroupKind(String)
+}
+
+/// Actor that resolves proxy group policies to concrete proxy node names.
+/// Integrates with `GroupSelector` (health-aware selection) and persists
+/// user `Select` choices across runtime restarts.
 public actor ProxyGroupResolver {
-    /// Persisted selections: groupID -> selected node name
-    private var selections: [String: String] = [:]
+    private let healthChecker: HealthChecker
+    private let selector: GroupSelector
+    private var selectChoices: [String: String] // group id → chosen proxy name
+    private var config: RiptideConfig
 
-    public init() {}
+    public init(healthChecker: HealthChecker, config: RiptideConfig = RiptideConfig(mode: .rule, proxies: [], rules: [])) {
+        self.healthChecker = healthChecker
+        self.selector = GroupSelector(healthChecker: healthChecker)
+        self.config = config
+        self.selectChoices = [:]
+    }
 
-    /// Resolve a group reference to a concrete proxy node name.
-    /// Returns nil if the group has no proxies.
-    public func resolve(
-        groupID: String,
-        group: ProxyGroup,
-        allProxies: [ProxyNode]
-    ) -> String? {
+    /// Update the active configuration with proxy groups.
+    public func updateConfig(_ config: RiptideConfig) {
+        self.config = config
+    }
+
+    /// Set the user-selected proxy for a `select` group.
+    public func setSelectedProxy(forGroup groupID: String, proxyName: String) throws {
+        guard let group = config.proxyGroups.first(where: { $0.id == groupID }) else {
+            throw ProxyGroupResolverError.groupNotFound(groupID)
+        }
+        guard group.kind == .select else {
+            throw ProxyGroupResolverError.wrongGroupKind(groupID)
+        }
+        guard group.proxies.contains(proxyName) else {
+            throw ProxyGroupResolverError.unknownNode(proxyName)
+        }
+        selectChoices[groupID] = proxyName
+    }
+
+    /// Resolve a group by ID to a concrete proxy node name, using health-aware
+    /// selection for URL-Test/Fallback/LoadBalance, and persisted choice for Select.
+    public func resolve(groupID: String) async throws -> String {
+        guard let group = config.proxyGroups.first(where: { $0.id == groupID }) else {
+            throw ProxyGroupResolverError.groupNotFound(groupID)
+        }
+
+        let nodeProxies = group.proxies.compactMap { name in
+            config.proxies.first { $0.name == name }
+        }
+
         switch group.kind {
         case .select:
-            if let saved = selections[groupID] {
-                return saved
+            // Use persisted choice, or fall back to first available
+            if let choice = selectChoices[groupID],
+               nodeProxies.contains(where: { $0.name == choice }) {
+                return choice
             }
-            return group.proxies.first
+            // Pick the first alive proxy, or first configured proxy
+            for node in nodeProxies {
+                if let result = await healthChecker.result(for: node.name), result.alive {
+                    return node.name
+                }
+            }
+            if let firstNode = nodeProxies.first {
+                return firstNode.name
+            }
+            if let unknownProxy = group.proxies.first {
+                throw ProxyGroupResolverError.unknownNode(unknownProxy)
+            }
+            throw ProxyGroupResolverError.noHealthyNode(groupID)
+
         case .urlTest:
-            // Phase 1: return first proxy; latency-based selection is Phase 2
-            return group.proxies.first
+            guard let best = await selector.select(group: group, proxies: nodeProxies) else {
+                throw ProxyGroupResolverError.noHealthyNode(groupID)
+            }
+            return best.name
+
         case .fallback:
-            // Phase 1: return first proxy; failover to next on failure is Phase 2
-            return group.proxies.first
+            guard let chosen = await selector.select(group: group, proxies: nodeProxies) else {
+                throw ProxyGroupResolverError.noHealthyNode(groupID)
+            }
+            return chosen.name
+
         case .loadBalance:
-            return group.proxies.randomElement()
+            guard let chosen = await selector.select(group: group, proxies: nodeProxies) else {
+                throw ProxyGroupResolverError.noHealthyNode(groupID)
+            }
+            return chosen.name
         }
     }
 
-    /// Persist a user's manual selection for a select-type group.
-    public func setSelection(groupID: String, nodeName: String) {
-        selections[groupID] = nodeName
-    }
+    /// Resolve a policy that might be a proxy node referencing a group.
+    public func resolvePolicy(_ policy: RoutingPolicy) async throws -> RoutingPolicy {
+        switch policy {
+        case .proxyNode(let name):
+            // Check if this name refers to a group
+            if config.proxyGroups.contains(where: { $0.id == name }) {
+                let resolved = try await resolve(groupID: name)
+                return .proxyNode(name: resolved)
+            }
+            return .proxyNode(name: name)
 
-    /// Get the persisted selection for a group.
-    public func getSelection(groupID: String) -> String? {
-        selections[groupID]
-    }
-
-    /// Clear all persisted selections.
-    public func reset() {
-        selections.removeAll()
+        default:
+            return policy
+        }
     }
 }

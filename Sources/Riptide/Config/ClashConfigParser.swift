@@ -22,11 +22,13 @@ public enum ClashConfigParser {
 
         let mode = try parseMode(raw.mode)
         let proxies = try parseProxies(raw.proxies)
-        let proxyNameSet = Set(proxies.map(\.name))
-        let rules = try parseRules(raw.rules, knownProxies: proxyNameSet, mode: mode)
-        try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
-
         let proxyGroups = try parseProxyGroups(raw.proxyGroups)
+        // Include both leaf proxy names and group IDs so rules can reference either.
+        let proxyNameSet = Set(proxies.map(\.name))
+        let groupIDSet = Set(proxyGroups.map(\.id))
+        let knownProxySet = proxyNameSet.union(groupIDSet)
+        let rules = try parseRules(raw.rules, knownProxies: knownProxySet, mode: mode)
+        try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
         let dnsPolicy = parseDNSPolicy(raw.dns)
         return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups, dnsPolicy: dnsPolicy)
     }
@@ -308,51 +310,46 @@ public enum ClashConfigParser {
     }
 
     private static func parseDNSPolicy(_ raw: ClashRawDNS?) -> DNSPolicy {
-        guard let raw, raw.enable != false else {
-            return DNSPolicy(enable: false)
+        guard let raw else {
+            return .default
         }
-        let enhancedMode: DNSEnhancedMode = (raw.enhancedMode == "fake-ip") ? .fakeIP : .realIP
+
+        let primary: [DNSResolverEndpoint]
+        if let ns = raw.nameserver, !ns.isEmpty {
+            primary = ns.map { addr in
+                if addr.lowercased().hasPrefix("https://") {
+                    return .doh(url: addr)
+                } else if addr.contains(":") {
+                    return DNSResolverEndpoint(kind: .udp, address: addr)
+                } else {
+                    return .udp(host: addr)
+                }
+            }
+        } else {
+            primary = []
+        }
+
+        let fb: [DNSResolverEndpoint]
+        if let fallback = raw.fallback, !fallback.isEmpty {
+            fb = fallback.map { addr in
+                if addr.contains(":") {
+                    return DNSResolverEndpoint(kind: .udp, address: addr)
+                } else {
+                    return .udp(host: addr)
+                }
+            }
+        } else {
+            fb = []
+        }
+
         return DNSPolicy(
-            enable: raw.enable ?? true,
-            listen: raw.listen,
-            enhancedMode: enhancedMode,
-            fakeIPRange: raw.fakeIPRange ?? "198.18.0.0/15",
-            fakeIPFilter: raw.fakeIPFilter ?? [],
-            nameserver: raw.nameserver ?? ["8.8.8.8", "1.1.1.1"],
-            fallback: raw.fallback,
-            nameserverPolicy: raw.nameserverPolicy ?? [:]
+            primaryResolvers: primary,
+            fallbackResolvers: fb,
+            domainPolicies: [],
+            respectRules: raw.respectRules ?? false,
+            fakeIPEnabled: raw.fakeIP ?? true,
+            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16"
         )
-    }
-}
-
-private struct ClashRawDNS: Codable {
-    let enable: Bool?
-    let listen: String?
-    let enhancedMode: String?
-    let fakeIPRange: String?
-    let fakeIPFilter: [String]?
-    let nameserver: [String]?
-    let fallback: [String]?
-    let nameserverPolicy: [String: [String]]?
-
-    private enum CodingKeys: String, CodingKey {
-        case enable, listen, nameserver, fallback, nameserverPolicy
-        case enhancedMode = "enhanced-mode"
-        case fakeIPRange = "fake-ip-range"
-        case fakeIPFilter = "fake-ip-filter"
-    }
-}
-
-private struct ClashRawProxyGroup: Codable {
-    let name: String?
-    let `type`: String?
-    let proxies: [String]?
-    let interval: Int?
-    let tolerance: Int?
-    let strategy: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case name, type, proxies, interval, tolerance, strategy
     }
 }
 
@@ -366,6 +363,39 @@ private struct ClashRawConfig: Decodable {
     private enum CodingKeys: String, CodingKey {
         case mode, proxies, rules, dns
         case proxyGroups = "proxy-groups"
+    }
+}
+
+private struct ClashRawDNS: Decodable {
+    let enable: Bool?
+    let nameserver: [String]?
+    let fallback: [String]?
+    let fakeIP: Bool?
+    let fakeIPRange: String?
+    let respectRules: Bool?
+    let defaultNameserver: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case enable
+        case nameserver
+        case fallback
+        case fakeIP = "fake-ip"
+        case fakeIPRange = "fake-ip-range"
+        case respectRules = "respect-rules"
+        case defaultNameserver = "default-nameserver"
+    }
+}
+
+private struct ClashRawProxyGroup: Codable {
+    let name: String?
+    let `type`: String?
+    let proxies: [String]?
+    let interval: Int?
+    let tolerance: Int?
+    let strategy: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case name, type, proxies, interval, tolerance, strategy
     }
 }
 

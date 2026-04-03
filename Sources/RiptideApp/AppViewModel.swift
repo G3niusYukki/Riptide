@@ -112,6 +112,9 @@ public final class AppViewModel {
     public private(set) var proxyMode: ProxyMode = .rule
     public var connectionMode: ConnectionMode = .systemProxy
 
+    /// Convenience for menu bar bindings.
+    public var isRunning: Bool { tunnelState == .running }
+
     // Config
     public private(set) var profiles: [Profile] = []
     public private(set) var activeProfile: Profile?
@@ -188,6 +191,7 @@ public final class AppViewModel {
                 tunnelState = .running
                 await refreshStatus()
                 rebuildProxyGroupDisplays()
+                startStatsPolling()
                 lastError = nil
             case .error(let message):
                 lastError = "Start failed: \(message)"
@@ -197,6 +201,11 @@ public final class AppViewModel {
         } catch {
             lastError = String(describing: error)
         }
+    }
+
+    /// Demo entry point for menu bar quick-start.
+    public func startDemo() async {
+        await start()
     }
 
     public func stop() async {
@@ -213,10 +222,20 @@ public final class AppViewModel {
 
     public func switchMode(_ mode: ProxyMode) async {
         proxyMode = mode
-        guard let profile = activeProfile else { return }
+        guard var profile = activeProfile else { return }
 
-        // Send the current profile to the runtime for re-evaluation with the new mode.
-        // The runtime will re-resolve rules using profile.config.mode (now updated).
+        // Update the profile's config with the new mode so the runtime receives
+        // the correct mode when we send .update.
+        let updatedConfig = RiptideConfig(
+            mode: mode,
+            proxies: profile.config.proxies,
+            rules: profile.config.rules,
+            proxyGroups: profile.config.proxyGroups,
+            dnsPolicy: profile.config.dnsPolicy
+        )
+        profile = Profile(name: profile.name, config: updatedConfig)
+        activeProfile = profile
+
         do {
             let response = try await controlChannel.send(.update(profile.tunnelProfile))
             guard case .ack = response else { return }

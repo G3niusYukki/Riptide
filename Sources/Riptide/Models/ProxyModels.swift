@@ -110,7 +110,7 @@ public struct RiptideConfig: Equatable, Sendable {
         proxies: [ProxyNode],
         rules: [ProxyRule],
         proxyGroups: [ProxyGroup] = [],
-        dnsPolicy: DNSPolicy = DNSPolicy()
+        dnsPolicy: DNSPolicy = .default
     ) {
         self.mode = mode
         self.proxies = proxies

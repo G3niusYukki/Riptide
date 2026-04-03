@@ -1,7 +1,7 @@
 import NetworkExtension
 import Riptide
 
-public class RiptidePacketTunnelProvider: PacketTunnelProvider {
+public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
 
     private var runtime: LiveTunnelRuntime?
     private var dnsPipeline: DNSPipeline?
@@ -25,28 +25,27 @@ public class RiptidePacketTunnelProvider: PacketTunnelProvider {
                 let profile = TunnelProfile(name: "tunnel", config: config)
 
                 // 3. Create DNS pipeline
-                let dnsPipeline = DNSPipeline(dnsPolicy: profile.config.dnsPolicy)
+                let pipeline = DNSPipeline(dnsPolicy: profile.config.dnsPolicy)
 
                 // 4. Create runtime
-                let runtime = LiveTunnelRuntime(
+                let rt = LiveTunnelRuntime(
                     proxyDialer: TCPTransportDialer(),
                     directDialer: TCPTransportDialer(),
                     geoIPResolver: .none,
-                    dnsPipeline: dnsPipeline
+                    dnsPipeline: pipeline
                 )
-                try await runtime.start(profile: profile)
-                self.runtime = runtime
-                self.dnsPipeline = dnsPipeline
+                try await rt.start(profile: profile)
+                self.runtime = rt
+                self.dnsPipeline = pipeline
 
                 // 5. Configure tunnel network settings
                 let settings = NEPacketTunnelNetworkSettings(
                     tunnelRemoteAddress: config.proxies.first?.server ?? "127.0.0.1"
                 )
 
-                if profile.config.dnsPolicy.fakeIPRange != nil {
-                    // Fake-IP mode: set the tunnel to claim the 198.18.0.0/15 range
+                if config.dnsPolicy.fakeIPEnabled {
+                    // Fake-IP mode: set the tunnel to claim the fake IP range
                     // so that any destination in that range is intercepted for DNS.
-                    // The gateway address (198.18.0.1) is used as the tunnel's IPv4 address.
                     settings.ipv4Settings = NEIPv4Settings(
                         addresses: ["198.18.0.1"],
                         subnetMasks: ["255.255.0.0"]
@@ -111,12 +110,12 @@ public class RiptidePacketTunnelProvider: PacketTunnelProvider {
         for (packet, _) in zip(packets, protocols) {
             guard let result = PacketHandler.parseIPPacket(packet) else { continue }
             Task {
-                await routePacket(result.ip)
+                await routePacket(result.ip, packetData: packet)
             }
         }
     }
 
-    private func routePacket(_ ip: IPHeader) async {
+    private func routePacket(_ ip: IPHeader, packetData: Data) async {
         // Routing logic:
         //   - TCP (protocol 6): hand off to UserSpaceTCP for userspace stack processing
         //   - UDP port 53 (DNS): intercept and resolve via fake-IP or forward to upstream
@@ -130,8 +129,9 @@ public class RiptidePacketTunnelProvider: PacketTunnelProvider {
             break
         case 17: // UDP
             if let udp = UDPHeader(ip.payload), udp.destinationPort == 53 {
-                // DNS query — resolve via DNSPipeline (fake-IP or real-IP)
-                if let query = PacketHandler.extractDNSQuery(ip.payload) {
+                // DNS query — extract from the original packet (which includes
+                // IP+UDP headers that extractDNSQuery expects to strip).
+                if let query = PacketHandler.extractDNSQuery(packetData) {
                     _ = dnsPipeline?.resolve(query: query)
                 }
             }

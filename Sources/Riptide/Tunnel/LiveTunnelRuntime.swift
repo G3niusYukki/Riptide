@@ -153,10 +153,15 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         }
 
         // Resolve the host to an IP before rule matching.
-        // In fakeIP mode the host is already a fake IP; otherwise resolve via DNS.
+        // In fakeIP mode: if already a fake IP, use it directly; otherwise allocate one.
+        // In realIP mode: resolve domain via DNS, pass-through if already an IP.
         let resolvedIP: String?
-        if profile.config.dnsPolicy.enhancedMode == .fakeIP {
-            resolvedIP = (try? await dnsPipeline.resolveFakeIP(target.host)) ?? target.host
+        if profile.config.dnsPolicy.fakeIPEnabled {
+            if await dnsPipeline.isFakeIP(target.host) {
+                resolvedIP = target.host
+            } else {
+                resolvedIP = (try? await dnsPipeline.resolveFakeIP(target.host)) ?? target.host
+            }
         } else if IPv4AddressParser.parse(target.host) == nil {
             // Domain — resolve it
             resolvedIP = (try? await dnsPipeline.resolve(target.host)).flatMap { $0.first }

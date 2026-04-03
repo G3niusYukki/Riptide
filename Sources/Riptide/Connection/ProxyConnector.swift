@@ -134,9 +134,10 @@ public struct ProxyConnector: Sendable {
 
     private func selectDialer(for node: ProxyNode) -> any TransportDialer {
         let useTLS = node.port == 443 || node.sni != nil || node.skipCertVerify == true
-        if node.network == "ws" || node.network == "grpc" {
-            // TLS + WS — currently use TLSTransportDialer; WSTransportDialer
-            // would be used here once fully integrated (Task 5 done)
+        if node.network == "ws" {
+            return WSTransportDialer()
+        } else if node.network == "grpc" {
+            // gRPC transport not yet wired; fall back to TLS for now.
             return TLSTransportDialer()
         } else if useTLS {
             return TLSTransportDialer()

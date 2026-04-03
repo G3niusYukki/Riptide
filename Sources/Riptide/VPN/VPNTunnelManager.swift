@@ -47,11 +47,32 @@ import NetworkExtension
 public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
     private var manager: NETunnelProviderManager?
     private var delegate: VPNTunnelDelegate?
-    private let bridge: TunnelProviderBridge
+    private var packetBuffer: [Data] = []
+    private var running = false
 
     public override init() {
-        self.bridge = TunnelProviderBridge()
         super.init()
+    }
+
+    /// Whether the VPN tunnel is currently running.
+    public var isRunning: Bool { running }
+
+    /// Start the VPN tunnel with the given configuration.
+    public func start(configuration: VPNConfiguration) {
+        running = true
+        delegate?.tunnelDidStart(configuration: configuration)
+    }
+
+    /// Stop the VPN tunnel.
+    public func stop() {
+        running = false
+        delegate?.tunnelDidStop(reason: "stopped by user")
+    }
+
+    /// Handle packets received from the tunnel interface.
+    public func handlePackets(_ packets: [Data]) {
+        packetBuffer.append(contentsOf: packets)
+        delegate?.tunnelDidReceivePackets(packets)
     }
 
     public func setDelegate(_ delegate: VPNTunnelDelegate) {
@@ -94,8 +115,13 @@ public enum VPNManagerError: Error {
 #else
 // Stub for Swift PM builds (NetworkExtension not available)
 public final class VPNTunnelManager: VPNTunnelManagerProtocol {
+    public var isRunning: Bool { false }
+
     public init() {}
     public func setDelegate(_: VPNTunnelDelegate) {}
+    public func start(configuration: VPNConfiguration) {}
+    public func stop() {}
+    public func handlePackets(_: [Data]) {}
     public func installConfiguration() async throws {}
     public func connect() async throws {}
     public func disconnect() {}

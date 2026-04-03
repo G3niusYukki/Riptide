@@ -48,6 +48,33 @@ public actor DNSPipeline {
         self.doHClient = DoHClient()
     }
 
+    /// Convenience initializer that builds a `DNSConfig` from a `DNSPolicy`.
+    public init(dnsPolicy: DNSPolicy, ruleEngine: RuleEngine? = nil) {
+        let nameservers = dnsPolicy.primaryResolvers.map { resolver -> String in
+            switch resolver.kind {
+            case .udp: return resolver.address
+            case .doh: return resolver.dohURL ?? resolver.address
+            case .tcp: return resolver.address
+            }
+        }
+        let fallbackServers = dnsPolicy.fallbackResolvers.map { $0.address }
+        let mode: DNSQueryMode = dnsPolicy.fakeIPEnabled ? .fakeIP : .realIP
+        let cfg = DNSConfig(
+            remoteServers: nameservers.isEmpty ? ["8.8.8.8", "1.1.1.1"] : nameservers,
+            directServers: fallbackServers,
+            doHEndpoints: dnsPolicy.primaryResolvers.compactMap { $0.kind == .doh ? $0.dohURL : nil },
+            mode: mode,
+            fakeIPCIDR: dnsPolicy.fakeIPCIDR,
+            cacheEnabled: true
+        )
+        self.config = cfg
+        self.cache = DNSCache()
+        self.fakeIPPool = FakeIPPool(cidr: cfg.fakeIPCIDR)
+        self.ruleEngine = ruleEngine
+        self.udpClient = UDPDNSClient()
+        self.doHClient = DoHClient()
+    }
+
     public func resolve(_ domain: String, type: DNSRecordType = .a) async throws -> [String] {
         if config.cacheEnabled {
             if let cached = await cache.get(name: domain, type: type) {
