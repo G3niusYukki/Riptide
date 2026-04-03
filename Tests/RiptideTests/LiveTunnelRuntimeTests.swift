@@ -39,7 +39,7 @@ struct LiveTunnelRuntimeTests {
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
-        #expect(context.node.kind == .http)
+        #expect(context.node.name == "DIRECT")
         #expect(await directDialer.openRequests.count == 1)
         #expect(await proxyDialer.openRequests.count == 0)
     }
@@ -153,4 +153,41 @@ struct LiveTunnelRuntimeTests {
         #expect(await proxyDialer.openRequests.count == 1)
         #expect(await directDialer.openRequests.count == 0)
     }
+
+    @Test("runtime creates new connection for different targets after close (SOCKS5 tunnels are not reusable)")
+    func runtimeCreatesNewConnectionForDifferentTarget() async throws {
+        // SOCKS5: once a CONNECT succeeds, the TCP stream is a tunnel to that specific target.
+        // After closeConnection, requesting a different target must open a new session —
+        // reusing the old one would send traffic to the wrong destination.
+        let node = ProxyNode(name: "socks-node", kind: .socks5, server: "10.0.0.2", port: 1080)
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .proxyNode(name: "socks-node"))]
+        )
+        let profile = TunnelProfile(name: "shared-pool", config: config)
+
+        let session1 = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let session2 = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let proxyDialer = LiveRuntimeMockDialer([session1, session2])
+        let directDialer = LiveRuntimeMockDialer([])
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+
+        try await runtime.start(profile: profile)
+        let ctx1 = try await runtime.openConnection(target: ConnectionTarget(host: "a.com", port: 443))
+        await runtime.closeConnection(id: ctx1.connection.id)
+
+        let ctx2 = try await runtime.openConnection(target: ConnectionTarget(host: "b.com", port: 443))
+
+        // A new dial should have been made since SOCKS5 tunnels are not reusable across targets
+        #expect(await proxyDialer.openRequests.count == 2)
+        #expect(ctx1.connection.id != ctx2.connection.id)
+    }
+
 }

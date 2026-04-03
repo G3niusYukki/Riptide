@@ -169,7 +169,11 @@ public actor LocalHTTPConnectProxyServer {
             do {
                 try await inboundSession.send(successResponse())
                 if !request.remainingData.isEmpty {
-                    try await context.connection.session.send(request.remainingData)
+                    if let encryptedStream = context.encryptedStream {
+                        try await encryptedStream.send(request.remainingData)
+                    } else {
+                        try await context.connection.session.send(request.remainingData)
+                    }
                     await runtime.recordTransfer(
                         connectionID: context.connection.id,
                         bytesUp: UInt64(request.remainingData.count)
@@ -180,7 +184,8 @@ public actor LocalHTTPConnectProxyServer {
                     clientSession: inboundSession,
                     remoteSession: context.connection.session,
                     connectionID: context.connection.id,
-                    runtime: runtime
+                    runtime: runtime,
+                    encryptedStream: context.encryptedStream
                 )
             } catch {
                 await runtime.closeConnection(id: context.connection.id)
@@ -259,14 +264,30 @@ enum ConnectionRelay {
         clientSession: any TransportSession,
         remoteSession: any TransportSession,
         connectionID: UUID,
-        runtime: LiveTunnelRuntime
+        runtime: LiveTunnelRuntime,
+        encryptedStream: ShadowsocksStream? = nil
     ) async throws {
+        let remoteSend: @Sendable (Data) async throws -> Void = { data in
+            if let encryptedStream {
+                try await encryptedStream.send(data)
+            } else {
+                try await remoteSession.send(data)
+            }
+        }
+        let remoteReceive: @Sendable () async throws -> Data = {
+            if let encryptedStream {
+                return try await encryptedStream.receive()
+            } else {
+                return try await remoteSession.receive()
+            }
+        }
+
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     try await pump(
                         source: clientSession,
-                        sink: remoteSession,
+                        sink: remoteSend,
                         connectionID: connectionID,
                         runtime: runtime,
                         direction: .clientToRemote
@@ -274,7 +295,7 @@ enum ConnectionRelay {
                 }
                 group.addTask {
                     try await pump(
-                        source: remoteSession,
+                        source: remoteReceive,
                         sink: clientSession,
                         connectionID: connectionID,
                         runtime: runtime,
@@ -305,17 +326,35 @@ enum ConnectionRelay {
 
     private static func pump(
         source: any TransportSession,
-        sink: any TransportSession,
+        sink: @Sendable (Data) async throws -> Void,
         connectionID: UUID,
         runtime: LiveTunnelRuntime,
         direction: RelayDirection
     ) async throws {
         while Task.isCancelled == false {
             let data = try await source.receive()
-            if data.isEmpty {
-                return
-            }
+            if data.isEmpty { return }
+            try await sink(data)
 
+            switch direction {
+            case .clientToRemote:
+                await runtime.recordTransfer(connectionID: connectionID, bytesUp: UInt64(data.count))
+            case .remoteToClient:
+                await runtime.recordTransfer(connectionID: connectionID, bytesDown: UInt64(data.count))
+            }
+        }
+    }
+
+    private static func pump(
+        source: @Sendable () async throws -> Data,
+        sink: any TransportSession,
+        connectionID: UUID,
+        runtime: LiveTunnelRuntime,
+        direction: RelayDirection
+    ) async throws {
+        while Task.isCancelled == false {
+            let data = try await source()
+            if data.isEmpty { return }
             try await sink.send(data)
 
             switch direction {

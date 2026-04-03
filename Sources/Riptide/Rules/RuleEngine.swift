@@ -3,10 +3,20 @@ import Foundation
 public struct RuleTarget: Equatable, Sendable {
     public let domain: String?
     public let ipAddress: String?
+    public let sourceIP: String?
+    public let sourcePort: Int?
+    public let destinationPort: Int?
+    public let processName: String?
 
-    public init(domain: String?, ipAddress: String?) {
+    public init(domain: String? = nil, ipAddress: String? = nil,
+                sourceIP: String? = nil, sourcePort: Int? = nil,
+                destinationPort: Int? = nil, processName: String? = nil) {
         self.domain = domain
         self.ipAddress = ipAddress
+        self.sourceIP = sourceIP
+        self.sourcePort = sourcePort
+        self.destinationPort = destinationPort
+        self.processName = processName
     }
 }
 
@@ -67,6 +77,32 @@ public struct RuleEngine: Sendable {
             }
             return network.contains(ipValue) ? policy : nil
 
+        case .ipCIDR6(let cidr, let policy):
+            guard let ipAddress = target.ipAddress else { return nil }
+            return IPv6CIDR(cidr)?.contains(ipAddress) == true ? policy : nil
+
+        case .srcIPCIDR(let cidr, let policy):
+            guard
+                let sourceIP = target.sourceIP,
+                let network = IPv4CIDR(cidr),
+                let ipValue = IPv4AddressParser.parse(sourceIP)
+            else {
+                return nil
+            }
+            return network.contains(ipValue) ? policy : nil
+
+        case .srcPort(let port, let policy):
+            guard let srcPort = target.sourcePort else { return nil }
+            return srcPort == port ? policy : nil
+
+        case .dstPort(let port, let policy):
+            guard let dstPort = target.destinationPort else { return nil }
+            return dstPort == port ? policy : nil
+
+        case .processName(let name, let policy):
+            guard let proc = target.processName else { return nil }
+            return proc == name ? policy : nil
+
         case .geoIP(let countryCode, let policy):
             guard
                 let ipAddress = target.ipAddress,
@@ -75,6 +111,18 @@ public struct RuleEngine: Sendable {
                 return nil
             }
             return resolvedCountryCode == countryCode.uppercased() ? policy : nil
+
+        case .ipASN(_, let policy):
+            return policy
+
+        case .geoSite(_, _, let policy):
+            return policy
+
+        case .ruleSet(_, let policy):
+            return policy
+
+        case .matchAll:
+            return .direct
 
         case .final(let policy):
             return policy
@@ -112,6 +160,51 @@ struct IPv4CIDR: Sendable {
 
     func contains(_ ip: UInt32) -> Bool {
         (ip & mask) == networkAddress
+    }
+}
+
+struct IPv6CIDR: Sendable {
+    let prefix: Int
+    let addressData: [UInt8]
+
+    init?(_ cidr: String) {
+        let parts = cidr.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return nil }
+        guard let prefix = Int(parts[1]), (0...128).contains(prefix) else { return nil }
+
+        var addr = in6_addr()
+        let result = String(parts[0]).withCString { ptr in
+            inet_pton(AF_INET6, ptr, &addr)
+        }
+        guard result == 1 else { return nil }
+
+        self.prefix = prefix
+        self.addressData = withUnsafeBytes(of: &addr) { Array($0) }
+    }
+
+    func contains(_ ip: String) -> Bool {
+        var addr = in6_addr()
+        let result = ip.withCString { ptr in
+            inet_pton(AF_INET6, ptr, &addr)
+        }
+        guard result == 1 else { return false }
+
+        let ipBytes = withUnsafeBytes(of: &addr) { Array($0) }
+        guard ipBytes.count == addressData.count else { return false }
+
+        let fullBytes = prefix / 8
+        let remainingBits = prefix % 8
+
+        for i in 0..<fullBytes {
+            guard ipBytes[i] == addressData[i] else { return false }
+        }
+
+        if remainingBits > 0 && fullBytes < 16 {
+            let mask = UInt8(0xFF << (8 - remainingBits))
+            guard (ipBytes[fullBytes] & mask) == (addressData[fullBytes] & mask) else { return false }
+        }
+
+        return true
     }
 }
 

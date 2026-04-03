@@ -3,10 +3,12 @@ import Foundation
 public struct ConnectedProxyContext: Sendable {
     public let node: ProxyNode
     public let connection: PooledTransportConnection
+    public let encryptedStream: ShadowsocksStream?
 
-    public init(node: ProxyNode, connection: PooledTransportConnection) {
+    public init(node: ProxyNode, connection: PooledTransportConnection, encryptedStream: ShadowsocksStream? = nil) {
         self.node = node
         self.connection = connection
+        self.encryptedStream = encryptedStream
     }
 }
 
@@ -26,7 +28,9 @@ public struct ProxyConnector: Sendable {
             case .socks5:
                 try await performSOCKS5Connect(session: connection.session, target: target)
             case .shadowsocks:
-                try await performShadowsocksConnect(session: connection.session, target: target)
+                return try await performShadowsocksConnect(connection: connection, node: node, target: target)
+            case .vmess, .vless, .trojan, .hysteria2:
+                throw ProtocolError.malformedResponse("\(node.kind) protocol connector not yet implemented")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {
@@ -68,13 +72,32 @@ public struct ProxyConnector: Sendable {
     }
 
     private func performShadowsocksConnect(
-        session: any TransportSession,
+        connection: PooledTransportConnection,
+        node: ProxyNode,
         target: ConnectionTarget
-    ) async throws {
-        let proto = ShadowsocksProtocol()
-        let frames = try proto.makeConnectRequest(for: target)
-        for frame in frames {
-            try await session.send(frame)
+    ) async throws -> ConnectedProxyContext {
+        guard let cipher = node.cipher, let password = node.password else {
+            throw ProtocolError.malformedResponse("shadowsocks node missing cipher or password")
         }
+
+        let ssStream = try ShadowsocksStream(
+            session: connection.session,
+            cipher: cipher,
+            password: password
+        )
+
+        let proto = ShadowsocksProtocol()
+        let preamble = try proto.makeConnectRequest(for: target)
+        guard let preambleData = preamble.first else {
+            throw ProtocolError.malformedResponse("shadowsocks preamble empty")
+        }
+
+        try await ssStream.sendHandshake(preambleData)
+
+        return ConnectedProxyContext(
+            node: node,
+            connection: connection,
+            encryptedStream: ssStream
+        )
     }
 }

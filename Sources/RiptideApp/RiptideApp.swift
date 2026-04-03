@@ -1,41 +1,51 @@
 import SwiftUI
+import Riptide
 
 @main
 struct RiptideApp: App {
-    @State private var viewModel = AppViewModel()
+    @State private var vpnVM = VPNViewModel()
+    @State private var proxyVM = ProxyViewModel()
+    @State private var selectedTab = 0
 
     var body: some Scene {
-        WindowGroup("Riptide") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Riptide")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+        WindowGroup {
+            TabView(selection: $selectedTab) {
+                MainView()
+                    .tabItem { Label("Dashboard", systemImage: "gauge.medium") }
+                    .tag(0)
 
-                Text(viewModel.statusText)
-                    .font(.system(.body, design: .monospaced))
+                ProxyListView(proxies: proxyVM.proxyNodes, selected: $proxyVM.selectedProxy)
+                    .tabItem { Label("Proxies", systemImage: "list.bullet") }
+                    .tag(1)
 
-                HStack(spacing: 8) {
-                    Button("Load Demo Config & Start") {
-                        Task { await viewModel.startDemo() }
+                ConnectionView(count: vpnVM.activeConnections, bytesUp: vpnVM.bytesUp, bytesDown: vpnVM.bytesDown)
+                    .tabItem { Label("Connections", systemImage: "network") }
+                    .tag(2)
+
+                TrafficView(bytesUp: vpnVM.bytesUp, bytesDown: vpnVM.bytesDown)
+                    .tabItem { Label("Traffic", systemImage: "chart.bar") }
+                    .tag(3)
+
+                SettingsView(controllerPort: .constant("9090"))
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tag(4)
+            }
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        Task {
+                            if vpnVM.isRunning {
+                                await vpnVM.stop()
+                            } else {
+                                await vpnVM.start()
+                            }
+                        }
+                    } label: {
+                        Label(vpnVM.isRunning ? "Stop" : "Start", systemImage: vpnVM.isRunning ? "stop.circle" : "play.circle")
                     }
-                    .disabled(viewModel.isRunning)
-
-                    Button("Stop") {
-                        Task { await viewModel.stop() }
-                    }
-                    .disabled(!viewModel.isRunning)
-                }
-
-                if let error = viewModel.lastError {
-                    Text("error: \(error)")
-                        .foregroundStyle(.red)
                 }
             }
-            .padding(16)
-            .frame(minWidth: 480, minHeight: 180)
-            .task {
-                await viewModel.refreshStatus()
-            }
+            .frame(minWidth: 700, minHeight: 450)
         }
     }
 }

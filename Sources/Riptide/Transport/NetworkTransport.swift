@@ -1,6 +1,34 @@
 import Foundation
 import Network
 
+final class NWConnectionReadyGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _continuation: CheckedContinuation<Void, Error>?
+    private var resolved = false
+
+    func wait() async throws {
+        try await withCheckedThrowingContinuation { cont in
+            lock.lock()
+            guard !resolved else {
+                lock.unlock()
+                cont.resume(returning: ())
+                return
+            }
+            _continuation = cont
+            lock.unlock()
+        }
+    }
+
+    func fulfill(_ result: Result<Void, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resolved else { return }
+        resolved = true
+        _continuation?.resume(with: result)
+        _continuation = nil
+    }
+}
+
 public final class NWTransportSession: TransportSession, @unchecked Sendable {
     private let connection: NWConnection
 
@@ -47,22 +75,54 @@ public struct TCPTransportDialer: TransportDialer {
         }
 
         let connection = NWConnection(host: host, port: port, using: .tcp)
+        let gate = NWConnectionReadyGate()
+
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                gate.fulfill(.success(()))
+            case .failed(let error):
+                gate.fulfill(.failure(TransportError.dialFailed(String(describing: error))))
+            case .cancelled:
+                gate.fulfill(.failure(TransportError.dialFailed("connection cancelled")))
+            default:
+                break
+            }
+        }
+
         connection.start(queue: .global())
+        try await gate.wait()
         return NWTransportSession(connection: connection)
     }
 }
 
-public struct DirectTransportDialer: Sendable {
+public struct DirectTransportDialer: TransportDialer {
     public init() {}
 
-    public func openSession(to target: ConnectionTarget) async throws -> any TransportSession {
-        let host = NWEndpoint.Host(target.host)
-        guard let port = NWEndpoint.Port(rawValue: UInt16(target.port)) else {
-            throw TransportError.dialFailed("invalid target port \(target.port)")
+    public func openSession(to node: ProxyNode) async throws -> any TransportSession {
+        let host = NWEndpoint.Host(node.server)
+        guard let port = NWEndpoint.Port(rawValue: UInt16(node.port)) else {
+            throw TransportError.dialFailed("invalid target port \(node.port)")
         }
 
         let connection = NWConnection(host: host, port: port, using: .tcp)
+        let gate = NWConnectionReadyGate()
+
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                gate.fulfill(.success(()))
+            case .failed(let error):
+                gate.fulfill(.failure(TransportError.dialFailed(String(describing: error))))
+            case .cancelled:
+                gate.fulfill(.failure(TransportError.dialFailed("connection cancelled")))
+            default:
+                break
+            }
+        }
+
         connection.start(queue: .global())
+        try await gate.wait()
         return NWTransportSession(connection: connection)
     }
 }

@@ -10,6 +10,9 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private let proxyDialer: any TransportDialer
     private let directDialer: any TransportDialer
     private let geoIPResolver: GeoIPResolver
+    private var proxyPool: TransportConnectionPool
+    private var directPool: TransportConnectionPool
+    private var connector: ProxyConnector
     private var currentProfile: TunnelProfile?
     private var currentStatus: TunnelRuntimeStatus
     private var activeConnections: [UUID: ConnectedProxyContext]
@@ -22,6 +25,9 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         self.proxyDialer = proxyDialer
         self.directDialer = directDialer
         self.geoIPResolver = geoIPResolver
+        self.proxyPool = TransportConnectionPool(dialer: proxyDialer)
+        self.directPool = TransportConnectionPool(dialer: directDialer)
+        self.connector = ProxyConnector(pool: proxyPool)
         self.currentProfile = nil
         self.currentStatus = TunnelRuntimeStatus()
         self.activeConnections = [:]
@@ -31,6 +37,9 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         currentProfile = profile
         currentStatus = TunnelRuntimeStatus()
         activeConnections.removeAll()
+        proxyPool = TransportConnectionPool(dialer: proxyDialer)
+        directPool = TransportConnectionPool(dialer: directDialer)
+        connector = ProxyConnector(pool: proxyPool)
     }
 
     public func stop() async throws {
@@ -63,12 +72,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         case .direct:
             let directNode = ProxyNode(
                 name: "DIRECT",
-                kind: .http,
+                kind: .shadowsocks,
                 server: target.host,
                 port: target.port
             )
-            let pool = TransportConnectionPool(dialer: directDialer)
-            let connection = try await pool.acquire(for: directNode)
+            let connection = try await directPool.acquire(for: directNode)
             let context = ConnectedProxyContext(node: directNode, connection: connection)
             activeConnections[context.connection.id] = context
             currentStatus = TunnelRuntimeStatus(
@@ -82,8 +90,6 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             guard let node = profile.config.proxies.first(where: { $0.name == name }) else {
                 throw LiveTunnelRuntimeError.missingProxyNode(name)
             }
-            let pool = TransportConnectionPool(dialer: proxyDialer)
-            let connector = ProxyConnector(pool: pool)
             let context = try await connector.connect(via: node, to: target)
             activeConnections[context.connection.id] = context
             currentStatus = TunnelRuntimeStatus(
@@ -112,7 +118,15 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             return
         }
 
-        await context.connection.session.close()
+        if context.node.name == "DIRECT" {
+            await directPool.release(context.connection)
+        } else {
+            // Proxy connections (SOCKS5, HTTP CONNECT, etc.) become tunnels to a specific
+            // target after the protocol handshake. They cannot be reused for different
+            // targets, so discard rather than release back to the pool.
+            await proxyPool.discard(context.connection)
+        }
+
         currentStatus = TunnelRuntimeStatus(
             bytesUp: currentStatus.bytesUp,
             bytesDown: currentStatus.bytesDown,
