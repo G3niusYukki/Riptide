@@ -41,36 +41,65 @@ public protocol VPNTunnelDelegate: AnyObject, Sendable {
     func tunnelDidEncounterError(_ error: Error)
 }
 
-public final class VPNTunnelManager: @unchecked Sendable {
-    private var delegate: VPNTunnelDelegate?
-    private var running: Bool = false
-    private var packetBuffer: [Data] = []
+#if canImport(NetworkExtension)
+import NetworkExtension
 
-    public init() {}
+public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
+    private var manager: NETunnelProviderManager?
+    private var delegate: VPNTunnelDelegate?
+    private let bridge: TunnelProviderBridge
+
+    public override init() {
+        self.bridge = TunnelProviderBridge()
+        super.init()
+    }
 
     public func setDelegate(_ delegate: VPNTunnelDelegate) {
         self.delegate = delegate
     }
 
-    public func start(configuration: VPNConfiguration) {
-        running = true
-        delegate?.tunnelDidStart(configuration: configuration)
+    public func installConfiguration() async throws {
+        let managers = try await NETunnelProviderManager.loadAllFromPreferences()
+        if let existing = managers.first {
+            manager = existing
+            return
+        }
+        let newManager = NETunnelProviderManager()
+        let proto = NETunnelProviderProtocol()
+        proto.providerBundleIdentifier = "com.riptide.tunnel"
+        proto.serverAddress = "Riptide"
+        newManager.protocolConfiguration = proto
+        newManager.localizedDescription = "Riptide"
+        newManager.isEnabled = true
+        try await newManager.saveToPreferences()
+        try await newManager.loadFromPreferences()
+        manager = newManager
     }
 
-    public func stop(reason: String = "user initiated") {
-        running = false
-        delegate?.tunnelDidStop(reason: reason)
+    public func connect() async throws {
+        guard let manager = manager else {
+            throw VPNManagerError.notConfigured
+        }
+        try manager.connection.startVPNTunnel()
     }
 
-    public func handlePackets(_ packets: [Data]) {
-        guard running else { return }
-        packetBuffer.append(contentsOf: packets)
-        delegate?.tunnelDidReceivePackets(packets)
+    public func disconnect() {
+        manager?.connection.stopVPNTunnel()
     }
-
-    public func writePackets(_ packets: [Data]) {
-        packetBuffer.removeAll()
-    }
-
-    public var isRunning: Bool { running }
 }
+
+public enum VPNManagerError: Error {
+    case notConfigured
+}
+#else
+// Stub for Swift PM builds (NetworkExtension not available)
+public final class VPNTunnelManager: VPNTunnelManagerProtocol {
+    public init() {}
+    public func setDelegate(_: VPNTunnelDelegate) {}
+    public func installConfiguration() async throws {}
+    public func connect() async throws {}
+    public func disconnect() {}
+}
+#endif
+
+public protocol VPNTunnelManagerProtocol: AnyObject {}
