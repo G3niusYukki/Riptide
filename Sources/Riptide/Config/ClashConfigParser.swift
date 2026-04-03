@@ -393,8 +393,23 @@ public enum ClashConfigParser {
         let primary: [DNSResolverEndpoint]
         if let ns = raw.nameserver, !ns.isEmpty {
             primary = ns.map { addr in
-                if addr.lowercased().hasPrefix("https://") {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("https://") {
                     return .doh(url: addr)
+                } else if normalized.hasPrefix("tls://") {
+                    let stripped = String(addr.dropFirst(6))
+                    if stripped.contains(":") {
+                        return DNSResolverEndpoint(kind: .dot, address: stripped)
+                    } else {
+                        return .dot(host: stripped)
+                    }
+                } else if normalized.hasPrefix("quic://") {
+                    let stripped = String(addr.dropFirst(7))
+                    if stripped.contains(":") {
+                        return DNSResolverEndpoint(kind: .doq, address: stripped)
+                    } else {
+                        return .doq(host: stripped)
+                    }
                 } else if addr.contains(":") {
                     return DNSResolverEndpoint(kind: .udp, address: addr)
                 } else {
@@ -418,8 +433,58 @@ public enum ClashConfigParser {
             fb = []
         }
 
+        // Parse tls-nameserver (DoT entries) — add to primary resolvers.
+        // Entries may be in "tls://host:port" format.
+        var dotResolvers: [DNSResolverEndpoint] = []
+        if let tlsNS = raw.tlsNameserver, !tlsNS.isEmpty {
+            for addr in tlsNS {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("https://") {
+                    // Some configs may put DoH URLs in tls-nameserver
+                    dotResolvers.append(.doh(url: addr))
+                } else {
+                    // Strip "tls://" prefix if present, then treat as DoT
+                    let stripped = normalized.hasPrefix("tls://") ? String(addr.dropFirst(6)) : addr
+                    if stripped.contains(":") {
+                        dotResolvers.append(DNSResolverEndpoint(kind: .dot, address: stripped))
+                    } else {
+                        dotResolvers.append(.dot(host: stripped))
+                    }
+                }
+            }
+        }
+
+        let allPrimary = primary + dotResolvers
+
+        // Parse quic-nameserver (DoQ entries).
+        var doqResolvers: [DNSResolverEndpoint] = []
+        if let quicNS = raw.quicNameserver, !quicNS.isEmpty {
+            for addr in quicNS {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("quic://") {
+                    let stripped = String(addr.dropFirst(7))  // drop "quic://"
+                    if stripped.contains(":") {
+                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: stripped))
+                    } else {
+                        doqResolvers.append(.doq(host: stripped))
+                    }
+                } else if normalized.hasPrefix("https://") {
+                    doqResolvers.append(.doh(url: addr))
+                } else {
+                    // Bare address — treat as DoQ on default port 853
+                    if addr.contains(":") {
+                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: addr))
+                    } else {
+                        doqResolvers.append(.doq(host: addr))
+                    }
+                }
+            }
+        }
+
+        let finalPrimary = allPrimary + doqResolvers
+
         return DNSPolicy(
-            primaryResolvers: primary,
+            primaryResolvers: finalPrimary,
             fallbackResolvers: fb,
             domainPolicies: [],
             respectRules: raw.respectRules ?? false,
@@ -448,6 +513,7 @@ private struct ClashRawDNS: Decodable {
     let nameserver: [String]?
     let fallback: [String]?
     let tlsNameserver: [String]?
+    let quicNameserver: [String]?
     let fakeIP: Bool?
     let fakeIPRange: String?
     let respectRules: Bool?
@@ -464,6 +530,7 @@ private struct ClashRawDNS: Decodable {
         case defaultNameserver = "default-nameserver"
         case hosts
         case tlsNameserver = "tls-nameserver"
+        case quicNameserver = "quic-nameserver"
     }
 }
 

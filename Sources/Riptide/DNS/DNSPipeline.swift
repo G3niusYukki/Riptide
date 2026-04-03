@@ -9,24 +9,33 @@ public struct DNSConfig: Sendable {
     public let remoteServers: [String]
     public let directServers: [String]
     public let doHEndpoints: [String]
+    public let dotEndpoints: [String]
+    public let doQEndpoints: [String]
     public let mode: DNSQueryMode
     public let fakeIPCIDR: String
     public let cacheEnabled: Bool
+    public let hosts: [String: String]
 
     public init(
         remoteServers: [String] = ["8.8.8.8", "1.1.1.1"],
         directServers: [String] = ["223.5.5.5"],
         doHEndpoints: [String] = ["https://dns.google/dns-query", "https://1.1.1.1/dns-query"],
+        dotEndpoints: [String] = [],
+        doQEndpoints: [String] = [],
         mode: DNSQueryMode = .fakeIP,
         fakeIPCIDR: String = "198.18.0.0/16",
-        cacheEnabled: Bool = true
+        cacheEnabled: Bool = true,
+        hosts: [String: String] = [:]
     ) {
         self.remoteServers = remoteServers
         self.directServers = directServers
         self.doHEndpoints = doHEndpoints
+        self.dotEndpoints = dotEndpoints
+        self.doQEndpoints = doQEndpoints
         self.mode = mode
         self.fakeIPCIDR = fakeIPCIDR
         self.cacheEnabled = cacheEnabled
+        self.hosts = hosts
     }
 }
 
@@ -54,18 +63,23 @@ public actor DNSPipeline {
             switch resolver.kind {
             case .udp: return resolver.address
             case .doh: return resolver.dohURL ?? resolver.address
-            case .tcp: return resolver.address
+            case .tcp, .dot, .doq: return resolver.address
             }
         }
         let fallbackServers = dnsPolicy.fallbackResolvers.map { $0.address }
+        let dotEndpoints = dnsPolicy.primaryResolvers.compactMap { $0.kind == .dot ? $0.address : nil }
+        let doQEndpoints = dnsPolicy.primaryResolvers.compactMap { $0.kind == .doq ? $0.address : nil }
         let mode: DNSQueryMode = dnsPolicy.fakeIPEnabled ? .fakeIP : .realIP
         let cfg = DNSConfig(
             remoteServers: nameservers.isEmpty ? ["8.8.8.8", "1.1.1.1"] : nameservers,
             directServers: fallbackServers,
             doHEndpoints: dnsPolicy.primaryResolvers.compactMap { $0.kind == .doh ? $0.dohURL : nil },
+            dotEndpoints: dotEndpoints,
+            doQEndpoints: doQEndpoints,
             mode: mode,
             fakeIPCIDR: dnsPolicy.fakeIPCIDR,
-            cacheEnabled: true
+            cacheEnabled: true,
+            hosts: dnsPolicy.hosts
         )
         self.config = cfg
         self.cache = DNSCache()
@@ -76,6 +90,18 @@ public actor DNSPipeline {
     }
 
     public func resolve(_ domain: String, type: DNSRecordType = .a) async throws -> [String] {
+        // Check hosts before cache lookup.
+        if let ip = lookupHostsEntry(domain: domain) {
+            if config.cacheEnabled {
+                let record = DNSResourceRecord(
+                    name: domain, type: type, classValue: .inet,
+                    ttl: 300, rdata: ipToData(ip)
+                )
+                await cache.set(name: domain, type: type, records: [record])
+            }
+            return [ip]
+        }
+
         if config.cacheEnabled {
             if let cached = await cache.get(name: domain, type: type) {
                 return cached.compactMap { $0.addressString }
@@ -109,6 +135,44 @@ public actor DNSPipeline {
                 let response = try await doh.query(name: domain, type: type, id: UInt16.random(in: 1...65535))
                 if response.header.responseCode == .noError {
                     records = response.answers
+                }
+            }
+        }
+
+        if records.isEmpty {
+            for dotAddress in config.dotEndpoints {
+                do {
+                    let dot = try DOTResolver(address: dotAddress)
+                    let response = try await dot.query(name: domain, type: type, id: UInt16.random(in: 1...65535))
+                    if response.header.responseCode == .noError && !response.answers.isEmpty {
+                        records = response.answers
+                        break
+                    }
+                    lastError = DNSError.serverError("DoT response code: \(response.header.responseCode)")
+                } catch {
+                    lastError = error
+                    continue
+                }
+            }
+        }
+
+        if records.isEmpty {
+            for doqAddress in config.doQEndpoints {
+                let components = doqAddress.split(separator: ":")
+                guard components.count >= 1 else { continue }
+                let host = String(components[0])
+                let port: UInt16 = components.count >= 2 ? UInt16(components[1]) ?? 853 : 853
+                let resolver = DOQResolver(serverHost: host, serverPort: port)
+                do {
+                    let response = try await resolver.query(name: domain, type: type, id: UInt16.random(in: 1...65535))
+                    if response.header.responseCode == .noError && !response.answers.isEmpty {
+                        records = response.answers
+                        break
+                    }
+                    lastError = DNSError.serverError("DoQ response code: \(response.header.responseCode)")
+                } catch {
+                    lastError = error
+                    continue
                 }
             }
         }
@@ -157,4 +221,28 @@ public actor DNSPipeline {
         if case .proxyNode = policy { return true }
         return false
     }
+
+    /// Looks up a hosts entry for the given domain.
+    /// Checks exact match first, then wildcard match (`*.example.com` matches `sub.example.com`).
+    func lookupHostsEntry(domain: String) -> String? {
+        // Exact match.
+        if let ip = config.hosts[domain] {
+            return ip
+        }
+        // Wildcard match.
+        for (pattern, ip) in config.hosts {
+            if pattern.hasPrefix("*.") {
+                let suffix = String(pattern.dropFirst(2))
+                if domain.hasSuffix(suffix) && domain != suffix {
+                    return ip
+                }
+            }
+        }
+        return nil
+    }
+}
+
+private func ipToData(_ ip: String) -> Data {
+    let parts = ip.split(separator: ".").compactMap { UInt8($0) }
+    return Data(parts)
 }
