@@ -23,6 +23,17 @@ public struct ProxyNode: Equatable, Sendable {
     public let port: Int
     public let cipher: String?
     public let password: String?
+    public let uuid: String?
+    public let flow: String?
+    public let alterId: Int?
+    public let security: String?
+    public let sni: String?
+    public let alpn: [String]?
+    public let skipCertVerify: Bool?
+    public let network: String?
+    public let wsPath: String?
+    public let wsHost: String?
+    public let grpcServiceName: String?
 
     public init(
         name: String,
@@ -30,7 +41,18 @@ public struct ProxyNode: Equatable, Sendable {
         server: String,
         port: Int,
         cipher: String? = nil,
-        password: String? = nil
+        password: String? = nil,
+        uuid: String? = nil,
+        flow: String? = nil,
+        alterId: Int? = nil,
+        security: String? = nil,
+        sni: String? = nil,
+        alpn: [String]? = nil,
+        skipCertVerify: Bool? = nil,
+        network: String? = nil,
+        wsPath: String? = nil,
+        wsHost: String? = nil,
+        grpcServiceName: String? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -38,6 +60,17 @@ public struct ProxyNode: Equatable, Sendable {
         self.port = port
         self.cipher = cipher
         self.password = password
+        self.uuid = uuid
+        self.flow = flow
+        self.alterId = alterId
+        self.security = security
+        self.sni = sni
+        self.alpn = alpn
+        self.skipCertVerify = skipCertVerify
+        self.network = network
+        self.wsPath = wsPath
+        self.wsHost = wsHost
+        self.grpcServiceName = grpcServiceName
     }
 }
 
