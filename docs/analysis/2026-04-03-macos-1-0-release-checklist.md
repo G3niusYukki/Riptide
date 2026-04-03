@@ -62,8 +62,8 @@
 
 ### Automated Verification
 
-- [ ] `swift build` passes cleanly
-- [ ] `swift test` — all tests pass
+- [x] `swift build` passes cleanly
+- [x] `swift test` — all 141 tests pass
 - [ ] 50 clean start/stop cycles across both modes
 - [ ] 25 clean reload cycles
 - [ ] 24-hour soak on primary test machine
