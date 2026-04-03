@@ -302,4 +302,31 @@ struct ClashConfigParserTests {
             _ = try ClashConfigParser.parse(yaml: yaml)
         }
     }
+
+    @Test("parses dns hosts configuration")
+    func parsesDNSHosts() throws {
+        let yaml = """
+        mode: rule
+        dns:
+          nameserver:
+            - 8.8.8.8
+          hosts:
+            example.com: 1.2.3.4
+            "*.google.com": 8.8.8.8
+            localhost: 127.0.0.1
+        proxies:
+          - name: "proxy-a"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        rules:
+          - MATCH,proxy-a
+        """
+
+        let config = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.dnsPolicy.hosts["example.com"] == "1.2.3.4")
+        #expect(config.dnsPolicy.hosts["*.google.com"] == "8.8.8.8")
+        #expect(config.dnsPolicy.hosts["localhost"] == "127.0.0.1")
+    }
 }
