@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Testing
 
 @testable import Riptide
@@ -72,5 +73,54 @@ struct ProtocolFramingTests {
         let ipv4Target = ConnectionTarget(host: "1.2.3.4", port: 53)
         let ipv4Data = try proto.makeConnectRequest(for: ipv4Target)
         #expect(ipv4Data[0] == Data([0x01, 0x01, 0x02, 0x03, 0x04, 0x00, 0x35]))
+    }
+
+    @Test("Hysteria2 handshake encodes version, auth tag, and domain target")
+    func hysteria2HandshakeEncoding() async throws {
+        let password = "testpass"
+        let target = ConnectionTarget(host: "example.com", port: 443)
+
+        let authKey = SymmetricKey(data: Data(password.utf8))
+        let authTag = HMAC<SHA256>.authenticationCode(for: Data("hysteria2-auth".utf8), using: authKey)
+
+        var expectedHandshake = Data()
+        expectedHandshake.append(0x02)
+        expectedHandshake.append(contentsOf: Data(authTag))
+        expectedHandshake.append(0x02)
+        expectedHandshake.append(0x0B)
+        expectedHandshake.append(contentsOf: "example.com".utf8)
+        expectedHandshake.append(0x01)
+        expectedHandshake.append(0xBB)
+
+        let session = MockTransportSession(receiveQueue: [])
+        let stream = Hysteria2Stream(session: session, password: password)
+        try await stream.connect(to: target)
+
+        #expect(session.sentFrames.count == 1)
+        #expect(session.sentFrames[0] == expectedHandshake)
+    }
+
+    @Test("Hysteria2 handshake encodes IPv4 target correctly")
+    func hysteria2IPv4HandshakeEncoding() async throws {
+        let password = "testpass"
+        let target = ConnectionTarget(host: "1.2.3.4", port: 80)
+
+        let authKey = SymmetricKey(data: Data(password.utf8))
+        let authTag = HMAC<SHA256>.authenticationCode(for: Data("hysteria2-auth".utf8), using: authKey)
+
+        var expectedHandshake = Data()
+        expectedHandshake.append(0x02)
+        expectedHandshake.append(contentsOf: Data(authTag))
+        expectedHandshake.append(0x01)
+        expectedHandshake.append(contentsOf: [0x01, 0x02, 0x03, 0x04])
+        expectedHandshake.append(0x00)
+        expectedHandshake.append(0x50)
+
+        let session = MockTransportSession(receiveQueue: [])
+        let stream = Hysteria2Stream(session: session, password: password)
+        try await stream.connect(to: target)
+
+        #expect(session.sentFrames.count == 1)
+        #expect(session.sentFrames[0] == expectedHandshake)
     }
 }

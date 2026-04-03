@@ -4,8 +4,8 @@ import Foundation
 
 actor MockTransportSession: TransportSession {
     private var queuedResponses: [Data]
-    private(set) var sentFrames: [Data]
-    private(set) var isClosed: Bool
+    nonisolated(unsafe) private(set) var sentFrames: [Data]
+    nonisolated(unsafe) private(set) var isClosed: Bool
 
     init(receiveQueue: [Data]) {
         self.queuedResponses = receiveQueue
@@ -27,11 +27,19 @@ actor MockTransportSession: TransportSession {
     func close() async {
         isClosed = true
     }
+
+    func getSentFrames() -> [Data] {
+        sentFrames
+    }
+
+    func getIsClosed() -> Bool {
+        isClosed
+    }
 }
 
 actor MockTransportDialer: TransportDialer {
     private var sessions: [MockTransportSession]
-    private(set) var openCount: Int
+    nonisolated(unsafe) private(set) var openCount: Int
 
     init(_ sessions: [MockTransportSession]) {
         self.sessions = sessions
@@ -45,5 +53,9 @@ actor MockTransportDialer: TransportDialer {
             throw TransportError.noSessionAvailable
         }
         return sessions.removeFirst()
+    }
+
+    func getOpenCount() -> Int {
+        openCount
     }
 }
