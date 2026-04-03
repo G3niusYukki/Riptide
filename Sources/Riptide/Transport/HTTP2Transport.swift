@@ -26,7 +26,7 @@ public final class HTTP2TransportSession: TransportSession, @unchecked Sendable 
 
     public func receive() async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
-            streamTask.readData(ofMinLength: 1, maxLength: 65536, completionHandler: { data, _, error in
+            streamTask.readData(ofMinLength: 1, maxLength: 65536, timeout: 15, completionHandler: { data, _, error in
                 if let error {
                     continuation.resume(throwing: TransportError.receiveFailed(error.localizedDescription))
                 } else {

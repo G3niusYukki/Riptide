@@ -13,24 +13,38 @@ public enum ClashConfigError: Error, Equatable, Sendable {
 
 public enum ClashConfigParser {
     public static func parse(yaml: String) throws -> RiptideConfig {
-        let raw: ClashRawConfig
+        let rawMap: [String: Any]
         do {
-            raw = try YAMLDecoder().decode(ClashRawConfig.self, from: yaml)
+            guard let node = try Yams.load(yaml: yaml) as? [String: Any] else {
+                throw ClashConfigError.invalidYAML("root must be a mapping")
+            }
+            rawMap = node
         } catch {
             throw ClashConfigError.invalidYAML(error.localizedDescription)
         }
 
-        let mode = try parseMode(raw.mode)
+        let mode = try parseMode(rawMap["mode"] as? String)
+        let raw = try YAMLDecoder().decode(ClashRawConfig.self, from: yaml)
         let proxies = try parseProxies(raw.proxies)
         let proxyGroups = try parseProxyGroups(raw.proxyGroups)
+
+        let ruleProviders = try parseRuleProviders(rawMap["rule-providers"] as? [String: Any])
+
         // Include both leaf proxy names and group IDs so rules can reference either.
         let proxyNameSet = Set(proxies.map(\.name))
         let groupIDSet = Set(proxyGroups.map(\.id))
         let knownProxySet = proxyNameSet.union(groupIDSet)
-        let rules = try parseRules(raw.rules, knownProxies: knownProxySet, mode: mode)
+        let rules = try parseRules(raw.rules, knownProxies: knownProxySet, ruleProviders: ruleProviders)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
         let dnsPolicy = parseDNSPolicy(raw.dns)
-        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups, dnsPolicy: dnsPolicy)
+        return RiptideConfig(
+            mode: mode,
+            proxies: proxies,
+            rules: rules,
+            proxyGroups: proxyGroups,
+            dnsPolicy: dnsPolicy,
+            ruleProviders: ruleProviders
+        )
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {
@@ -189,15 +203,10 @@ public enum ClashConfigParser {
     private static func parseRules(
         _ rawRules: [String]?,
         knownProxies: Set<String>,
-        mode: ProxyMode
+        ruleProviders: [String: RuleSetProviderConfig]
     ) throws -> [ProxyRule] {
         guard let rawRules, !rawRules.isEmpty else {
-            switch mode {
-            case .rule:
-                throw ClashConfigError.missingRules
-            case .global, .direct:
-                return []
-            }
+            throw ClashConfigError.missingRules
         }
 
         return try rawRules.enumerated().map { index, rawRule in
@@ -302,6 +311,21 @@ public enum ClashConfigParser {
                 }
                 return .final(policy: try parsePolicy(parts[1], knownProxies: knownProxies))
 
+            case "RULE-SET":
+                guard parts.count >= 2 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "RULE-SET requires provider name")
+                }
+                let providerName = parts[1]
+                let policyName = parts.count > 2 ? parts[2] : "DIRECT"
+                guard ruleProviders[providerName] != nil else {
+                    throw ClashConfigError.unknownProxyReference(providerName)
+                }
+                // RULE-SET default policy can be DIRECT/REJECT or any known proxy.
+                return .ruleSet(
+                    name: providerName,
+                    policy: try parsePolicyOrBuiltin(policyName, knownProxies: knownProxies)
+                )
+
             default:
                 throw ClashConfigError.invalidRule(index: index, reason: "unsupported rule type")
             }
@@ -324,6 +348,23 @@ public enum ClashConfigParser {
                 throw ClashConfigError.unknownProxyReference(normalized)
             }
             return .proxyNode(name: normalized)
+        }
+    }
+
+    /// Like parsePolicy but also accepts DIRECT/REJECT even if not in knownProxies.
+    /// Used for RULE-SET default policies where the set's own rules carry their own policy.
+    private static func parsePolicyOrBuiltin(_ rawPolicy: String, knownProxies: Set<String>) throws -> RoutingPolicy {
+        let normalized = rawPolicy.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        switch normalized {
+        case "DIRECT":
+            return .direct
+        case "REJECT":
+            return .reject
+        default:
+            guard knownProxies.contains(rawPolicy) else {
+                throw ClashConfigError.unknownProxyReference(rawPolicy)
+            }
+            return .proxyNode(name: rawPolicy)
         }
     }
 
@@ -492,6 +533,38 @@ public enum ClashConfigParser {
             fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16",
             hosts: raw.hosts ?? [:]
         )
+    }
+    private static func parseRuleProviders(
+        _ raw: [String: Any]?
+    ) throws -> [String: RuleSetProviderConfig] {
+        guard let raw, !raw.isEmpty else { return [:] }
+
+        var providers: [String: RuleSetProviderConfig] = [:]
+        for (name, value) in raw {
+            guard let dict = value as? [String: Any],
+                  let type = dict["type"] as? String,
+                  let url = dict["url"] as? String,
+                  let interval = dict["interval"] as? Int else {
+                continue
+            }
+
+            let behaviorStr = (dict["behavior"] as? String) ?? "classical"
+            let behavior: RuleSetBehavior
+            switch behaviorStr {
+            case "domain": behavior = .domain
+            case "ipcidr": behavior = .ipcidr
+            default: behavior = .classical
+            }
+
+            providers[name] = RuleSetProviderConfig(
+                name: name,
+                type: type,
+                url: url,
+                interval: interval,
+                behavior: behavior
+            )
+        }
+        return providers
     }
 }
 

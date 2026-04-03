@@ -17,6 +17,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private var currentProfile: TunnelProfile?
     private var currentStatus: TunnelRuntimeStatus
     private var activeConnections: [UUID: ConnectedProxyContext]
+    /// Active rule-set providers, keyed by provider name.
+    private var ruleSetProviders: [String: RuleSetProvider] = [:]
+    /// Most-recently-loaded rules for each provider.
+    private var ruleSetRules: [String: [ProxyRule]] = [:]
+    private var ruleSetRefreshTask: Task<Void, Never>?
 
     public init(
         proxyDialer: any TransportDialer,
@@ -45,6 +50,37 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         connector = ProxyConnector(pool: proxyPool)
         // Fake-IP pool is initialized in DNSPipeline.init from dnsPolicy.fakeIPRange;
         // no separate start call needed.
+
+        // Start rule-set providers.
+        ruleSetProviders.removeAll()
+        ruleSetRules.removeAll()
+        ruleSetRefreshTask?.cancel()
+        ruleSetRefreshTask = nil
+
+        for (_, config) in profile.config.ruleProviders {
+            let provider = RuleSetProvider(config: config)
+            ruleSetProviders[config.name] = provider
+            await provider.start()
+        }
+
+        // Wait for initial load of all providers before accepting connections.
+        await refreshRuleSets()
+
+        // Schedule periodic refreshes every 60 seconds.
+        ruleSetRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                await refreshRuleSets()
+            }
+        }
+    }
+
+    /// Refresh all rule-set providers and update the cached rules.
+    private func refreshRuleSets() async {
+        for (name, provider) in ruleSetProviders {
+            let rules = await provider.rules()
+            ruleSetRules[name] = rules
+        }
     }
 
     public func stop() async throws {
@@ -54,6 +90,14 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         activeConnections.removeAll()
         currentProfile = nil
         currentStatus = TunnelRuntimeStatus()
+
+        ruleSetRefreshTask?.cancel()
+        ruleSetRefreshTask = nil
+        for provider in ruleSetProviders.values {
+            await provider.stop()
+        }
+        ruleSetProviders.removeAll()
+        ruleSetRules.removeAll()
     }
 
     public func update(profile: TunnelProfile) async throws {
@@ -170,7 +214,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         }
 
         let ruleTarget = RuleTarget(domain: target.host, ipAddress: resolvedIP)
-        let engine = RuleEngine(rules: profile.config.rules, geoIPResolver: geoIPResolver)
+        let engine = RuleEngine(
+            rules: profile.config.rules,
+            ruleSets: ruleSetRules,
+            geoIPResolver: geoIPResolver
+        )
         return engine.resolve(target: ruleTarget)
     }
 }

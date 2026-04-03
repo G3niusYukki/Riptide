@@ -152,6 +152,15 @@ struct TransportIntegrationTests {
         #expect(sent[0].count > 28)
     }
 
+    @Test("HTTP2TransportDialer creates a session")
+    func http2TransportCreatesSession() async throws {
+        let dialer = HTTP2TransportDialer()
+        let node = ProxyNode(name: "h2-test", kind: .http, server: "example.com", port: 443)
+        let session = try await dialer.openSession(to: node)
+        #expect(session is HTTP2TransportSession)
+        await session.close()
+    }
+
     @Test("ProxyConnector VMess fails when node has no uuid")
     func vmessConnectFailsOnMissingUUID() async throws {
         let node = ProxyNode(

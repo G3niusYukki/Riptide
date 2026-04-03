@@ -104,18 +104,22 @@ public struct RiptideConfig: Equatable, Sendable {
     public let rules: [ProxyRule]
     public let proxyGroups: [ProxyGroup]
     public let dnsPolicy: DNSPolicy
+    /// Static rule-set provider configurations parsed from the config file.
+    public let ruleProviders: [String: RuleSetProviderConfig]
 
     public init(
         mode: ProxyMode,
         proxies: [ProxyNode],
         rules: [ProxyRule],
         proxyGroups: [ProxyGroup] = [],
-        dnsPolicy: DNSPolicy = .default
+        dnsPolicy: DNSPolicy = .default,
+        ruleProviders: [String: RuleSetProviderConfig] = [:]
     ) {
         self.mode = mode
         self.proxies = proxies
         self.rules = rules
         self.proxyGroups = proxyGroups
         self.dnsPolicy = dnsPolicy
+        self.ruleProviders = ruleProviders
     }
 }
