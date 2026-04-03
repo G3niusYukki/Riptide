@@ -28,4 +28,6 @@ public enum TransportError: Error, Equatable, Sendable {
     case dialFailed(String)
     case sendFailed(String)
     case receiveFailed(String)
+    case connectionFailed(String)
+    case cancelled
 }

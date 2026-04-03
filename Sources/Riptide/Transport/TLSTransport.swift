@@ -1,6 +1,8 @@
 import Foundation
 import Network
 
+// MARK: - TLSTransportSession
+
 public actor TLSTransportSession: TransportSession {
     private let innerSession: any TransportSession
     private let hostname: String
@@ -23,14 +25,10 @@ public actor TLSTransportSession: TransportSession {
     }
 }
 
-public struct TLSTransportDialer: TransportDialer {
-    public let hostname: String
-    public let skipCertVerify: Bool
+// MARK: - TLSTransportDialer
 
-    public init(hostname: String = "", skipCertVerify: Bool = false) {
-        self.hostname = hostname
-        self.skipCertVerify = skipCertVerify
-    }
+public struct TLSTransportDialer: TransportDialer {
+    public init() {}
 
     public func openSession(to node: ProxyNode) async throws -> any TransportSession {
         let host = NWEndpoint.Host(node.server)
@@ -38,30 +36,87 @@ public struct TLSTransportDialer: TransportDialer {
             throw TransportError.dialFailed("invalid port")
         }
 
-        let tls = NWParameters.tls
-        if !hostname.isEmpty {
-            // Configure TLS server name for SNI via the protocol options
-            if let tlsOptions = tls.defaultProtocolStack.applicationProtocols.first as? NWProtocolTLS.Options {
-                sec_protocol_options_set_tls_server_name(tlsOptions.securityProtocolOptions, hostname)
-            }
+        // Build TLS options with proper SNI and cert verification
+        let tlsOptions = NWProtocolTLS.Options()
+        let sniHost = node.sni ?? node.server
+        sec_protocol_options_set_tls_server_name(tlsOptions.securityProtocolOptions, sniHost)
+        if node.skipCertVerify == true {
+            sec_protocol_options_set_verify_block(tlsOptions.securityProtocolOptions, { _, _, done in
+                done(true)
+            }, .main)
         }
-        let connection = NWConnection(host: host, port: port, using: tls)
+
+        // Build TCP parameters
+        let tcpParams = NWProtocolTCP.Options()
+        tcpParams.enableKeepalive = true
+        let params = NWParameters(tls: tlsOptions, tcp: tcpParams)
+
+        let connection = NWConnection(host: host, port: port, using: params)
         connection.start(queue: .global())
 
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<any TransportSession, Error>) in
-            connection.stateUpdateHandler = { state in
+            let gate = TLSTransportReadyGate(continuation: cont, sniHost: sniHost, connection: connection)
+
+            // Start timeout task
+            let timeoutTask = Task {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                connection.cancel()
+                gate.fail(TransportError.connectionFailed("TLS connection timeout after 15s"))
+            }
+
+            connection.stateUpdateHandler = { [timeoutTask] state in
                 switch state {
                 case .ready:
-                    cont.resume(returning: TLSTransportSession(
+                    timeoutTask.cancel()
+                    gate.succeed(TLSTransportSession(
                         innerSession: NWTransportSession(connection: connection),
-                        hostname: self.hostname.isEmpty ? node.server : self.hostname
+                        hostname: sniHost
                     ))
                 case .failed(let error):
-                    cont.resume(throwing: TransportError.dialFailed(String(describing: error)))
+                    timeoutTask.cancel()
+                    gate.fail(TransportError.connectionFailed(String(describing: error)))
+                case .cancelled:
+                    gate.fail(TransportError.cancelled)
+                case .waiting(let error):
+                    // Connection waiting (e.g. network unreachable) — fail fast
+                    timeoutTask.cancel()
+                    gate.fail(TransportError.connectionFailed("connection waiting: \(error)"))
                 default:
                     break
                 }
             }
         }
+    }
+}
+
+/// Lock-protected gate for TLSTransportDialer — allows a single resume of a CheckedContinuation
+/// from a @Sendable context (the NWConnection state handler).
+private final class TLSTransportReadyGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<any TransportSession, Error>?
+    private let sniHost: String
+    private let connection: NWConnection
+
+    init(continuation: CheckedContinuation<any TransportSession, Error>, sniHost: String, connection: NWConnection) {
+        self.continuation = continuation
+        self.sniHost = sniHost
+        self.connection = connection
+    }
+
+    func succeed(_ session: TLSTransportSession) {
+        lock.lock()
+        guard let cont = continuation else { lock.unlock(); return }
+        continuation = nil
+        lock.unlock()
+        cont.resume(returning: session)
+    }
+
+    func fail(_ error: Error) {
+        lock.lock()
+        guard let cont = continuation else { lock.unlock(); return }
+        continuation = nil
+        lock.unlock()
+        cont.resume(throwing: error)
     }
 }
