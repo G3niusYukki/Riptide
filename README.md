@@ -2,7 +2,7 @@
 
 Riptide is an open-source Swift proxy engine project targeting a Surge-like architecture: strict config parsing, deterministic rule routing, protocol framing, transport orchestration, tunnel lifecycle management, and executable CLI/App entrypoints.
 
-**Current state: Alpha** — System Proxy mode, profile management, subscription workflow, runtime observability, and menu bar shell are implemented. TUN mode and proxy groups are scaffolded.
+**Current state: Beta** — System Proxy mode, TUN mode scaffolding, profile management, subscription workflow, runtime observability, and menu bar shell are implemented. Proxy groups and DNS policy routing are complete.
 
 ## Features
 
@@ -28,14 +28,14 @@ Riptide is an open-source Swift proxy engine project targeting a Surge-like arch
 
 | Feature | Status |
 |---------|--------|
-| System Proxy mode | Alpha-ready |
-| Profile import (YAML) | Alpha-ready |
-| Subscription workflow | Alpha-ready |
-| Runtime observability | Alpha-ready |
-| Menu bar controls | Alpha-ready |
+| System Proxy mode | Beta-ready |
+| Profile import (YAML) | Beta-ready |
+| Subscription workflow | Beta-ready |
+| Runtime observability | Beta-ready |
+| Menu bar controls | Beta-ready |
+| Proxy groups | Beta-ready |
+| DNS policy routing | Beta-ready |
 | TUN / Packet Tunnel | Scaffolded (Beta) |
-| Proxy groups | Scaffolded (Beta) |
-| DNS policy routing | Scaffolded (Beta) |
 
 ## Project Structure
 
@@ -136,7 +136,7 @@ Default resolver is `.none` (no country match). Production integration (e.g., MM
 
 ## Roadmap
 
-### Beta (next)
+### Beta (current)
 
 1. TUN / Packet Tunnel: wire `PacketTunnelProvider` and NetworkExtension target
 2. Proxy groups: `ProxyGroupResolver` for Select, URL-Test, Fallback, Load-Balance

@@ -5,7 +5,7 @@
 ### Automated Verification
 
 - [x] `swift build` passes cleanly (0 errors)
-- [x] `swift test` — all 126 tests pass
+- [x] `swift test` — all 141 tests pass (28 suites)
 
 ### Manual Alpha Cycle Checks
 
@@ -34,8 +34,8 @@
 
 ### Automated Verification
 
-- [ ] `swift build` passes cleanly
-- [ ] `swift test` — all tests pass
+- [x] `swift build` passes cleanly
+- [x] `swift test` — all 141 tests pass (28 suites)
 - [ ] 20 consecutive TUN start/stop cycles (primary setup)
 - [ ] Daily-use traffic matrix in both modes:
   - [ ] System Proxy mode: see Alpha checks
@@ -45,8 +45,8 @@
 
 - [ ] TUN mode starts and stops cleanly
 - [ ] Visible fallback recommendation when TUN start fails
-- [ ] Proxy groups (Select, URL-Test, Fallback) route correctly
-- [ ] DNS policy respected in both modes
+- [x] Proxy groups (Select, URL-Test, Fallback) route correctly
+- [x] DNS policy respected in both modes
 - [ ] Subscription refresh updates active profile
 - [ ] App group shared state visible to extension
 
