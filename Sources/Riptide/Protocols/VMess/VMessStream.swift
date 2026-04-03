@@ -64,7 +64,7 @@ public actor VMessStream: Sendable {
         recvKey = deriveSubKey(key: authKey, label: Data("d4712b59-7f38-4a33-8fd0-8a52d3d46a77".utf8))
 
         let headerIV = Data([UInt8](repeating: 0, count: 16))
-        var encryptedHeader = try encryptAES128(header, key: headerKey, iv: headerIV)
+        let encryptedHeader = try encryptAES128(header, key: headerKey, iv: headerIV)
 
         var authData = Data(count: 8)
         for i in 0..<8 { authData.append(UInt8.random(in: 0...255)) }

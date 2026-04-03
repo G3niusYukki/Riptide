@@ -26,7 +26,7 @@ public final class TCPDNSClient: Sendable {
         }
         let connection = NWConnection(host: NWEndpoint.Host(serverHost), port: port, using: .tcp)
 
-        // Await connection readiness outside the task group (Copilot: task group is Data but ready gate returns Void)
+        // Await connection readiness
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             connection.stateUpdateHandler = { state in
                 switch state {
@@ -41,57 +41,72 @@ public final class TCPDNSClient: Sendable {
             connection.start(queue: .global())
         }
 
-        // Use race pattern for timeout instead of non-existent group.next(timeout:)
-        let sendPacket = packet  // copy for sendability
-        let sendConnection = connection
-        let result: Data = try await withThrowingTaskGroup(of: Data.self) { group in
+        // Send query
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            connection.send(content: packet, completion: .contentProcessed { error in
+                if let error {
+                    cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                } else {
+                    cont.resume()
+                }
+            })
+        }
+
+        // Read 2-byte length prefix
+        let timeoutSeconds = self.timeout
+        let lengthData = try await withThrowingTaskGroup(of: Data.self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
-                    sendConnection.send(content: sendPacket, completion: .contentProcessed { error in
+                    connection.receive(minimumIncompleteLength: 2, maximumLength: 2) { data, _, _, error in
                         if let error {
                             cont.resume(throwing: DNSError.serverError(String(describing: error)))
-                            return
-                        }
-                    })
-                    var buffer = Data()
-                    func readMore() {
-                        sendConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
-                            if let error {
-                                cont.resume(throwing: DNSError.serverError(String(describing: error)))
-                                return
-                            }
-                            guard let data, !data.isEmpty else {
-                                cont.resume(throwing: DNSError.noRecords)
-                                return
-                            }
-                            buffer.append(data)
-                            if buffer.count >= 2 {
-                                let length = Int(buffer[0]) << 8 | Int(buffer[1])
-                                if buffer.count >= 2 + length {
-                                    cont.resume(returning: Data(buffer.dropFirst(2)))
-                                    return
-                                }
-                            }
-                            readMore()
+                        } else if let data, data.count == 2 {
+                            cont.resume(returning: data)
+                        } else {
+                            cont.resume(throwing: DNSError.noRecords)
                         }
                     }
-                    readMore()
                 }
             }
-
-            group.addTask { [timeout] in
-                try await Task.sleep(for: timeout)
+            group.addTask {
+                try await Task.sleep(for: timeoutSeconds)
                 throw DNSError.timeout
             }
-
-            guard let first = try await group.next() else {
+            guard let result = try await group.next() else {
                 throw DNSError.timeout
             }
             group.cancelAll()
-            sendConnection.cancel()
-            return first
+            return result
         }
 
-        return try DNSMessage.parse(result)
+        let payloadLength = Int(lengthData[0]) << 8 | Int(lengthData[1])
+
+        // Read payload
+        let payload = try await withThrowingTaskGroup(of: Data.self) { group in
+            group.addTask {
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
+                    connection.receive(minimumIncompleteLength: payloadLength, maximumLength: payloadLength) { data, _, _, error in
+                        if let error {
+                            cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                        } else if let data {
+                            cont.resume(returning: data)
+                        } else {
+                            cont.resume(throwing: DNSError.noRecords)
+                        }
+                    }
+                }
+            }
+            group.addTask {
+                try await Task.sleep(for: timeoutSeconds)
+                throw DNSError.timeout
+            }
+            guard let result = try await group.next() else {
+                throw DNSError.timeout
+            }
+            group.cancelAll()
+            return result
+        }
+
+        return try DNSMessage.parse(payload)
     }
 }
