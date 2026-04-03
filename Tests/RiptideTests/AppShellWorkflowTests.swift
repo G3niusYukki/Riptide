@@ -115,6 +115,25 @@ struct AppShellWorkflowTests {
         #expect(errorSnapshot.code == "E_NO_PROFILE")
     }
 
+    @Test("mode coordinator can switch to system proxy and back")
+    func modeCoordinatorSystemProxySwitch() async throws {
+        let controller = MockSystemProxyController()
+        let coordinator = ModeCoordinator(systemProxyController: controller, lifecycleManager: nil)
+
+        try await coordinator.start(mode: .systemProxy, profile: nil)
+        let modeAfterStart = await coordinator.currentMode()
+        #expect(modeAfterStart == .systemProxy)
+
+        let events = await coordinator.recentEvents()
+        let hasModeChanged = events.contains { event in
+            if case .modeChanged(.systemProxy) = event { return true }
+            return false
+        }
+        #expect(hasModeChanged)
+
+        try await coordinator.stop()
+    }
+
     private func sampleConfig() -> RiptideConfig {
         RiptideConfig(
             mode: .rule,
