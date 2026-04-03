@@ -79,6 +79,61 @@ struct AppShellWorkflowTests {
         }
     }
 
+    @Test("control channel emits RuntimeMode and RuntimeEvent through event stream")
+    func runtimeModeAndEventEmittedThroughControlChannel() async throws {
+        let runtime = MockTunnelRuntime()
+        let manager = TunnelLifecycleManager(runtime: runtime)
+        let channel = InProcessTunnelControlChannel(lifecycleManager: manager)
+        let profile = TunnelProfile(name: "demo", config: sampleConfig())
+
+        let stream = await channel.events()
+        _ = try await channel.send(.start(profile))
+
+        var iterator = stream.makeAsyncIterator()
+        var foundRuntimeEvent = false
+        // Consume at most 10 events — the stream stays open so a plain while loop would hang
+        for _ in 0..<10 {
+            guard let event = await iterator.next() else { break }
+            if case .runtimeEvent(.stateChanged(let state)) = event {
+                #expect(state == .running)
+                foundRuntimeEvent = true
+                break
+            }
+        }
+        #expect(foundRuntimeEvent)
+
+        let snapshot = RuntimeConnectionSnapshot(
+            id: UUID(),
+            targetHost: "example.com",
+            targetPort: 443,
+            routeDescription: "proxy-a"
+        )
+        #expect(snapshot.targetHost == "example.com")
+        #expect(snapshot.targetPort == 443)
+
+        let errorSnapshot = RuntimeErrorSnapshot(code: "E_NO_PROFILE", message: "no profile loaded")
+        #expect(errorSnapshot.code == "E_NO_PROFILE")
+    }
+
+    @Test("mode coordinator can switch to system proxy and back")
+    func modeCoordinatorSystemProxySwitch() async throws {
+        let controller = MockSystemProxyController()
+        let coordinator = ModeCoordinator(systemProxyController: controller, lifecycleManager: nil)
+
+        try await coordinator.start(mode: .systemProxy, profile: nil)
+        let modeAfterStart = await coordinator.currentMode()
+        #expect(modeAfterStart == .systemProxy)
+
+        let events = await coordinator.recentEvents()
+        let hasModeChanged = events.contains { event in
+            if case .modeChanged(.systemProxy) = event { return true }
+            return false
+        }
+        #expect(hasModeChanged)
+
+        try await coordinator.stop()
+    }
+
     private func sampleConfig() -> RiptideConfig {
         RiptideConfig(
             mode: .rule,

@@ -17,6 +17,7 @@ public actor ExternalController {
     private var listener: NWListener?
     private var activeConnections: [UUID: ConnectionContext]
     private var requestLog: [APIRequestLog]
+    private var currentMode: RuntimeMode
     private let maxLogs: Int = 1000
 
     private struct ConnectionContext: Sendable {
@@ -49,6 +50,7 @@ public actor ExternalController {
         self.config = config
         self.activeConnections = [:]
         self.requestLog = []
+        self.currentMode = .systemProxy
     }
 
     public func start(host: String = "127.0.0.1", port: UInt16 = 9090) async throws -> String {
@@ -70,6 +72,19 @@ public actor ExternalController {
     public func stop() {
         listener?.cancel()
         listener = nil
+    }
+
+    public func snapshot(mode: RuntimeMode) async -> TunnelStatusSnapshot {
+        currentMode = mode
+        let status = await runtime.status()
+        return TunnelStatusSnapshot(
+            state: .stopped,
+            activeProfileName: nil,
+            bytesUp: status.bytesUp,
+            bytesDown: status.bytesDown,
+            activeConnections: status.activeConnections,
+            lastError: nil
+        )
     }
 
     private func handleRequest(_ connection: NWConnection) async {

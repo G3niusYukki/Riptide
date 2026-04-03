@@ -35,4 +35,8 @@ enum DemoConfigFactory {
           - MATCH,demo-socks
         """
     }
+
+    static func makeControlSurface(mode: RuntimeMode) -> RuntimeControlSurface {
+        RuntimeControlSurface(mode: mode)
+    }
 }

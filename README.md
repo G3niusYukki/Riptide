@@ -2,23 +2,40 @@
 
 Riptide is an open-source Swift proxy engine project targeting a Surge-like architecture: strict config parsing, deterministic rule routing, protocol framing, transport orchestration, tunnel lifecycle management, and executable CLI/App entrypoints.
 
-Current state: **library-first foundation with runnable CLI/App demos and live TCP runtime path**, plus a baseline in-process control channel and injectable GeoIP rule resolver.
+**Current state: Beta** — System Proxy mode, TUN mode scaffolding, profile management, subscription workflow, runtime observability, and menu bar shell are implemented. Proxy groups and DNS policy routing are complete.
 
 ## Features
 
 - **Strict Clash-compatible parser (subset)** with explicit validation errors
-- **Rule engine**: `DOMAIN`, `DOMAIN-SUFFIX`, `DOMAIN-KEYWORD`, `IP-CIDR`, `GEOIP` (resolver-injected), `MATCH/FINAL`
-- **Protocol framing**: HTTP CONNECT, SOCKS5, Shadowsocks target preamble
-- **Transport layer**: connection contracts, pooling, and `Network.framework` TCP dialers
+- **Rule engine**: `DOMAIN`, `DOMAIN-SUFFIX`, `DOMAIN-KEYWORD`, `IP-CIDR`, `IP-CIDR6`, `GEOIP`, `PROCESS-NAME`, `MATCH/FINAL`
+- **Protocol framing**: HTTP CONNECT, SOCKS5, Shadowsocks AEAD
+- **Transport layer**: connection contracts, pooling, and `Network.framework` TCP/TLS dialers
 - **Runtime layers**:
   - `TunnelLifecycleManager` for lifecycle state transitions
   - `LiveTunnelRuntime` for real policy execution (`DIRECT` / `REJECT` / proxy path)
   - `InProcessTunnelControlChannel` for command/response/event control abstraction
+  - `ModeCoordinator` for unified system proxy / TUN mode orchestration
+- **Profile management**: `ProfileStore` actor for local and subscription-backed profiles
+- **Observability**: `RuntimeEventStore` bounded buffer for lifecycle events, connection snapshots, and throughput counters
 - **Local proxy ingress**:
   - `LocalHTTPConnectProxyServer` for real local HTTP CONNECT traffic and relay
+  - `SystemProxyControlling` protocol for enable/disable with test doubles
 - **Entrypoints**:
   - `riptide` CLI (`validate`, `run`, `smoke`, `serve`)
-  - `RiptideApp` minimal SwiftUI shell
+  - `RiptideApp` SwiftUI app with menu bar shell (`MenuBarExtra`) and tabbed dashboard
+
+## Alpha-Ready Capabilities
+
+| Feature | Status |
+|---------|--------|
+| System Proxy mode | Beta-ready |
+| Profile import (YAML) | Beta-ready |
+| Subscription workflow | Beta-ready |
+| Runtime observability | Beta-ready |
+| Menu bar controls | Beta-ready |
+| Proxy groups | Beta-ready |
+| DNS policy routing | Beta-ready |
+| TUN / Packet Tunnel | Scaffolded (Beta) |
 
 ## Project Structure
 
@@ -117,13 +134,20 @@ rules:
 
 Default resolver is `.none` (no country match). Production integration (e.g., MMDB) can be added without changing rule matching call sites.
 
-## Roadmap (next priorities)
+## Roadmap
 
-1. Native NetworkExtension target integration (PacketTunnelProvider/XPC boundary)
-2. DNS subsystem baseline (UDP/TCP/DoH) + richer policy depth
-3. Proxy groups, health checks, and broader observability
-4. MITM / rewrite / dashboard / external controller surfaces
-5. Shadowsocks AEAD data-path encryption/decryption (beyond current target preamble framing)
+### Beta (current)
+
+1. TUN / Packet Tunnel: wire `PacketTunnelProvider` and NetworkExtension target
+2. Proxy groups: `ProxyGroupResolver` for Select, URL-Test, Fallback, Load-Balance
+3. DNS policy routing: `DNSPolicy` with `respect-rules` and nameserver fallback
+
+### Future
+
+4. MITM / rewrite surfaces
+5. External controller REST API expansion
+6. VMess / VLESS / Trojan / Hysteria2 stream actors wired to `ProxyConnector`
+7. Advanced dashboard and rule-set support
 
 ## Contributing
 

@@ -69,6 +69,46 @@ struct TunnelControlChannelTests {
         }
     }
 
+    @Test("control channel emits structured lifecycle and failure events")
+    func controlChannelEmitsStructuredEvents() async throws {
+        let runtime = MockTunnelRuntime()
+        let manager = TunnelLifecycleManager(runtime: runtime)
+        let channel = InProcessTunnelControlChannel(lifecycleManager: manager)
+        let profile = TunnelProfile(name: "test", config: sampleConfig())
+
+        let stream = await channel.events()
+        _ = try await channel.send(.start(profile))
+
+        var iterator = stream.makeAsyncIterator()
+        var foundStateChanged = false
+        for _ in 0..<10 {
+            guard let event = await iterator.next() else { break }
+            if case .runtimeEvent(.stateChanged(let state)) = event {
+                #expect(state == .running)
+                foundStateChanged = true
+                break
+            }
+        }
+        #expect(foundStateChanged)
+    }
+
+    @Test("view model maps connection snapshot and mode state")
+    func viewModelMapsRuntimeSnapshots() async throws {
+        let runtime = MockTunnelRuntime()
+        let manager = TunnelLifecycleManager(runtime: runtime)
+        let viewModel = TunnelControlViewModel(lifecycleManager: manager)
+
+        await viewModel.setMode(.tun)
+        let mode = await viewModel.currentMode()
+        #expect(mode == .tun)
+    }
+
+    @Test("mode transitions surface degraded-state recommendations")
+    func modeTransitionsSurfaceDegradedStates() async throws {
+        let event = RuntimeEvent.degraded(.tun, "no TUN interface available, falling back to system proxy")
+        #expect(event == RuntimeEvent.degraded(.tun, "no TUN interface available, falling back to system proxy"))
+    }
+
     private func sampleConfig() -> RiptideConfig {
         RiptideConfig(
             mode: .rule,

@@ -5,9 +5,21 @@ import Riptide
 struct RiptideApp: App {
     @State private var vpnVM = VPNViewModel()
     @State private var proxyVM = ProxyViewModel()
+    @State private var appVM = AppViewModel()
+    @State private var menuBarVM: MenuBarViewModel?
     @State private var selectedTab = 0
 
-    var body: some Scene {
+    var body: some SwiftUI.Scene {
+        MenuBarExtra {
+            if let menuBarVM {
+                RiptideMenuBar(viewModel: menuBarVM)
+            }
+        } label: {
+            Image(systemName: vpnVM.isRunning ? "shield.checkmark.fill" : "shield.slash")
+                .symbolRenderingMode(.hierarchical)
+        }
+        .menuBarExtraStyle(.menu)
+
         WindowGroup {
             TabView(selection: $selectedTab) {
                 MainView()
@@ -46,6 +58,9 @@ struct RiptideApp: App {
                 }
             }
             .frame(minWidth: 700, minHeight: 450)
+            .task {
+                menuBarVM = MenuBarViewModel(appViewModel: appVM)
+            }
         }
     }
 }

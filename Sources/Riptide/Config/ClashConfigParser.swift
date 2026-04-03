@@ -26,7 +26,9 @@ public enum ClashConfigParser {
         let rules = try parseRules(raw.rules, knownProxies: proxyNameSet, mode: mode)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
 
-        return RiptideConfig(mode: mode, proxies: proxies, rules: rules)
+        let dnsPolicy = parseDNSPolicy(raw.dns)
+
+        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, dnsPolicy: dnsPolicy)
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {
@@ -221,12 +223,77 @@ public enum ClashConfigParser {
             break
         }
     }
+
+    private static func parseDNSPolicy(_ raw: ClashRawDNS?) -> DNSPolicy {
+        guard let raw else {
+            return .default
+        }
+
+        let primary: [DNSResolverEndpoint]
+        if let ns = raw.nameserver, !ns.isEmpty {
+            primary = ns.map { addr in
+                if addr.lowercased().hasPrefix("https://") {
+                    return .doh(url: addr)
+                } else if addr.contains(":") {
+                    return DNSResolverEndpoint(kind: .udp, address: addr)
+                } else {
+                    return .udp(host: addr)
+                }
+            }
+        } else {
+            primary = []
+        }
+
+        let fallback: [DNSResolverEndpoint]
+        if let fb = raw.fallback, !fb.isEmpty {
+            fallback = fb.map { addr in
+                if addr.contains(":") {
+                    return DNSResolverEndpoint(kind: .udp, address: addr)
+                } else {
+                    return .udp(host: addr)
+                }
+            }
+        } else {
+            fallback = []
+        }
+
+        return DNSPolicy(
+            primaryResolvers: primary,
+            fallbackResolvers: fallback,
+            // TODO: Parse per-domain DNS overrides from ClashRawDNS.custom
+            domainPolicies: [],
+            respectRules: raw.respectRules ?? false,
+            fakeIPEnabled: raw.fakeIP ?? true,
+            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16"
+        )
+    }
 }
 
 private struct ClashRawConfig: Decodable {
     let mode: String?
     let proxies: [ClashRawProxy]?
     let rules: [String]?
+    let dns: ClashRawDNS?
+}
+
+private struct ClashRawDNS: Decodable {
+    let enable: Bool?
+    let nameserver: [String]?
+    let fallback: [String]?
+    let fakeIP: Bool?
+    let fakeIPRange: String?
+    let respectRules: Bool?
+    let defaultNameserver: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case enable
+        case nameserver
+        case fallback
+        case fakeIP = "fake-ip"
+        case fakeIPRange = "fake-ip-range"
+        case respectRules = "respect-rules"
+        case defaultNameserver = "default-nameserver"
+    }
 }
 
 private struct ClashRawProxy: Decodable {

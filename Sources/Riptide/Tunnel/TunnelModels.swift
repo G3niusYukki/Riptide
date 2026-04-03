@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TunnelLifecycleState: Equatable, Sendable {
+public enum TunnelLifecycleState: Equatable, Sendable, Codable {
     case stopped
     case starting
     case running
@@ -18,7 +18,7 @@ public struct TunnelProfile: Equatable, Sendable {
     }
 }
 
-public struct TunnelRuntimeStatus: Equatable, Sendable {
+public struct TunnelRuntimeStatus: Equatable, Sendable, Codable {
     public let bytesUp: UInt64
     public let bytesDown: UInt64
     public let activeConnections: Int
