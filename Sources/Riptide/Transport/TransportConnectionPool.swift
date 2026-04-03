@@ -70,7 +70,7 @@ public actor TransportConnectionPool {
     }
 
     private func evictStale(key: PoolKey) async {
-        guard var idle = idleByNodeKey[key], !idle.isEmpty else { return }
+        guard let idle = idleByNodeKey[key], !idle.isEmpty else { return }
         let now = ContinuousClock.now
         var kept: [PooledConnection] = []
         for pooled in idle {

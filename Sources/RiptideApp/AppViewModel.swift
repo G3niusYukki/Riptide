@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 import Riptide
 
 // MARK: - App-Shell Stub Types
@@ -137,6 +138,9 @@ public final class AppViewModel {
 
     // Errors
     public private(set) var lastError: String?
+
+    // MARK: - Window Reference
+    public weak var mainWindow: NSWindow?
 
     // MARK: - Private
 

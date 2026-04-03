@@ -41,7 +41,7 @@ public actor ScriptEngine {
     }
 
     public func executeRequestModify(scriptName: String, requestHeaders: [String: String]) throws -> [String: String] {
-        guard let value = contexts[scriptName] else {
+        guard contexts[scriptName] != nil else {
             throw ScriptError.runtimeError("script not loaded: \(scriptName)")
         }
         return requestHeaders

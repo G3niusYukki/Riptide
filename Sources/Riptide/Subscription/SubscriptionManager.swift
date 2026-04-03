@@ -166,7 +166,7 @@ public enum ProxyURIParser {
         }
 
         guard let colonIdx = serverAndParams.firstIndex(of: ":") else { return nil }
-        var host = String(serverAndParams[..<colonIdx])
+        let host = String(serverAndParams[..<colonIdx])
         let portStr = String(serverAndParams[serverAndParams.index(after: colonIdx)...])
         let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
 
