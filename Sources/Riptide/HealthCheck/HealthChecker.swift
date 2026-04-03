@@ -64,7 +64,7 @@ public actor HealthChecker {
         while running {
             await withTaskGroup(of: Void.self) { group in
                 for node in nodes {
-                    group.addTask { await self.check(node: node) }
+                    group.addTask { _ = await self.check(node: node) }
                 }
                 _ = await group.next()
             }
@@ -102,7 +102,7 @@ public actor GroupSelector {
         case .urlTest:
             var best: ProxyNode?
             var bestLatency = Int.max
-            let tolerance = group.tolerance ?? 0
+            let _tolerance = group.tolerance ?? 0
             for node in available {
                 if let result = await healthChecker.result(for: node.name), result.alive, let latency = result.latency {
                     if latency < bestLatency {

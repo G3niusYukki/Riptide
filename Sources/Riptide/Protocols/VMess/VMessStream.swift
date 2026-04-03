@@ -46,7 +46,7 @@ public actor VMessStream: Sendable {
         header.append(targetData)
         header.append(0) // random fill length
 
-        let uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
+        let _uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
         let timestamp = UInt64(Date().timeIntervalSince1970)
         var timestampData = Data(count: 8)
         timestampData.withUnsafeMutableBytes { ptr in
@@ -67,7 +67,7 @@ public actor VMessStream: Sendable {
         let encryptedHeader = try encryptAES128(header, key: headerKey, iv: headerIV)
 
         var authData = Data(count: 8)
-        for i in 0..<8 { authData.append(UInt8.random(in: 0...255)) }
+        for _ in 0..<8 { authData.append(UInt8.random(in: 0...255)) }
         authData.append(timestampData)
         authData.append(encryptedHeader)
         authData.append(1) // header length
@@ -154,7 +154,7 @@ public actor VMessStream: Sendable {
     }
 
     private func decryptAES128(_ ciphertext: Data, key: SymmetricKey, iv: Data) throws -> Data {
-        let nonce = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
+        let _nonce = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
         let sealed = try AES.GCM.SealedBox(combined: ciphertext)
         return try AES.GCM.open(sealed, using: key)
     }
