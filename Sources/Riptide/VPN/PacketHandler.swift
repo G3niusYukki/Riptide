@@ -85,6 +85,7 @@ public struct TCPHeader {
     public var fin: Bool { flags.fin }
     public var rst: Bool { flags.rst }
     public var psh: Bool { flags.psh }
+    public var urg: Bool { flags.urg }
 }
 
 public struct UDPHeader {
@@ -129,6 +130,9 @@ public struct TCPFlags: Sendable {
     public var fin: Bool { (raw & 0x01) != 0 }
     public var rst: Bool { (raw & 0x04) != 0 }
     public var psh: Bool { (raw & 0x08) != 0 }
+    public var urg: Bool { (raw & 0x20) != 0 }
+    public var ece: Bool { (raw & 0x40) != 0 }
+    public var cwr: Bool { (raw & 0x80) != 0 }
 }
 
 public enum PacketHandler {
@@ -164,6 +168,8 @@ public enum PacketHandler {
         payload: Data
     ) -> Data {
         let tcpHeader = buildTCPHeader(
+            srcIP: srcIP,
+            dstIP: dstIP,
             srcPort: srcPort,
             dstPort: dstPort,
             seq: seq,
@@ -298,6 +304,8 @@ public enum PacketHandler {
     // ============================================================
 
     private static func buildTCPHeader(
+        srcIP: String,
+        dstIP: String,
         srcPort: UInt16,
         dstPort: UInt16,
         seq: UInt32,
@@ -324,19 +332,29 @@ public enum PacketHandler {
         header[14] = UInt8(windowSize >> 8)
         header[15] = UInt8(windowSize & 0xFF)
         // bytes 16-17: checksum (filled below)
-        // bytes 18-19: urgent pointer
+        // bytes 18-19: urgent pointer (0)
 
         // Compute TCP checksum with pseudo-header (RFC 793)
         let tcpLength = UInt16(header.count + payload.count)
+        let srcParts = srcIP.split(separator: ".").compactMap { UInt8($0) }
+        let dstParts = dstIP.split(separator: ".").compactMap { UInt8($0) }
 
-        // Build pseudo-header
-        var pseudoHeader = Data(count: 12)
-        // Source IP (placeholder — caller should use swapIPAddresses pattern)
-        pseudoHeader[11] = 6  // protocol = TCP
-        pseudoHeader.append(header)
-        pseudoHeader.append(payload)
+        // Build pseudo-header with actual IP addresses
+        var pseudoHeader = Data(capacity: 12)
+        pseudoHeader.append(srcParts.count >= 4 ? srcParts[0] : 0)
+        pseudoHeader.append(srcParts.count >= 4 ? srcParts[1] : 0)
+        pseudoHeader.append(srcParts.count >= 4 ? srcParts[2] : 0)
+        pseudoHeader.append(srcParts.count >= 4 ? srcParts[3] : 0)
+        pseudoHeader.append(dstParts.count >= 4 ? dstParts[0] : 0)
+        pseudoHeader.append(dstParts.count >= 4 ? dstParts[1] : 0)
+        pseudoHeader.append(dstParts.count >= 4 ? dstParts[2] : 0)
+        pseudoHeader.append(dstParts.count >= 4 ? dstParts[3] : 0)
+        pseudoHeader.append(0)        // reserved
+        pseudoHeader.append(6)        // protocol = TCP
+        pseudoHeader.append(UInt8(tcpLength >> 8))
+        pseudoHeader.append(UInt8(tcpLength & 0xFF))
 
-        let checksum = computeChecksum(pseudoHeader)
+        let checksum = computeChecksum(pseudoHeader + header + payload)
         header[16] = UInt8(checksum >> 8)
         header[17] = UInt8(checksum & 0xFF)
 
@@ -380,17 +398,23 @@ public enum PacketHandler {
         guard packet.count >= 20 else { return packet }
         var result = packet
 
-        // Swap IP src and dst (bytes 12-19)
-        let srcIP = result[12...19]
-        result.replaceSubrange(12...19, with: result[16...23])
-        result.replaceSubrange(16...23, with: srcIP)
+        // Swap source IP (bytes 12-15) with destination IP (bytes 16-19)
+        let src0 = result[12], src1 = result[13], src2 = result[14], src3 = result[15]
+        result[12] = result[16]
+        result[13] = result[17]
+        result[14] = result[18]
+        result[15] = result[19]
+        result[16] = src0
+        result[17] = src1
+        result[18] = src2
+        result[19] = src3
 
         return result
     }
 
     /// Swap both IP addresses and UDP/TCP ports in a packet for response.
     public static func swapIPAndPorts(_ packet: Data) -> Data {
-        guard packet.count >= 20 else { return packet }
+        guard packet.count >= 24 else { return packet }
         var result = packet
 
         // Swap IP addresses
@@ -398,10 +422,12 @@ public enum PacketHandler {
 
         let ipProtocol = result[9]
         if ipProtocol == 6 || ipProtocol == 17 {  // TCP or UDP
-            // Swap ports (bytes 20-23 for TCP/UDP)
-            let srcPort = result[20...21]
-            result.replaceSubrange(20...21, with: result[22...23])
-            result.replaceSubrange(22...23, with: srcPort)
+            // Swap ports (bytes 20-23)
+            let srcPort0 = result[20], srcPort1 = result[21]
+            result[20] = result[22]
+            result[21] = result[23]
+            result[22] = srcPort0
+            result[23] = srcPort1
         }
 
         return result

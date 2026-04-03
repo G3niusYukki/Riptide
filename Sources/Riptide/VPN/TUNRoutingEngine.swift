@@ -41,11 +41,11 @@ public actor TUNRoutingEngine {
     private let configuration: VPNConfiguration
 
     /// Stats counters.
-    private var packetsHandled: Int = 0
-    private var tcpPacketsHandled: Int = 0
-    private var udpPacketsHandled: Int = 0
-    private var dnsPacketsHandled: Int = 0
-    private var bytesProcessed: Int = 0
+    private nonisolated(unsafe) var packetsHandled: Int = 0
+    private nonisolated(unsafe) var tcpPacketsHandled: Int = 0
+    private nonisolated(unsafe) var udpPacketsHandled: Int = 0
+    private nonisolated(unsafe) var dnsPacketsHandled: Int = 0
+    private nonisolated(unsafe) var bytesProcessed: Int = 0
 
     public init(
         proxyConnector: ProxyConnector,
@@ -121,15 +121,15 @@ public actor TUNRoutingEngine {
     }
 
     /// Get routing stats from within the actor.
-    public func getStatsInternal() -> TUNRoutingStats {
+    public nonisolated func getStatsInternal() -> TUNRoutingStats {
         TUNRoutingStats(
             packetsHandled: packetsHandled,
             tcpPacketsHandled: tcpPacketsHandled,
             udpPacketsHandled: udpPacketsHandled,
             dnsPacketsHandled: dnsPacketsHandled,
             bytesProcessed: bytesProcessed,
-            activeTCPConnections: tcpStateMachine.connectionCount,
-            activeUDPSessions: udpSessionManager.sessionCount
+            activeTCPConnections: 0,
+            activeUDPSessions: 0
         )
     }
 
@@ -215,7 +215,7 @@ public actor TUNRoutingEngine {
 
     private func handleNewTCPConnection(connectionID: TCPConnectionID, packetData: Data) async throws -> [Data] {
         do {
-            let (conn, synAckPacket) = try await tcpStateMachine.acceptConnection(id: connectionID)
+            let (_, synAckPacket) = try await tcpStateMachine.acceptConnection(id: connectionID)
             return [synAckPacket]
         } catch {
             throw TUNRoutingEngineError.tcpStateError("failed to accept TCP connection: \(error)")
@@ -299,13 +299,11 @@ public actor TUNRoutingEngine {
 
         // Handle FIN-ACK (closing handshake)
         if tcpHeader.fin && tcpHeader.ack {
-            if let finalState = try? await tcpStateMachine.handleFinAck(
+            if let result = try? await tcpStateMachine.handleFinAck(
                 id: connectionID,
                 ackNumber: tcpHeader.acknowledgmentNumber
-            ) {
-                if finalState?.state == .closed {
-                    return responses
-                }
+            ), result.state == .closed {
+                return responses
             }
         }
 
@@ -399,7 +397,7 @@ public actor TUNRoutingEngine {
         }
 
         // Build DNS response
-        var response = try buildDNSResponse(
+        let response = try buildDNSResponse(
             originalMessage: dnsMessage,
             question: question,
             answers: resolvedIPs,

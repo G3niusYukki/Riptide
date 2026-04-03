@@ -70,7 +70,7 @@ public actor UDPSession {
     }
 
     /// Close the session.
-    public func close() {
+    public func close() async {
         isActive = false
         pendingPackets.removeAll()
     }
@@ -223,10 +223,12 @@ public actor UDPSessionManager {
 
     // MARK: - Private
 
-    private func cleanupSession(id: UDPSessionID) {
+    private func cleanupSession(id: UDPSessionID) async {
         cleanupTasks[id]?.cancel()
         cleanupTasks.removeValue(forKey: id)
-        sessions[id]?.close()
+        if let session = sessions[id] {
+            await session.close()
+        }
         sessions.removeValue(forKey: id)
     }
 

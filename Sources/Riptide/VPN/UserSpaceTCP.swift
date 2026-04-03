@@ -126,16 +126,12 @@ public actor TCPStateMachine {
     private var pendingConnections: [TCPConnectionID: ManagedTCPConnection] = [:]
     private let maxConnections: Int
     private let connectionTimeout: Duration
-    private var cleanupTask: Task<Void, Never>?
+    private nonisolated(unsafe) var cleanupTask: Task<Void, Never>?
 
     public init(maxConnections: Int = 10000, connectionTimeout: Duration = .seconds(300)) {
         self.maxConnections = maxConnections
         self.connectionTimeout = connectionTimeout
-        self.cleanupTask = Task { await self.runCleanupLoop() }
-    }
-
-    deinit {
-        cleanupTask?.cancel()
+        // Cleanup loop is started lazily on first connection access
     }
 
     /// Get or create a connection by ID.

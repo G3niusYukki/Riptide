@@ -34,7 +34,7 @@ public enum ClashConfigParser {
         let proxyNameSet = Set(proxies.map(\.name))
         let groupIDSet = Set(proxyGroups.map(\.id))
         let knownProxySet = proxyNameSet.union(groupIDSet)
-        let rules = try parseRules(raw.rules, knownProxies: knownProxySet, ruleProviders: ruleProviders)
+        let rules = try parseRules(raw.rules, mode: mode, knownProxies: knownProxySet, ruleProviders: ruleProviders)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
         let dnsPolicy = parseDNSPolicy(raw.dns)
         return RiptideConfig(
@@ -202,11 +202,17 @@ public enum ClashConfigParser {
 
     private static func parseRules(
         _ rawRules: [String]?,
+        mode: ProxyMode,
         knownProxies: Set<String>,
         ruleProviders: [String: RuleSetProviderConfig]
     ) throws -> [ProxyRule] {
         guard let rawRules, !rawRules.isEmpty else {
-            throw ClashConfigError.missingRules
+            switch mode {
+            case .rule:
+                throw ClashConfigError.missingRules
+            case .global, .direct:
+                return []
+            }
         }
 
         return try rawRules.enumerated().map { index, rawRule in
