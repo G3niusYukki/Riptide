@@ -103,11 +103,19 @@ public struct RiptideConfig: Equatable, Sendable {
     public let proxies: [ProxyNode]
     public let rules: [ProxyRule]
     public let proxyGroups: [ProxyGroup]
+    public let dnsPolicy: DNSPolicy
 
-    public init(mode: ProxyMode, proxies: [ProxyNode], rules: [ProxyRule], proxyGroups: [ProxyGroup] = []) {
+    public init(
+        mode: ProxyMode,
+        proxies: [ProxyNode],
+        rules: [ProxyRule],
+        proxyGroups: [ProxyGroup] = [],
+        dnsPolicy: DNSPolicy = DNSPolicy()
+    ) {
         self.mode = mode
         self.proxies = proxies
         self.rules = rules
         self.proxyGroups = proxyGroups
+        self.dnsPolicy = dnsPolicy
     }
 }

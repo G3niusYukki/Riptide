@@ -27,7 +27,8 @@ public enum ClashConfigParser {
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
 
         let proxyGroups = try parseProxyGroups(raw.proxyGroups)
-        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups)
+        let dnsPolicy = parseDNSPolicy(raw.dns)
+        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups, dnsPolicy: dnsPolicy)
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {
@@ -305,6 +306,41 @@ public enum ClashConfigParser {
             break
         }
     }
+
+    private static func parseDNSPolicy(_ raw: ClashRawDNS?) -> DNSPolicy {
+        guard let raw, raw.enable != false else {
+            return DNSPolicy(enable: false)
+        }
+        let enhancedMode: DNSEnhancedMode = (raw.enhancedMode == "fake-ip") ? .fakeIP : .realIP
+        return DNSPolicy(
+            enable: raw.enable ?? true,
+            listen: raw.listen,
+            enhancedMode: enhancedMode,
+            fakeIPRange: raw.fakeIPRange ?? "198.18.0.0/15",
+            fakeIPFilter: raw.fakeIPFilter ?? [],
+            nameserver: raw.nameserver ?? ["8.8.8.8", "1.1.1.1"],
+            fallback: raw.fallback,
+            nameserverPolicy: raw.nameserverPolicy ?? [:]
+        )
+    }
+}
+
+private struct ClashRawDNS: Codable {
+    let enable: Bool?
+    let listen: String?
+    let enhancedMode: String?
+    let fakeIPRange: String?
+    let fakeIPFilter: [String]?
+    let nameserver: [String]?
+    let fallback: [String]?
+    let nameserverPolicy: [String: [String]]?
+
+    private enum CodingKeys: String, CodingKey {
+        case enable, listen, nameserver, fallback, nameserverPolicy
+        case enhancedMode = "enhanced-mode"
+        case fakeIPRange = "fake-ip-range"
+        case fakeIPFilter = "fake-ip-filter"
+    }
 }
 
 private struct ClashRawProxyGroup: Codable {
@@ -325,9 +361,10 @@ private struct ClashRawConfig: Decodable {
     let proxies: [ClashRawProxy]?
     let rules: [String]?
     var proxyGroups: [ClashRawProxyGroup]?
+    let dns: ClashRawDNS?
 
     private enum CodingKeys: String, CodingKey {
-        case mode, proxies, rules
+        case mode, proxies, rules, dns
         case proxyGroups = "proxy-groups"
     }
 }
