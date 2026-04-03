@@ -118,7 +118,27 @@ public enum ClashConfigParser {
                     network: proxy.network
                 )
 
-            case .socks5, .http, .vmess, .hysteria2:
+            case .vmess:
+                guard let uuid = proxy.uuid, !uuid.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VMess")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .vmess,
+                    server: proxy.server,
+                    port: port,
+                    uuid: uuid,
+                    alterId: proxy.alterId,
+                    security: proxy.security,
+                    sni: proxy.sni,
+                    alpn: proxy.alpn,
+                    skipCertVerify: proxy.skipCertVerify,
+                    network: proxy.network,
+                    wsPath: proxy.wsOpts?.path,
+                    wsHost: proxy.wsOpts?.headers?["Host"]
+                )
+
+            case .socks5, .http:
                 return ProxyNode(
                     name: proxy.name,
                     kind: kind,
@@ -126,6 +146,20 @@ public enum ClashConfigParser {
                     port: port,
                     cipher: proxy.cipher,
                     password: proxy.password
+                )
+
+            case .hysteria2:
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Hysteria2")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .hysteria2,
+                    server: proxy.server,
+                    port: port,
+                    password: password,
+                    sni: proxy.sni,
+                    skipCertVerify: proxy.skipCertVerify
                 )
             }
         }
@@ -208,6 +242,48 @@ public enum ClashConfigParser {
                 }
                 return .ipCIDR(
                     cidr: parts[1],
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "IP-CIDR6":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "IP-CIDR6 requires CIDR and policy")
+                }
+                return .ipCIDR6(
+                    cidr: parts[1],
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "SRC-IP-CIDR":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-IP-CIDR requires CIDR and policy")
+                }
+                return .srcIPCIDR(
+                    cidr: parts[1],
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "SRC-PORT":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-PORT requires port and policy")
+                }
+                guard let port = Int(parts[1]), (1...65535).contains(port) else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-PORT requires a valid port number (1-65535)")
+                }
+                return .srcPort(
+                    port: port,
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "DST-PORT":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "DST-PORT requires port and policy")
+                }
+                guard let port = Int(parts[1]), (1...65535).contains(port) else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "DST-PORT requires a valid port number (1-65535)")
+                }
+                return .dstPort(
+                    port: port,
                     policy: try parsePolicy(parts[2], knownProxies: knownProxies)
                 )
 
@@ -348,7 +424,8 @@ public enum ClashConfigParser {
             domainPolicies: [],
             respectRules: raw.respectRules ?? false,
             fakeIPEnabled: raw.fakeIP ?? true,
-            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16"
+            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16",
+            hosts: raw.hosts ?? [:]
         )
     }
 }
@@ -370,10 +447,12 @@ private struct ClashRawDNS: Decodable {
     let enable: Bool?
     let nameserver: [String]?
     let fallback: [String]?
+    let tlsNameserver: [String]?
     let fakeIP: Bool?
     let fakeIPRange: String?
     let respectRules: Bool?
     let defaultNameserver: [String]?
+    let hosts: [String: String]?
 
     enum CodingKeys: String, CodingKey {
         case enable
@@ -383,6 +462,8 @@ private struct ClashRawDNS: Decodable {
         case fakeIPRange = "fake-ip-range"
         case respectRules = "respect-rules"
         case defaultNameserver = "default-nameserver"
+        case hosts
+        case tlsNameserver = "tls-nameserver"
     }
 }
 
