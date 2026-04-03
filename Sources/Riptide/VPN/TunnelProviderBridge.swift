@@ -28,7 +28,7 @@ public actor TunnelProviderBridge {
         switch command {
         case .start(let configData):
             try await start(with: configData)
-            return makeSnapshot(running: true)
+            return makeSnapshot(running: vpnManager?.isRunning ?? false)
 
         case .stop:
             vpnManager?.stop(reason: "extension command")

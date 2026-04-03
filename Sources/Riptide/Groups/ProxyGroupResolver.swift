@@ -5,6 +5,7 @@ public enum ProxyGroupResolverError: Error, Equatable, Sendable {
     case groupNotFound(String)
     case noHealthyNode(String)
     case unknownNode(String)
+    case wrongGroupKind(String)
 }
 
 /// Actor that resolves proxy group policies to concrete proxy node names.
@@ -34,7 +35,7 @@ public actor ProxyGroupResolver {
             throw ProxyGroupResolverError.groupNotFound(groupID)
         }
         guard group.kind == .select else {
-            throw ProxyGroupResolverError.groupNotFound(groupID) // or a different error
+            throw ProxyGroupResolverError.wrongGroupKind(groupID)
         }
         guard group.proxies.contains(proxyName) else {
             throw ProxyGroupResolverError.unknownNode(proxyName)
@@ -60,13 +61,19 @@ public actor ProxyGroupResolver {
                nodeProxies.contains(where: { $0.name == choice }) {
                 return choice
             }
-            // Pick the first alive proxy, or first in list
+            // Pick the first alive proxy, or first configured proxy
             for node in nodeProxies {
                 if let result = await healthChecker.result(for: node.name), result.alive {
                     return node.name
                 }
             }
-            return nodeProxies.first?.name ?? group.proxies.first!
+            if let firstNode = nodeProxies.first {
+                return firstNode.name
+            }
+            if let unknownProxy = group.proxies.first {
+                throw ProxyGroupResolverError.unknownNode(unknownProxy)
+            }
+            throw ProxyGroupResolverError.noHealthyNode(groupID)
 
         case .urlTest:
             guard let best = await selector.select(group: group, proxies: nodeProxies) else {

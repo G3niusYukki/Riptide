@@ -74,19 +74,17 @@ public actor ExternalController {
         listener = nil
     }
 
-    public func snapshot(mode: RuntimeMode) -> TunnelStatusSnapshot {
-        // In a full implementation this would embed the mode context into the snapshot.
-        // Here we return the current runtime status wrapped with mode context.
-        // The mode is stored in self.currentMode and can be compared with the passed mode.
-        let baseSnapshot = TunnelStatusSnapshot(
+    public func snapshot(mode: RuntimeMode) async -> TunnelStatusSnapshot {
+        currentMode = mode
+        let status = await runtime.status()
+        return TunnelStatusSnapshot(
             state: .stopped,
             activeProfileName: nil,
-            bytesUp: 0,
-            bytesDown: 0,
-            activeConnections: 0,
+            bytesUp: status.bytesUp,
+            bytesDown: status.bytesDown,
+            activeConnections: status.activeConnections,
             lastError: nil
         )
-        return baseSnapshot
     }
 
     private func handleRequest(_ connection: NWConnection) async {

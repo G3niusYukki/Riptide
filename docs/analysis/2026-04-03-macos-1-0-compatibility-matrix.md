@@ -41,10 +41,10 @@
 
 | Type | Config Key | Status | Notes |
 |------|-----------|--------|-------|
-| Select | `select` | Model only | No runtime resolver yet |
-| URL-Test | `url-test` | Model only | No runtime resolver yet |
-| Fallback | `fallback` | Model only | No runtime resolver yet |
-| Load-Balance | `load-balance` | Model only | No runtime resolver yet |
+| Select | `select` | Runtime | `ProxyGroupResolver` with persisted user choice |
+| URL-Test | `url-test` | Runtime | Health-aware selection via `GroupSelector` |
+| Fallback | `fallback` | Runtime | Health-aware selection via `GroupSelector` |
+| Load-Balance | `load-balance` | Runtime | Health-aware selection via `GroupSelector` |
 
 ## Supported Subscription / Import Inputs
 
@@ -73,5 +73,5 @@ The following inputs must raise diagnostics when encountered:
 
 | Mode | Status | Notes |
 |------|--------|-------|
-| System Proxy | Planned for Alpha | HTTP/SOCKS local proxy |
-| TUN | Planned for Beta | Packet tunnel via NetworkExtension |
+| System Proxy | Beta | HTTP/SOCKS local proxy via `ModeCoordinator` |
+| TUN | Scaffolded | Packet tunnel via NetworkExtension, bridge layer ready |

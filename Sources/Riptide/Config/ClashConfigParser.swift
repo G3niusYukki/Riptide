@@ -260,6 +260,7 @@ public enum ClashConfigParser {
         return DNSPolicy(
             primaryResolvers: primary,
             fallbackResolvers: fallback,
+            // TODO: Parse per-domain DNS overrides from ClashRawDNS.custom
             domainPolicies: [],
             respectRules: raw.respectRules ?? false,
             fakeIPEnabled: raw.fakeIP ?? true,

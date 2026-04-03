@@ -33,6 +33,9 @@ public struct RiptideMenuBar: View {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+                .onChange(of: viewModel.selectedMode) {
+                    viewModel.requestModeChange(viewModel.selectedMode)
+                }
             }
 
             Divider()
@@ -66,6 +69,12 @@ public final class MenuBarViewModel: ObservableObject {
         self.isRunning = appViewModel.isRunning
     }
 
+    /// Request a mode switch. Currently a no-op placeholder — will be wired
+    /// to ModeCoordinator once the mode-switch control path is implemented.
+    public func requestModeChange(_ mode: RuntimeMode) {
+        // TODO: Wire through ModeCoordinator / control channel
+    }
+
     public func toggleConnection() async {
         if isRunning {
             await appViewModel.stop()
@@ -80,7 +89,8 @@ public final class MenuBarViewModel: ObservableObject {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
-    public func update() {
+    /// Refresh state from the app view model to stay in sync.
+    public func syncFromApp() {
         isRunning = appViewModel.isRunning
         updateStatusLabel()
     }

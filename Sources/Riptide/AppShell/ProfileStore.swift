@@ -57,7 +57,9 @@ public actor ProfileStore {
         self.fileURL = dir.appendingPathComponent(fileName)
         self.profiles = [:]
         self.currentProfileID = nil
-        self.profiles = try Self.loadFromDisk(fileURL: fileURL)
+        let loaded = try Self.loadFromDisk(fileURL: fileURL)
+        self.profiles = loaded.profiles
+        self.currentProfileID = loaded.currentProfileID
     }
 
     /// Import a YAML config as a new local profile and make it active.
@@ -150,12 +152,12 @@ public actor ProfileStore {
         try data.write(to: fileURL)
     }
 
-    private static func loadFromDisk(fileURL: URL) throws -> [UUID: Profile] {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [:] }
+    private static func loadFromDisk(fileURL: URL) throws -> (profiles: [UUID: Profile], currentProfileID: UUID?) {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return ([:], nil) }
         do {
             let data = try Data(contentsOf: fileURL)
             let wrapper = try JSONDecoder().decode(Wrapper.self, from: data)
-            return wrapper.profiles
+            return (wrapper.profiles, wrapper.currentProfileID)
         } catch {
             throw ProfileStoreError.persistenceFailed(String(describing: error))
         }

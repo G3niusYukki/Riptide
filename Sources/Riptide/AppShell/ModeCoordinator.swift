@@ -23,12 +23,11 @@ public actor ModeCoordinator {
     }
 
     public func start(mode: RuntimeMode, profile: TunnelProfile?) async throws {
-        activeMode = mode
-
         switch mode {
         case .systemProxy:
             do {
                 try systemProxyController.enable(httpPort: Self.defaultHTTPPort, socksPort: nil)
+                activeMode = mode
                 emit(.modeChanged(.systemProxy))
                 emit(.stateChanged(.running))
             } catch {
@@ -47,10 +46,15 @@ public actor ModeCoordinator {
                 emit(.error(RuntimeErrorSnapshot(code: "E_NO_MANAGER", message: msg)))
                 throw SystemProxyError.unknown("no lifecycle manager for TUN mode")
             }
+            guard let profile else {
+                let msg = "TUN mode requires a profile"
+                emit(.degraded(.tun, msg))
+                emit(.error(RuntimeErrorSnapshot(code: "E_NO_PROFILE", message: msg)))
+                throw SystemProxyError.unknown("no profile for TUN mode")
+            }
             do {
-                if let profile {
-                    try await manager.start(profile: profile)
-                }
+                try await manager.start(profile: profile)
+                activeMode = mode
                 emit(.modeChanged(.tun))
                 emit(.stateChanged(.running))
             } catch {
