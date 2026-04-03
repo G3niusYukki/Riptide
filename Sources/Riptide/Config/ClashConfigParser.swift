@@ -26,7 +26,8 @@ public enum ClashConfigParser {
         let rules = try parseRules(raw.rules, knownProxies: proxyNameSet, mode: mode)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
 
-        return RiptideConfig(mode: mode, proxies: proxies, rules: rules)
+        let proxyGroups = try parseProxyGroups(raw.proxyGroups)
+        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups)
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {
@@ -78,7 +79,43 @@ public enum ClashConfigParser {
                     password: password
                 )
 
-            case .socks5, .http, .vmess, .vless, .trojan, .hysteria2:
+            case .vless:
+                guard let uuid = proxy.uuid, !uuid.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VLESS")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .vless,
+                    server: proxy.server,
+                    port: port,
+                    uuid: uuid,
+                    flow: proxy.flow,
+                    sni: proxy.sni,
+                    alpn: proxy.alpn,
+                    skipCertVerify: proxy.skipCertVerify,
+                    network: proxy.network,
+                    wsPath: proxy.wsOpts?.path,
+                    wsHost: proxy.wsOpts?.headers?["Host"],
+                    grpcServiceName: proxy.grpcOpts?.grpcServiceName
+                )
+
+            case .trojan:
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Trojan")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .trojan,
+                    server: proxy.server,
+                    port: port,
+                    password: password,
+                    sni: proxy.sni,
+                    alpn: proxy.alpn,
+                    skipCertVerify: proxy.skipCertVerify,
+                    network: proxy.network
+                )
+
+            case .socks5, .http, .vmess, .hysteria2:
                 return ProxyNode(
                     name: proxy.name,
                     kind: kind,
@@ -99,8 +136,16 @@ public enum ClashConfigParser {
             return .socks5
         case "http":
             return .http
+        case "vmess":
+            return .vmess
+        case "vless":
+            return .vless
+        case "trojan":
+            return .trojan
+        case "hysteria2":
+            return .hysteria2
         default:
-            throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type")
+            throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type: \(rawType ?? "nil")")
         }
     }
 
@@ -203,6 +248,45 @@ public enum ClashConfigParser {
         }
     }
 
+    private static func parseProxyGroups(_ rawGroups: [ClashRawProxyGroup]?) throws -> [ProxyGroup] {
+        guard let rawGroups, !rawGroups.isEmpty else { return [] }
+        return try rawGroups.enumerated().map { index, group in
+            guard let id = group.name, !id.isEmpty else {
+                throw ClashConfigError.invalidProxy(index: index, reason: "proxy-group name is required")
+            }
+            guard let typeStr = group.type else {
+                throw ClashConfigError.invalidProxy(index: index, reason: "proxy-group type is required")
+            }
+            let kind: ProxyGroupKind
+            switch typeStr.lowercased() {
+            case "select":
+                kind = .select
+            case "url-test":
+                kind = .urlTest
+            case "fallback":
+                kind = .fallback
+            case "load-balance":
+                kind = .loadBalance
+            default:
+                throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy-group type: \(typeStr)")
+            }
+            let strategy: LBStrategy?
+            if let s = group.strategy {
+                strategy = (s == "consistent-hashing") ? .consistentHashing : .roundRobin
+            } else {
+                strategy = nil
+            }
+            return ProxyGroup(
+                id: id,
+                kind: kind,
+                proxies: group.proxies ?? [],
+                interval: group.interval,
+                tolerance: group.tolerance,
+                strategy: strategy
+            )
+        }
+    }
+
     private static func validateModeRequirements(
         mode: ProxyMode,
         proxies: [ProxyNode],
@@ -223,10 +307,29 @@ public enum ClashConfigParser {
     }
 }
 
+private struct ClashRawProxyGroup: Codable {
+    let name: String?
+    let `type`: String?
+    let proxies: [String]?
+    let interval: Int?
+    let tolerance: Int?
+    let strategy: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case name, type, proxies, interval, tolerance, strategy
+    }
+}
+
 private struct ClashRawConfig: Decodable {
     let mode: String?
     let proxies: [ClashRawProxy]?
     let rules: [String]?
+    var proxyGroups: [ClashRawProxyGroup]?
+
+    private enum CodingKeys: String, CodingKey {
+        case mode, proxies, rules
+        case proxyGroups = "proxy-groups"
+    }
 }
 
 private struct ClashRawProxy: Decodable {
@@ -236,4 +339,35 @@ private struct ClashRawProxy: Decodable {
     let port: Int?
     let cipher: String?
     let password: String?
+    let uuid: String?
+    let alterId: Int?
+    let security: String?
+    let flow: String?
+    let network: String?
+    let tls: Bool?
+    let sni: String?
+    let alpn: [String]?
+    let skipCertVerify: Bool?
+    let wsOpts: WSOpts?
+    let grpcOpts: GRPCOpts?
+
+    struct WSOpts: Codable {
+        let path: String?
+        let headers: [String: String]?
+    }
+
+    struct GRPCOpts: Codable {
+        let grpcServiceName: String?
+        private enum CodingKeys: String, CodingKey {
+            case grpcServiceName = "grpc-service-name"
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name, type, server, port, cipher, password
+        case uuid, alterId, security, flow, network, tls, sni, alpn
+        case skipCertVerify = "skip-cert-verify"
+        case wsOpts = "ws-opts"
+        case grpcOpts = "grpc-opts"
+    }
 }
