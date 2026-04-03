@@ -30,8 +30,12 @@ public struct ProxyConnector: Sendable {
                 try await performSOCKS5Connect(session: connection.session, target: target)
             case .shadowsocks:
                 return try await performShadowsocksConnect(connection: connection, node: node, target: target)
-            case .vmess, .vless, .trojan, .hysteria2:
-                throw ProtocolError.malformedResponse("\(node.kind) protocol connector not yet implemented")
+            case .vless:
+                return try await performVLESSConnect(connection: connection, node: node, target: target)
+            case .trojan:
+                return try await performTrojanConnect(connection: connection, node: node, target: target)
+            case .vmess, .hysteria2:
+                throw ProtocolError.malformedResponse("\(node.kind) protocol not supported yet")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {
@@ -100,6 +104,32 @@ public struct ProxyConnector: Sendable {
             connection: connection,
             encryptedStream: ssStream
         )
+    }
+
+    private func performVLESSConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString) else {
+            throw ProtocolError.malformedResponse("VLESS node missing uuid")
+        }
+        let vlessStream = VLESSStream(session: connection.session, uuid: uuid)
+        try await vlessStream.connect(to: target, flow: node.flow)
+        return ConnectedProxyContext(node: node, connection: connection)
+    }
+
+    private func performTrojanConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let password = node.password else {
+            throw ProtocolError.malformedResponse("Trojan node missing password")
+        }
+        let trojanStream = try TrojanStream(session: connection.session, password: password)
+        try await trojanStream.connect(to: target)
+        return ConnectedProxyContext(node: node, connection: connection)
     }
 
     private func selectDialer(for node: ProxyNode) -> any TransportDialer {
