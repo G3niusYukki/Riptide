@@ -4,21 +4,18 @@ import Riptide
 @main
 struct RiptideApp: App {
     @State private var appVM = AppViewModel()
-    @State private var statusBarController = StatusBarController()
+    @State private var statusBar = StatusBarController()
 
     var body: some Scene {
         WindowGroup {
             MainTabView(vm: appVM)
                 .preferredColorScheme(.dark)
+                .frame(minWidth: 800, minHeight: 500)
+                .onAppear {
+                    statusBar.setup(vm: appVM)
+                }
         }
         .windowStyle(.hiddenTitleBar)
-        .commands {
-            CommandGroup(replacing: .appSettings) {
-                Button("Preferences…") {
-                    NSApp.sendAction(Selector(("showPreferencesWindow")), to: nil, from: nil)
-                }
-                .keyboardShortcut(",", modifiers: .command)
-            }
-        }
+        .defaultSize(width: 900, height: 600)
     }
 }
