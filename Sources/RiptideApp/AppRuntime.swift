@@ -1,6 +1,15 @@
 import Foundation
 import Riptide
 
+/// A simple RuntimeControlSurface carrying a mode.
+public struct RuntimeControlSurface: Sendable {
+    public let mode: RuntimeMode
+
+    public init(mode: RuntimeMode) {
+        self.mode = mode
+    }
+}
+
 actor AppMockTunnelRuntime: TunnelRuntime {
     private var currentStatus = TunnelRuntimeStatus()
 
@@ -34,5 +43,9 @@ enum DemoConfigFactory {
         rules:
           - MATCH,demo-socks
         """
+    }
+
+    static func makeControlSurface(mode: RuntimeMode) -> RuntimeControlSurface {
+        RuntimeControlSurface(mode: mode)
     }
 }
