@@ -154,8 +154,11 @@ struct LiveTunnelRuntimeTests {
         #expect(await directDialer.openRequests.count == 0)
     }
 
-    @Test("runtime uses shared pool so close then acquire reuses connection")
-    func runtimeUsesSharedPool() async throws {
+    @Test("runtime creates new connection for different targets after close (SOCKS5 tunnels are not reusable)")
+    func runtimeCreatesNewConnectionForDifferentTarget() async throws {
+        // SOCKS5: once a CONNECT succeeds, the TCP stream is a tunnel to that specific target.
+        // After closeConnection, requesting a different target must open a new session —
+        // reusing the old one would send traffic to the wrong destination.
         let node = ProxyNode(name: "socks-node", kind: .socks5, server: "10.0.0.2", port: 1080)
         let config = RiptideConfig(
             mode: .rule,
@@ -164,11 +167,15 @@ struct LiveTunnelRuntimeTests {
         )
         let profile = TunnelProfile(name: "shared-pool", config: config)
 
-        let session = MockTransportSession(receiveQueue: [
+        let session1 = MockTransportSession(receiveQueue: [
             Data([0x05, 0x00]),
             Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
         ])
-        let proxyDialer = LiveRuntimeMockDialer([session])
+        let session2 = MockTransportSession(receiveQueue: [
+            Data([0x05, 0x00]),
+            Data([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x1F, 0x90]),
+        ])
+        let proxyDialer = LiveRuntimeMockDialer([session1, session2])
         let directDialer = LiveRuntimeMockDialer([])
         let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
 
@@ -178,7 +185,9 @@ struct LiveTunnelRuntimeTests {
 
         let ctx2 = try await runtime.openConnection(target: ConnectionTarget(host: "b.com", port: 443))
 
-        #expect(await proxyDialer.openRequests.count == 1)
-        #expect(ctx1.connection.id == ctx2.connection.id)
+        // A new dial should have been made since SOCKS5 tunnels are not reusable across targets
+        #expect(await proxyDialer.openRequests.count == 2)
+        #expect(ctx1.connection.id != ctx2.connection.id)
     }
+
 }

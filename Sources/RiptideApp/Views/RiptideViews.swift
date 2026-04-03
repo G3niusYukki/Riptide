@@ -1,4 +1,5 @@
 import SwiftUI
+import Riptide
 
 struct ProxyListView: View {
     let proxies: [ProxyNode]

@@ -29,6 +29,8 @@ public struct ProxyConnector: Sendable {
                 try await performSOCKS5Connect(session: connection.session, target: target)
             case .shadowsocks:
                 return try await performShadowsocksConnect(connection: connection, node: node, target: target)
+            case .vmess, .vless, .trojan, .hysteria2:
+                throw ProtocolError.malformedResponse("\(node.kind) protocol connector not yet implemented")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {

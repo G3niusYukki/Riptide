@@ -40,7 +40,10 @@ public struct TLSTransportDialer: TransportDialer {
 
         let tls = NWParameters.tls
         if !hostname.isEmpty {
-            tls.defaultTLS?.peerName = hostname
+            // Configure TLS server name for SNI via the protocol options
+            if let tlsOptions = tls.defaultProtocolStack.applicationProtocols.first as? NWProtocolTLS.Options {
+                sec_protocol_options_set_tls_server_name(tlsOptions.securityProtocolOptions, hostname)
+            }
         }
         let connection = NWConnection(host: host, port: port, using: tls)
         connection.start(queue: .global())

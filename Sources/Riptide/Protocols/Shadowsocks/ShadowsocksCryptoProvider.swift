@@ -52,7 +52,7 @@ struct ShadowsocksCryptoProvider: Sendable {
             info: Data("ss-subkey".utf8),
             outputByteCount: cipher.keyLength
         )
-        return Data(expanded)
+        return expanded.withUnsafeBytes { Data($0) }
     }
 
     func generateSalt() -> Data {
@@ -87,7 +87,7 @@ struct ShadowsocksCryptoProvider: Sendable {
         case .chacha20IETFPoly1305:
             let chachaNonce = try ChaChaPoly.Nonce(data: nonce)
             let sealedBox = try ChaChaPoly.seal(plaintext, using: symmetricKey, nonce: chachaNonce)
-            return sealedBox.combined!
+            return sealedBox.combined
         }
     }
 

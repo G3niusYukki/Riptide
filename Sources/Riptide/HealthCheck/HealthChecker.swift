@@ -22,6 +22,12 @@ public actor HealthChecker {
         self.results = [:]
     }
 
+    /// Check the reachability of testURL and record the result under `node.name`.
+    ///
+    /// **Note:** The current implementation performs a direct `URLSession` HEAD request
+    /// and does **not** route traffic through the provided `ProxyNode`. The `node` parameter
+    /// is used only to label the result. A future iteration should route the probe through
+    /// the proxy dialer so that latency reflects the actual proxy path.
     public func check(node: ProxyNode, testURL: URL = URL(string: "http://www.gstatic.com/generate_204")!,
                       timeout: Duration = .seconds(5)) async -> HealthResult {
         let start = ContinuousClock.now
@@ -84,7 +90,13 @@ public actor GroupSelector {
 
         switch group.kind {
         case .select:
-            let firstAlive = available.first { await healthChecker.result(for: $0.name)?.alive ?? false }
+            var firstAlive: ProxyNode? = nil
+            for node in available {
+                if await healthChecker.result(for: node.name)?.alive ?? false {
+                    firstAlive = node
+                    break
+                }
+            }
             return firstAlive ?? available.first
 
         case .urlTest:

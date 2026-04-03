@@ -109,7 +109,7 @@ public actor SubscriptionManager {
 }
 
 public enum ProxyURIParser {
-    struct ParsedProxy {
+    public struct ParsedProxy {
         let name: String
         let kind: ProxyKind
         let server: String

@@ -24,7 +24,7 @@ struct ShadowsocksCryptoTests {
             info: Data("ss-subkey".utf8),
             outputByteCount: 32
         )
-        #expect(Data(expanded) == subkey)
+        #expect(expanded.withUnsafeBytes { Data($0) } == subkey)
     }
 
     @Test("HKDF derives subkey from password and salt for aes-128-gcm")

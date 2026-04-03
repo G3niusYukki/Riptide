@@ -108,7 +108,7 @@ public actor DNSPipeline {
     }
 
     public func reverseLookup(_ ip: String) -> String? {
-        fakeIPPool.reverseLookup(ip)
+        fakeIPPool.reverseLookup(ip: ip)
     }
 
     public func isFakeIP(_ ip: String) -> Bool {

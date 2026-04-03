@@ -26,33 +26,36 @@ public final class TCPDNSClient: Sendable {
         }
         let connection = NWConnection(host: NWEndpoint.Host(serverHost), port: port, using: .tcp)
 
-        return try await withThrowingTaskGroup(of: Data.self) { group in
-            group.addTask {
-                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-                    connection.stateUpdateHandler = { state in
-                        switch state {
-                        case .ready:
-                            cont.resume()
-                        case .failed(let error):
-                            cont.resume(throwing: DNSError.serverError(String(describing: error)))
-                        default:
-                            break
-                        }
-                    }
-                    connection.start(queue: .global())
+        // Await connection readiness outside the task group (Copilot: task group is Data but ready gate returns Void)
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    cont.resume()
+                case .failed(let error):
+                    cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                default:
+                    break
                 }
             }
+            connection.start(queue: .global())
+        }
 
+        // Use race pattern for timeout instead of non-existent group.next(timeout:)
+        let sendPacket = packet  // copy for sendability
+        let sendConnection = connection
+        let result: Data = try await withThrowingTaskGroup(of: Data.self) { group in
             group.addTask {
-                var buffer = Data()
                 try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
-                    connection.send(content: packet, completion: .contentProcessed { error in
+                    sendConnection.send(content: sendPacket, completion: .contentProcessed { error in
                         if let error {
                             cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                            return
                         }
                     })
+                    var buffer = Data()
                     func readMore() {
-                        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
+                        sendConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
                             if let error {
                                 cont.resume(throwing: DNSError.serverError(String(describing: error)))
                                 return
@@ -76,12 +79,19 @@ public final class TCPDNSClient: Sendable {
                 }
             }
 
-            let result = try await group.next(timeout: timeout)
-            connection.cancel()
-            group.cancelAll()
-            while let _ = try? await group.next() {}
+            group.addTask { [timeout] in
+                try await Task.sleep(for: timeout)
+                throw DNSError.timeout
+            }
 
-            return try DNSMessage.parse(result)
+            guard let first = try await group.next() else {
+                throw DNSError.timeout
+            }
+            group.cancelAll()
+            sendConnection.cancel()
+            return first
         }
+
+        return try DNSMessage.parse(result)
     }
 }

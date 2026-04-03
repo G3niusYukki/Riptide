@@ -5,7 +5,7 @@ public struct IPHeader {
     public let version: UInt8
     public let ihl: UInt8
     public let totalLength: UInt16
-    public let protocol: UInt8
+    public let ipProtocol: UInt8
     public let sourceAddress: String
     public let destinationAddress: String
     public let payload: Data
@@ -20,7 +20,7 @@ public struct IPHeader {
         guard data.count >= headerLength else { return nil }
 
         totalLength = UInt16(data[2]) << 8 | UInt16(data[3])
-        protocol = data[9]
+        ipProtocol = data[9]
 
         sourceAddress = "\(data[12]).\(data[13]).\(data[14]).\(data[15])"
         destinationAddress = "\(data[16]).\(data[17]).\(data[18]).\(data[19])"

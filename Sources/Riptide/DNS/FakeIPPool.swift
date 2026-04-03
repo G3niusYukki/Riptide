@@ -1,6 +1,6 @@
 import Foundation
 
-public final class FakeIPPool: Sendable {
+public final class FakeIPPool: @unchecked Sendable {
     private struct Allocation: Sendable {
         let domain: String
         let allocatedAt: ContinuousClock.Instant

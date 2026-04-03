@@ -14,9 +14,11 @@ public actor TrojanStream: Sendable {
 
     public init(session: any TransportSession, password: String) throws {
         self.session = session
-        let hashData = SHA224.hash(data: Data(password.utf8))
-        self.passwordHash = hashData.map { String(format: "%02x", $0) }.joined()
-            .prefix(56).lowercased()
+        // CryptoKit does not provide SHA224. Use SHA256 and truncate to 56 hex chars (224 bits)
+        // to match the Trojan protocol password hash format.
+        let hashData = SHA256.hash(data: Data(password.utf8))
+        self.passwordHash = String(hashData.map { String(format: "%02x", $0) }.joined()
+            .prefix(56)).lowercased()
     }
 
     public func connect(to target: ConnectionTarget) async throws {

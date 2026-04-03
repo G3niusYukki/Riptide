@@ -29,12 +29,18 @@ public actor CertificateAuthority {
         }
         self.privateKey = privateKey
 
-        let subject = [
-            kSecAttrCommonName as String: commonName,
-            kSecAttrOrganization as String: "Riptide",
-        ] as CFDictionary
+        // Subject attributes for the self-signed CA certificate
+        // Note: kSecAttrCommonName / kSecAttrOrganization are not available in the Security
+        // certificate API. Full certificate generation requires ASN.1 encoding or a
+        // third-party library. This is placeholder scaffolding for Phase 7.
+        let _ = [
+            "CN": commonName,
+            "O": "Riptide",
+        ]
 
-        let certData = SecCertificateCreateWithData(nil, Data()) // placeholder
+        // SecCertificateCreateWithData expects DER-encoded certificate data.
+        // Passing empty data is a placeholder — real implementation needs ASN.1 DER generation.
+        let certData = SecCertificateCreateWithData(nil, Data() as CFData)
         _ = certData
 
         self.certificate = nil

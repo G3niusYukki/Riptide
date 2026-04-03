@@ -6,11 +6,11 @@ public actor WSTransportSession: TransportSession {
     public init() {}
 
     public func send(_ data: Data) async throws {
-        fatalError("WebSocket transport requires URLSessionWebSocketTask integration")
+        throw TransportError.unsupportedSessionOperation("WebSocket transport requires URLSessionWebSocketTask integration")
     }
 
     public func receive() async throws -> Data {
-        fatalError("WebSocket transport requires URLSessionWebSocketTask integration")
+        throw TransportError.unsupportedSessionOperation("WebSocket transport requires URLSessionWebSocketTask integration")
     }
 
     public func close() async {

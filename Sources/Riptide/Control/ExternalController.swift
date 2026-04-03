@@ -40,6 +40,7 @@ public actor ExternalController {
             self.target = target
             self.policy = policy
             self.startTime = ContinuousClock.now
+            self.endTime = nil
         }
     }
 
@@ -130,7 +131,7 @@ public actor ExternalController {
         }
     }
 
-    private func routeRequest(method: String, path: String, body: Data) -> APIResponse {
+    private func routeRequest(method: String, path: String, body: Data) async -> APIResponse {
         switch (method, path) {
         case ("GET", "/version"):
             return json(200, ["version": "1.0.0", "name": "Riptide"])

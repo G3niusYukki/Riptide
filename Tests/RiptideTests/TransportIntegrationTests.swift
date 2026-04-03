@@ -23,7 +23,7 @@ struct TransportIntegrationTests {
     @Test("pool enforces max idle connections per node")
     func poolMaxIdlePerNode() async throws {
         let node = ProxyNode(name: "test", kind: .socks5, server: "1.2.3.4", port: 1080)
-        let sessions = (0..<7).map { _ in MockTransportSession(receiveQueue: []) }
+        let sessions = (0..<11).map { _ in MockTransportSession(receiveQueue: []) }
         let dialer = MockTransportDialer(sessions)
         let pool = TransportConnectionPool(dialer: dialer, maxIdlePerNode: 3)
 
@@ -33,13 +33,22 @@ struct TransportIntegrationTests {
             connections.append(conn)
         }
 
+        // Release all 7 — pool keeps only 3 (maxIdlePerNode), evicts 4
         for conn in connections {
             await pool.release(conn)
         }
 
+        // First 3 acquires should reuse idle connections (no new dials)
         let _ = try await pool.acquire(for: node)
         #expect(await dialer.openCount == 7)
 
+        let _ = try await pool.acquire(for: node)
+        #expect(await dialer.openCount == 7)
+
+        let _ = try await pool.acquire(for: node)
+        #expect(await dialer.openCount == 7)
+
+        // 4th acquire exhausts the pool — triggers a new dial
         let _ = try await pool.acquire(for: node)
         #expect(await dialer.openCount == 8)
     }
@@ -47,8 +56,9 @@ struct TransportIntegrationTests {
     @Test("pool discards stale connections on acquire")
     func poolEvictsStaleConnections() async throws {
         let node = ProxyNode(name: "test", kind: .socks5, server: "1.2.3.4", port: 1080)
-        let session = MockTransportSession(receiveQueue: [])
-        let dialer = MockTransportDialer([session])
+        let session1 = MockTransportSession(receiveQueue: [])
+        let session2 = MockTransportSession(receiveQueue: [])
+        let dialer = MockTransportDialer([session1, session2])
         let pool = TransportConnectionPool(dialer: dialer, maxIdlePerNode: 5, maxIdleLifetime: .milliseconds(50))
 
         let conn = try await pool.acquire(for: node)

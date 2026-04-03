@@ -122,7 +122,7 @@ public struct RuleEngine: Sendable {
             return policy
 
         case .matchAll:
-            return policy
+            return .direct
 
         case .final(let policy):
             return policy

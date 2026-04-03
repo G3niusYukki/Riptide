@@ -121,7 +121,10 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         if context.node.name == "DIRECT" {
             await directPool.release(context.connection)
         } else {
-            await proxyPool.release(context.connection)
+            // Proxy connections (SOCKS5, HTTP CONNECT, etc.) become tunnels to a specific
+            // target after the protocol handshake. They cannot be reused for different
+            // targets, so discard rather than release back to the pool.
+            await proxyPool.discard(context.connection)
         }
 
         currentStatus = TunnelRuntimeStatus(

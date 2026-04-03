@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Riptide
 
 struct MainView: View {
     @State private var vpnVM = VPNViewModel()
@@ -22,7 +23,7 @@ struct MainView: View {
 
             Divider()
 
-            List(proxyVM.proxyNodes, id: \.name, selection: $proxyVM.selectedProxy) { node in
+            List(proxyVM.proxyNodes, id: \ProxyNode.name, selection: $proxyVM.selectedProxy) { node in
                 HStack {
                     Circle()
                         .fill(Color.green)
@@ -30,7 +31,7 @@ struct MainView: View {
                     Text(node.name)
                         .font(.system(.body))
                     Spacer()
-                    Text(node.kindString)
+                    Text(node.kind.kindString)
                         .font(.system(.caption))
                         .foregroundStyle(.secondary)
                 }

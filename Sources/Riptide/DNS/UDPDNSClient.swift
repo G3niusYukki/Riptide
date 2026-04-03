@@ -21,31 +21,32 @@ public final class UDPDNSClient: Sendable {
         }
         let connection = NWConnection(host: NWEndpoint.Host(serverHost), port: port, using: .udp)
 
-        return try await withThrowingTaskGroup(of: Data.self) { group in
-            group.addTask {
-                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-                    connection.stateUpdateHandler = { state in
-                        switch state {
-                        case .ready:
-                            cont.resume()
-                        case .failed(let error):
-                            cont.resume(throwing: DNSError.serverError(String(describing: error)))
-                        default:
-                            break
-                        }
-                    }
-                    connection.start(queue: .global())
+        // Await connection readiness outside the task group (Copilot: task group is Data but ready gate returns Void)
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    cont.resume()
+                case .failed(let error):
+                    cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                default:
+                    break
                 }
             }
+            connection.start(queue: .global())
+        }
 
+        // Use race pattern for timeout instead of non-existent group.next(timeout:)
+        let result: Data = try await withThrowingTaskGroup(of: Data.self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
                     connection.send(content: requestData, completion: .contentProcessed { error in
                         if let error {
                             cont.resume(throwing: DNSError.serverError(String(describing: error)))
+                            return
                         }
                     })
-                    connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { data, _, isComplete, error in
+                    connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { data, _, _, error in
                         if let error {
                             cont.resume(throwing: DNSError.serverError(String(describing: error)))
                         } else {
@@ -55,16 +56,23 @@ public final class UDPDNSClient: Sendable {
                 }
             }
 
-            let result = try await group.next(timeout: timeout)
-            connection.cancel()
-            group.cancelAll()
-            while let _ = try? await group.next() {}
-
-            guard !result.isEmpty else {
-                throw DNSError.noRecords
+            group.addTask { [timeout] in
+                try await Task.sleep(for: timeout)
+                throw DNSError.timeout
             }
 
-            return try DNSMessage.parse(result)
+            guard let first = try await group.next() else {
+                throw DNSError.timeout
+            }
+            group.cancelAll()
+            connection.cancel()
+            return first
         }
+
+        guard !result.isEmpty else {
+            throw DNSError.noRecords
+        }
+
+        return try DNSMessage.parse(result)
     }
 }

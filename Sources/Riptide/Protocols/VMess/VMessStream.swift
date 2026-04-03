@@ -46,8 +46,7 @@ public actor VMessStream: Sendable {
         header.append(targetData)
         header.append(0) // random fill length
 
-        let uuidBytes = uuid.uuid
-        let uuidData = Data(uuidBytes)
+        let uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
         let timestamp = UInt64(Date().timeIntervalSince1970)
         var timestampData = Data(count: 8)
         timestampData.withUnsafeMutableBytes { ptr in
@@ -134,10 +133,10 @@ public actor VMessStream: Sendable {
     }
 
     private func deriveAuthKey(uuid: UUID) -> SymmetricKey {
-        let uuidBytes = uuid.uuid
+        let uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
         var key = Data(count: 16)
         for i in 0..<16 {
-            key[i] = uuidBytes[i]
+            key[i] = uuidData[i]
         }
         return SymmetricKey(data: key)
     }
@@ -145,7 +144,7 @@ public actor VMessStream: Sendable {
     private func deriveSubKey(key: SymmetricKey, label: Data) -> SymmetricKey {
         let prk = HKDF<SHA256>.extract(inputKeyMaterial: key, salt: Data([UInt8](repeating: 0, count: 16)))
         let expanded = HKDF<SHA256>.expand(pseudoRandomKey: prk, info: label, outputByteCount: 16)
-        return SymmetricKey(data: Data(expanded))
+        return SymmetricKey(data: expanded.withUnsafeBytes { Data($0) })
     }
 
     private func encryptAES128(_ plaintext: Data, key: SymmetricKey, iv: Data) throws -> Data {

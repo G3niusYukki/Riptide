@@ -19,7 +19,8 @@ public actor VLESSStream: Sendable {
     public func connect(to target: ConnectionTarget, flow: String? = nil) async throws {
         var request = Data()
         request.append(0) // version
-        request.append(contentsOf: uuid.uuid)
+        let uuidBytes = withUnsafeBytes(of: uuid.uuid) { Data($0) }
+        request.append(contentsOf: uuidBytes)
 
         var addons = Data()
         if let flow {

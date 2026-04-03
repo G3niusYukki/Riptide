@@ -8,7 +8,7 @@ enum ShadowsocksAEAD: Sendable {
         counter: UInt64,
         provider: ShadowsocksCryptoProvider
     ) throws -> Data {
-        let length = UInt16(payload.count).bigEndian
+        let length = UInt16(payload.count)
         var lengthBytes = Data(count: 2)
         lengthBytes[0] = UInt8((length >> 8) & 0xFF)
         lengthBytes[1] = UInt8(length & 0xFF)

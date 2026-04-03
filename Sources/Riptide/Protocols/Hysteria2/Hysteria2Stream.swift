@@ -23,10 +23,10 @@ public actor Hysteria2Stream: Sendable {
         var handshake = Data()
         handshake.append(2) // version
 
+        // Derive auth token from password using HMAC-SHA256 (Copilot: previous AES.GCM.SealedBox with tag:nil was invalid)
         let authKey = SymmetricKey(data: Data(password.utf8))
-        let nonce = Data([UInt8](repeating: 0, count: 12))
-        let sealedBox = try AES.GCM.SealedBox(nonce: try AES.GCM.Nonce(data: nonce), ciphertext: [], tag: nil)
-        _ = sealedBox
+        let authTag = HMAC<SHA256>.authenticationCode(for: Data("hysteria2-auth".utf8), using: authKey)
+        handshake.append(contentsOf: Data(authTag))
 
         handshake.append(try encodeHysteria2Target(target))
         try await session.send(handshake)

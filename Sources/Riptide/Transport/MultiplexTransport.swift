@@ -82,16 +82,16 @@ public final class MultiplexStream: @unchecked Sendable {
     }
 
     public func send(_ data: Data) async throws {
-        lock.lock()
-        guard !closed else { lock.unlock(); throw MultiplexError.sessionClosed }
-        lock.unlock()
+        try lock.withLock {
+            guard !closed else { throw MultiplexError.sessionClosed }
+        }
         try await parent.sendStreamData(streamID: id, data: data)
     }
 
     public func close() async {
-        lock.lock()
-        closed = true
-        lock.unlock()
+        lock.withLock {
+            closed = true
+        }
         await parent.closeStream(id)
     }
 

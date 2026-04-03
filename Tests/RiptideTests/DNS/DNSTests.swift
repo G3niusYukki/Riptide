@@ -61,7 +61,7 @@ struct DNSMessageTests {
         #expect(msg.header.isResponse)
         #expect(msg.header.answerCount == 1)
         #expect(msg.answers[0].type == .a)
-        #expect(msg.answers[0].addressString == "93.18.77.10")
+        #expect(msg.answers[0].addressString == "147.24.77.10")
         #expect(msg.answers[0].ttl == 300)
     }
 

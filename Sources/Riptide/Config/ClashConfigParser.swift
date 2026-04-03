@@ -78,12 +78,14 @@ public enum ClashConfigParser {
                     password: password
                 )
 
-            case .socks5, .http:
+            case .socks5, .http, .vmess, .vless, .trojan, .hysteria2:
                 return ProxyNode(
                     name: proxy.name,
                     kind: kind,
                     server: proxy.server,
-                    port: port
+                    port: port,
+                    cipher: proxy.cipher,
+                    password: proxy.password
                 )
             }
         }
