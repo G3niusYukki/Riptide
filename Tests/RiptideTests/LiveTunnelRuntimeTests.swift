@@ -14,7 +14,7 @@ struct LiveTunnelRuntimeTests {
         )
         let profile = TunnelProfile(name: "reject", config: config)
         let dialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: dialer, directDialer: dialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: dialer, directDialer: dialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
 
@@ -35,7 +35,7 @@ struct LiveTunnelRuntimeTests {
         let directSession = MockTransportSession(receiveQueue: [])
         let directDialer = LiveRuntimeMockDialer([directSession])
         let proxyDialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
@@ -60,7 +60,7 @@ struct LiveTunnelRuntimeTests {
         ])
         let proxyDialer = LiveRuntimeMockDialer([proxySession])
         let directDialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
@@ -95,7 +95,8 @@ struct LiveTunnelRuntimeTests {
             geoIPResolver: GeoIPResolver(resolveCountryCode: { ip in
                 if ip == "1.1.1.1" { return "CN" }
                 return nil
-            })
+            }),
+            dnsPipeline: DNSPipeline()
         )
 
         try await runtime.start(profile: profile)
@@ -117,7 +118,7 @@ struct LiveTunnelRuntimeTests {
         let directSession = MockTransportSession(receiveQueue: [])
         let directDialer = LiveRuntimeMockDialer([directSession])
         let proxyDialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
@@ -144,7 +145,7 @@ struct LiveTunnelRuntimeTests {
         ])
         let proxyDialer = LiveRuntimeMockDialer([proxySession])
         let directDialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
         let context = try await runtime.openConnection(target: ConnectionTarget(host: "example.com", port: 443))
@@ -177,7 +178,7 @@ struct LiveTunnelRuntimeTests {
         ])
         let proxyDialer = LiveRuntimeMockDialer([session1, session2])
         let directDialer = LiveRuntimeMockDialer([])
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
         try await runtime.start(profile: profile)
         let ctx1 = try await runtime.openConnection(target: ConnectionTarget(host: "a.com", port: 443))

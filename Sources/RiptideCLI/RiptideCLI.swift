@@ -83,7 +83,8 @@ struct RiptideCLI: AsyncParsableCommand {
             let imported = try ConfigImportService().importProfile(name: "cli", yaml: content)
             let runtime = LiveTunnelRuntime(
                 proxyDialer: TCPTransportDialer(),
-                directDialer: TCPTransportDialer()
+                directDialer: TCPTransportDialer(),
+                dnsPipeline: DNSPipeline()
             )
             try await runtime.start(profile: imported.profile)
 

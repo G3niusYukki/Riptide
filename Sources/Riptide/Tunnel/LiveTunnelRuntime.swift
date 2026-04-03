@@ -10,6 +10,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private let proxyDialer: any TransportDialer
     private let directDialer: any TransportDialer
     private let geoIPResolver: GeoIPResolver
+    private let dnsPipeline: DNSPipeline
     private var proxyPool: TransportConnectionPool
     private var directPool: TransportConnectionPool
     private var connector: ProxyConnector
@@ -20,11 +21,13 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     public init(
         proxyDialer: any TransportDialer,
         directDialer: any TransportDialer,
-        geoIPResolver: GeoIPResolver = .none
+        geoIPResolver: GeoIPResolver = .none,
+        dnsPipeline: DNSPipeline
     ) {
         self.proxyDialer = proxyDialer
         self.directDialer = directDialer
         self.geoIPResolver = geoIPResolver
+        self.dnsPipeline = dnsPipeline
         self.proxyPool = TransportConnectionPool(dialer: proxyDialer)
         self.directPool = TransportConnectionPool(dialer: directDialer)
         self.connector = ProxyConnector(pool: proxyPool)
@@ -40,6 +43,8 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         proxyPool = TransportConnectionPool(dialer: proxyDialer)
         directPool = TransportConnectionPool(dialer: directDialer)
         connector = ProxyConnector(pool: proxyPool)
+        // Fake-IP pool is initialized in DNSPipeline.init from dnsPolicy.fakeIPRange;
+        // no separate start call needed.
     }
 
     public func stop() async throws {
@@ -64,7 +69,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             throw LiveTunnelRuntimeError.notStarted
         }
 
-        let policy = resolvePolicy(profile: profile, target: target)
+        let policy = await resolvePolicy(profile: profile, target: target)
         switch policy {
         case .reject:
             throw LiveTunnelRuntimeError.rejectPolicy
@@ -134,7 +139,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         )
     }
 
-    private func resolvePolicy(profile: TunnelProfile, target: ConnectionTarget) -> RoutingPolicy {
+    private func resolvePolicy(profile: TunnelProfile, target: ConnectionTarget) async -> RoutingPolicy {
         switch profile.config.mode {
         case .direct:
             return .direct
@@ -147,8 +152,19 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             break
         }
 
-        let ipAddress = IPv4AddressParser.parse(target.host) != nil ? target.host : nil
-        let ruleTarget = RuleTarget(domain: target.host, ipAddress: ipAddress)
+        // Resolve the host to an IP before rule matching.
+        // In fakeIP mode the host is already a fake IP; otherwise resolve via DNS.
+        let resolvedIP: String?
+        if profile.config.dnsPolicy.enhancedMode == .fakeIP {
+            resolvedIP = (try? await dnsPipeline.resolveFakeIP(target.host)) ?? target.host
+        } else if IPv4AddressParser.parse(target.host) == nil {
+            // Domain — resolve it
+            resolvedIP = (try? await dnsPipeline.resolve(target.host)).flatMap { $0.first }
+        } else {
+            resolvedIP = target.host
+        }
+
+        let ruleTarget = RuleTarget(domain: target.host, ipAddress: resolvedIP)
         let engine = RuleEngine(rules: profile.config.rules, geoIPResolver: geoIPResolver)
         return engine.resolve(target: ruleTarget)
     }

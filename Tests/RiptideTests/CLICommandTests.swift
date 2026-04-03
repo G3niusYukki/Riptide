@@ -103,7 +103,8 @@ struct CLICommandTests {
             targetHost: "example.com",
             targetPort: 443,
             proxyDialer: mockDialer,
-            directDialer: mockDialer
+            directDialer: mockDialer,
+            dnsPipeline: DNSPipeline()
         )
         #expect(text.contains("smoke=ok"))
     }

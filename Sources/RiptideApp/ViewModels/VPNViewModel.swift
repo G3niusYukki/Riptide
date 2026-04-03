@@ -18,7 +18,7 @@ final class VPNViewModel {
         do {
             let proxyDialer = TCPTransportDialer()
             let directDialer = TCPTransportDialer()
-            let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+            let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: DNSPipeline())
 
             let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
             let profile = TunnelProfile(name: "default", config: config)

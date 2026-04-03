@@ -67,7 +67,8 @@ public enum CLICommandRunner {
             targetHost: targetHost,
             targetPort: targetPort,
             proxyDialer: TCPTransportDialer(),
-            directDialer: TCPTransportDialer()
+            directDialer: TCPTransportDialer(),
+            dnsPipeline: DNSPipeline()
         )
     }
 
@@ -77,10 +78,11 @@ public enum CLICommandRunner {
         targetHost: String,
         targetPort: Int,
         proxyDialer: any TransportDialer,
-        directDialer: any TransportDialer
+        directDialer: any TransportDialer,
+        dnsPipeline: DNSPipeline
     ) async throws -> String {
         let imported = try ConfigImportService().importProfile(name: profileName, yaml: yamlContent)
-        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer)
+        let runtime = LiveTunnelRuntime(proxyDialer: proxyDialer, directDialer: directDialer, dnsPipeline: dnsPipeline)
         try await runtime.start(profile: imported.profile)
 
         do {

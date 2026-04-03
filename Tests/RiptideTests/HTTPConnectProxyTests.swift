@@ -25,7 +25,8 @@ struct HTTPConnectProxyTests {
 
         let runtime = LiveTunnelRuntime(
             proxyDialer: TCPTransportDialer(),
-            directDialer: TCPTransportDialer()
+            directDialer: TCPTransportDialer(),
+            dnsPipeline: DNSPipeline()
         )
         try await runtime.start(
             profile: TunnelProfile(
