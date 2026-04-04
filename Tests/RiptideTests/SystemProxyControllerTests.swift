@@ -3,72 +3,227 @@ import Testing
 
 @testable import Riptide
 
-@Suite("System proxy controller")
-struct SystemProxyControllerTests {
-    @Test("mock controller starts in disabled state")
-    func mockStartsDisabled() throws {
-        let controller = MockSystemProxyController()
-        let state = try controller.currentState()
-        #expect(state == .disabled)
+// MARK: - Mock MihomoRuntimeManager
+
+/// A mock implementation of MihomoRuntimeManaging for testing.
+actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
+    var isRunning: Bool = false
+    var currentMode: RuntimeMode? = nil
+    var currentProfile: TunnelProfile? = nil
+    let helperConnection: HelperToolConnection = HelperToolConnection()
+
+    // Configuration state
+    var shouldThrowOnStart: Error? = nil
+    var shouldThrowOnStop: Error? = nil
+    var mockTraffic: (up: Int, down: Int) = (0, 0)
+    var mockConnections: [ConnectionInfo] = []
+    var mockProxies: [ProxyInfo] = []
+
+    // Configuration methods (isolated)
+    func configureThrowOnStart(_ error: Error?) {
+        shouldThrowOnStart = error
     }
 
-    @Test("mock controller enables and reports correct state")
-    func mockEnableAndState() throws {
-        let controller = MockSystemProxyController()
-        try controller.enable(httpPort: 6152, socksPort: nil)
-        let state = try controller.currentState()
-        if case .enabled(let httpPort, let socksPort) = state {
-            #expect(httpPort == 6152)
-            #expect(socksPort == nil)
-        } else {
-            Issue.record("Expected enabled state")
+    func configureThrowOnStop(_ error: Error?) {
+        shouldThrowOnStop = error
+    }
+
+    func configureMockTraffic(_ traffic: (up: Int, down: Int)) {
+        mockTraffic = traffic
+    }
+
+    func configureMockConnections(_ connections: [ConnectionInfo]) {
+        mockConnections = connections
+    }
+
+    func configureMockProxies(_ proxies: [ProxyInfo]) {
+        mockProxies = proxies
+    }
+
+    func setup() async throws {
+        // No-op for mock
+    }
+
+    func start(mode: RuntimeMode, profile: TunnelProfile) async throws {
+        if let error = shouldThrowOnStart {
+            throw error
+        }
+        isRunning = true
+        currentMode = mode
+        currentProfile = profile
+    }
+
+    func stop() async throws {
+        if let error = shouldThrowOnStop {
+            throw error
+        }
+        isRunning = false
+        currentMode = nil
+    }
+
+    func switchProxy(to proxyName: String) async throws {
+        guard isRunning else {
+            throw RuntimeError.notRunning
         }
     }
 
-    @Test("mock controller disables and returns disabled state")
-    func mockDisable() throws {
-        let controller = MockSystemProxyController()
-        try controller.enable(httpPort: 6152, socksPort: 1080)
-        try controller.disable()
-        let state = try controller.currentState()
-        #expect(state == .disabled)
+    func getProxyStatus() async throws -> [ProxyInfo] {
+        guard isRunning else {
+            throw RuntimeError.notRunning
+        }
+        return mockProxies
+    }
+
+    func getConnections() async throws -> [ConnectionInfo] {
+        guard isRunning else {
+            throw RuntimeError.notRunning
+        }
+        return mockConnections
+    }
+
+    func getTraffic() async throws -> (up: Int, down: Int) {
+        guard isRunning else {
+            throw RuntimeError.notRunning
+        }
+        return mockTraffic
     }
 }
 
-@Suite("Mode coordinator")
-struct ModeCoordinatorTests {
+// MARK: - Tests
+
+@Suite("Mihomo runtime manager")
+struct MihomoRuntimeManagerTests {
+    @Test("mock manager starts not running")
+    func mockStartsNotRunning() async throws {
+        let manager = MockMihomoRuntimeManager()
+        #expect(await manager.isRunning == false)
+        #expect(await manager.currentMode == nil)
+    }
+
+    @Test("mock manager starts and stops")
+    func mockStartAndStop() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        #expect(await manager.isRunning == true)
+        #expect(await manager.currentMode == .systemProxy)
+        #expect(await manager.currentProfile?.name == "test")
+
+        try await manager.stop()
+        #expect(await manager.isRunning == false)
+        #expect(await manager.currentMode == nil)
+    }
+
+    @Test("mock manager throws on start when configured")
+    func mockThrowsOnStart() async throws {
+        let manager = MockMihomoRuntimeManager()
+        await manager.configureThrowOnStart(RuntimeError.helperNotInstalled)
+
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        do {
+            try await manager.start(mode: .systemProxy, profile: profile)
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            // Expected
+        }
+        #expect(await manager.isRunning == false)
+    }
+
+    @Test("mock manager returns traffic when running")
+    func mockReturnsTraffic() async throws {
+        let manager = MockMihomoRuntimeManager()
+        await manager.configureMockTraffic((up: 1024, down: 2048))
+
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        let traffic = try await manager.getTraffic()
+        #expect(traffic.up == 1024)
+        #expect(traffic.down == 2048)
+    }
+
+    @Test("mock manager throws when getting traffic while not running")
+    func mockThrowsTrafficWhenNotRunning() async throws {
+        let manager = MockMihomoRuntimeManager()
+
+        do {
+            _ = try await manager.getTraffic()
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            // Expected
+        }
+    }
+}
+
+@Suite("Mode coordinator with mihomo")
+struct ModeCoordinatorMihomoTests {
     @Test("mode coordinator starts in system proxy mode")
     func coordinatorStartsSystemProxy() async throws {
-        let controller = MockSystemProxyController()
-        let coordinator = ModeCoordinator(
-            systemProxyController: controller,
-            lifecycleManager: nil
-        )
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
         let mode = await coordinator.currentMode()
         #expect(mode == .systemProxy)
     }
 
-    @Test("mode coordinator enables system proxy mode")
+    @Test("mode coordinator starts runtime in system proxy mode")
     func coordinatorStartsSystemProxyMode() async throws {
-        let controller = MockSystemProxyController()
-        let coordinator = ModeCoordinator(
-            systemProxyController: controller,
-            lifecycleManager: nil
-        )
-        try await coordinator.start(mode: .systemProxy, profile: nil)
-        let state = try controller.currentState()
-        #expect(state == .enabled(httpPort: 6152, socksPort: nil))
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await coordinator.start(mode: .systemProxy, profile: profile)
+        #expect(await manager.isRunning == true)
+        #expect(await manager.currentMode == .systemProxy)
+
+        let events = await coordinator.recentEvents()
+        let hasModeChanged = events.contains { event in
+            if case .modeChanged(.systemProxy) = event { return true }
+            return false
+        }
+        #expect(hasModeChanged)
     }
 
-    @Test("mode coordinator surfaces fallback recommendation when mode start fails")
-    func coordinatorSurfacesFallbackRecommendation() async throws {
-        let failingController = FailingSystemProxyController()
-        let coordinator = ModeCoordinator(
-            systemProxyController: failingController,
-            lifecycleManager: nil
-        )
+    @Test("mode coordinator starts runtime in TUN mode")
+    func coordinatorStartsTunMode() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await coordinator.start(mode: .tun, profile: profile)
+        #expect(await manager.isRunning == true)
+        #expect(await manager.currentMode == .tun)
+    }
+
+    @Test("mode coordinator requires profile to start")
+    func coordinatorRequiresProfile() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+
         do {
             try await coordinator.start(mode: .systemProxy, profile: nil)
+            Issue.record("Expected an error to be thrown")
+        } catch {
+            // Expected
+        }
+    }
+
+    @Test("mode coordinator surfaces fallback recommendation when start fails")
+    func coordinatorSurfacesFallbackRecommendation() async throws {
+        let manager = MockMihomoRuntimeManager()
+        await manager.configureThrowOnStart(RuntimeError.helperNotInstalled)
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        do {
+            try await coordinator.start(mode: .systemProxy, profile: profile)
             Issue.record("Expected an error to be thrown")
         } catch {
             // Expected — the coordinator should throw after emitting the degraded event
@@ -81,16 +236,79 @@ struct ModeCoordinatorTests {
         #expect(hasDegraded)
     }
 
-    @Test("mode coordinator stops and disables proxy")
+    @Test("mode coordinator stops runtime")
     func coordinatorStop() async throws {
-        let controller = MockSystemProxyController()
-        let coordinator = ModeCoordinator(
-            systemProxyController: controller,
-            lifecycleManager: nil
-        )
-        try await coordinator.start(mode: .systemProxy, profile: nil)
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await coordinator.start(mode: .systemProxy, profile: profile)
+        #expect(await manager.isRunning == true)
+
         try await coordinator.stop()
-        let state = try controller.currentState()
-        #expect(state == .disabled)
+        #expect(await manager.isRunning == false)
+    }
+
+    @Test("mode coordinator returns traffic stats")
+    func coordinatorTrafficStats() async throws {
+        let manager = MockMihomoRuntimeManager()
+        await manager.configureMockTraffic((up: 1024, down: 2048))
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await coordinator.start(mode: .systemProxy, profile: profile)
+        let traffic = await coordinator.getTraffic()
+        #expect(traffic.up == 1024)
+        #expect(traffic.down == 2048)
+    }
+
+    @Test("mode coordinator returns zero traffic when not running")
+    func coordinatorZeroTrafficWhenNotRunning() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+
+        let traffic = await coordinator.getTraffic()
+        #expect(traffic.up == 0)
+        #expect(traffic.down == 0)
+    }
+
+    @Test("mode coordinator returns connection count")
+    func coordinatorConnectionCount() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let metadata1 = ConnectionMetadata(network: "tcp", type: "HTTP", sourceIP: "127.0.0.1", destinationIP: "1.2.3.4", host: "example.com")
+        let metadata2 = ConnectionMetadata(network: "tcp", type: "HTTP", sourceIP: "127.0.0.1", destinationIP: "5.6.7.8", host: "test.com")
+        let connections = [
+            ConnectionInfo(id: UUID().uuidString, metadata: metadata1, upload: 100, download: 200),
+            ConnectionInfo(id: UUID().uuidString, metadata: metadata2, upload: 50, download: 100)
+        ]
+        await manager.configureMockConnections(connections)
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await coordinator.start(mode: .systemProxy, profile: profile)
+        let connectionCount = await coordinator.getConnections()
+        #expect(connectionCount == 2)
+    }
+
+    @Test("mode coordinator returns zero connections when not running")
+    func coordinatorZeroConnectionsWhenNotRunning() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+
+        let connections = await coordinator.getConnections()
+        #expect(connections == 0)
+    }
+
+    @Test("mode coordinator checks helper installation status")
+    func coordinatorChecksHelperInstallation() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+
+        // Mock helper connection doesn't have a real helper installed
+        let installed = await coordinator.isHelperInstalled()
+        #expect(installed == false)
     }
 }

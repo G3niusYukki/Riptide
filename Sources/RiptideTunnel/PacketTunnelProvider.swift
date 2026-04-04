@@ -21,8 +21,8 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
 
                 // 2. Parse profile from provider config
                 let yaml = providerConfig["configYAML"] as? String ?? ""
-                let config = try ClashConfigParser.parse(yaml: yaml)
-                let profile = TunnelProfile(name: "tunnel", config: config)
+                let (config, ruleSetProviders) = try ClashConfigParser.parse(yaml: yaml)
+                let profile = TunnelProfile(name: "tunnel", config: config, ruleSetProviders: ruleSetProviders)
 
                 // 3. Create DNS pipeline
                 let pipeline = DNSPipeline(dnsPolicy: profile.config.dnsPolicy)

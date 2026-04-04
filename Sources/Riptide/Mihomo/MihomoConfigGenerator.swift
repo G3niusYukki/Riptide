@@ -3,6 +3,24 @@ import Foundation
 /// Generates mihomo-compatible YAML configuration from Riptide internal models.
 public enum MihomoConfigGenerator {
 
+    /// Escapes a string for safe inclusion in YAML output.
+    /// - Wraps strings in double quotes if they contain special characters
+    /// - Escapes backslashes and double quotes inside the string
+    /// - Returns plain string if no special characters
+    /// - Note: Colons are NOT escaped as they are common in IPv6 addresses and
+    ///   don't cause issues in list item contexts (not key-value contexts)
+    private static func yamlEscape(_ string: String) -> String {
+        let specialChars = CharacterSet(charactersIn: "#\"'{}[]\n,&*?|<>!=%@")
+        if string.rangeOfCharacter(from: specialChars) == nil && !string.hasPrefix("-") && !string.hasPrefix("[") {
+            return string
+        }
+        // Escape backslashes and quotes, then wrap in quotes
+        let escaped = string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+
     /// Options for configuration generation.
     public struct GenerationOptions: Sendable {
         /// The runtime mode (system proxy or TUN).
@@ -65,9 +83,9 @@ public enum MihomoConfigGenerator {
         // Proxies section
         lines.append("proxies:")
         for proxy in config.proxies {
-            lines.append("  - name: \(proxy.name)")
+            lines.append("  - name: \(yamlEscape(proxy.name))")
             lines.append("    type: \(mihomoProxyType(for: proxy.kind))")
-            lines.append("    server: \(proxy.server)")
+            lines.append("    server: \(yamlEscape(proxy.server))")
             lines.append("    port: \(proxy.port)")
 
             // Add proxy-specific fields
@@ -79,7 +97,7 @@ public enum MihomoConfigGenerator {
         if !config.proxyGroups.isEmpty {
             lines.append("proxy-groups:")
             for group in config.proxyGroups {
-                lines.append("  - name: \(group.id)")
+                lines.append("  - name: \(yamlEscape(group.id))")
                 lines.append("    type: \(group.kind.rawValue)")
 
                 if let interval = group.interval {
@@ -94,7 +112,7 @@ public enum MihomoConfigGenerator {
 
                 lines.append("    proxies:")
                 for proxyName in group.proxies {
-                    lines.append("      - \(proxyName)")
+                    lines.append("      - \(yamlEscape(proxyName))")
                 }
             }
             lines.append("")
@@ -136,56 +154,56 @@ public enum MihomoConfigGenerator {
         switch proxy.kind {
         case .shadowsocks:
             if let cipher = proxy.cipher {
-                lines.append("    cipher: \(cipher)")
+                lines.append("    cipher: \(yamlEscape(cipher))")
             }
             if let password = proxy.password {
-                lines.append("    password: \(password)")
+                lines.append("    password: \(yamlEscape(password))")
             }
 
         case .vmess:
             if let uuid = proxy.uuid {
-                lines.append("    uuid: \(uuid)")
+                lines.append("    uuid: \(yamlEscape(uuid))")
             }
             if let alterId = proxy.alterId {
                 lines.append("    alterId: \(alterId)")
             }
             // security becomes cipher in mihomo
             if let security = proxy.security {
-                lines.append("    cipher: \(security)")
+                lines.append("    cipher: \(yamlEscape(security))")
             } else if proxy.security == nil && proxy.uuid != nil {
                 // Default cipher for VMess
                 lines.append("    cipher: auto")
             }
             if let network = proxy.network {
-                lines.append("    network: \(network)")
+                lines.append("    network: \(yamlEscape(network))")
             }
             if let sni = proxy.sni {
-                lines.append("    servername: \(sni)")
+                lines.append("    servername: \(yamlEscape(sni))")
             }
             if let skipCertVerify = proxy.skipCertVerify {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
             }
             if let wsPath = proxy.wsPath {
-                lines.append("    ws-path: \(wsPath)")
+                lines.append("    ws-path: \(yamlEscape(wsPath))")
             }
             if let wsHost = proxy.wsHost {
                 lines.append("    ws-headers:")
-                lines.append("      Host: \(wsHost)")
+                lines.append("      Host: \(yamlEscape(wsHost))")
             }
 
         case .vless:
             if let uuid = proxy.uuid {
-                lines.append("    uuid: \(uuid)")
+                lines.append("    uuid: \(yamlEscape(uuid))")
             }
             if let flow = proxy.flow {
-                lines.append("    flow: \(flow)")
+                lines.append("    flow: \(yamlEscape(flow))")
             }
             // sni becomes servername in mihomo
             if let sni = proxy.sni {
-                lines.append("    servername: \(sni)")
+                lines.append("    servername: \(yamlEscape(sni))")
             }
             if let network = proxy.network {
-                lines.append("    network: \(network)")
+                lines.append("    network: \(yamlEscape(network))")
             }
             if let skipCertVerify = proxy.skipCertVerify {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
@@ -193,24 +211,24 @@ public enum MihomoConfigGenerator {
 
         case .trojan:
             if let password = proxy.password {
-                lines.append("    password: \(password)")
+                lines.append("    password: \(yamlEscape(password))")
             }
             if let sni = proxy.sni {
-                lines.append("    sni: \(sni)")
+                lines.append("    sni: \(yamlEscape(sni))")
             }
             if let skipCertVerify = proxy.skipCertVerify {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
             }
             if let network = proxy.network {
-                lines.append("    network: \(network)")
+                lines.append("    network: \(yamlEscape(network))")
             }
 
         case .hysteria2:
             if let password = proxy.password {
-                lines.append("    password: \(password)")
+                lines.append("    password: \(yamlEscape(password))")
             }
             if let sni = proxy.sni {
-                lines.append("    sni: \(sni)")
+                lines.append("    sni: \(yamlEscape(sni))")
             }
             if let skipCertVerify = proxy.skipCertVerify {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
@@ -219,10 +237,10 @@ public enum MihomoConfigGenerator {
         case .http, .socks5:
             // For HTTP/SOCKS5, cipher is used as username
             if let cipher = proxy.cipher {
-                lines.append("    username: \(cipher)")
+                lines.append("    username: \(yamlEscape(cipher))")
             }
             if let password = proxy.password {
-                lines.append("    password: \(password)")
+                lines.append("    password: \(yamlEscape(password))")
             }
         }
     }
@@ -231,22 +249,22 @@ public enum MihomoConfigGenerator {
     private static func mihomoRuleString(for rule: ProxyRule) -> String? {
         switch rule {
         case .domain(let domain, let policy):
-            return "DOMAIN,\(domain),\(mihomoPolicyString(for: policy))"
+            return "DOMAIN,\(yamlEscape(domain)),\(mihomoPolicyString(for: policy))"
 
         case .domainSuffix(let suffix, let policy):
-            return "DOMAIN-SUFFIX,\(suffix),\(mihomoPolicyString(for: policy))"
+            return "DOMAIN-SUFFIX,\(yamlEscape(suffix)),\(mihomoPolicyString(for: policy))"
 
         case .domainKeyword(let keyword, let policy):
-            return "DOMAIN-KEYWORD,\(keyword),\(mihomoPolicyString(for: policy))"
+            return "DOMAIN-KEYWORD,\(yamlEscape(keyword)),\(mihomoPolicyString(for: policy))"
 
         case .ipCIDR(let cidr, let policy):
-            return "IP-CIDR,\(cidr),\(mihomoPolicyString(for: policy))"
+            return "IP-CIDR,\(yamlEscape(cidr)),\(mihomoPolicyString(for: policy))"
 
         case .ipCIDR6(let cidr, let policy):
-            return "IP-CIDR6,\(cidr),\(mihomoPolicyString(for: policy))"
+            return "IP-CIDR6,\(yamlEscape(cidr)),\(mihomoPolicyString(for: policy))"
 
         case .srcIPCIDR(let cidr, let policy):
-            return "SRC-IP-CIDR,\(cidr),\(mihomoPolicyString(for: policy))"
+            return "SRC-IP-CIDR,\(yamlEscape(cidr)),\(mihomoPolicyString(for: policy))"
 
         case .srcPort(let port, let policy):
             return "SRC-PORT,\(port),\(mihomoPolicyString(for: policy))"
@@ -255,19 +273,19 @@ public enum MihomoConfigGenerator {
             return "DST-PORT,\(port),\(mihomoPolicyString(for: policy))"
 
         case .processName(let name, let policy):
-            return "PROCESS-NAME,\(name),\(mihomoPolicyString(for: policy))"
+            return "PROCESS-NAME,\(yamlEscape(name)),\(mihomoPolicyString(for: policy))"
 
         case .geoIP(let countryCode, let policy):
-            return "GEOIP,\(countryCode),\(mihomoPolicyString(for: policy))"
+            return "GEOIP,\(yamlEscape(countryCode)),\(mihomoPolicyString(for: policy))"
 
         case .ipASN(let asn, let policy):
             return "IP-ASN,\(asn),\(mihomoPolicyString(for: policy))"
 
         case .geoSite(let code, let category, let policy):
-            return "GEOSITE,\(code),\(mihomoPolicyString(for: policy))"
+            return "GEOSITE,\(yamlEscape(code)),\(mihomoPolicyString(for: policy))"
 
         case .ruleSet(let name, let policy):
-            return "RULE-SET,\(name),\(mihomoPolicyString(for: policy))"
+            return "RULE-SET,\(yamlEscape(name)),\(mihomoPolicyString(for: policy))"
 
         case .matchAll:
             // matchAll is typically rendered as MATCH,DIRECT by convention
@@ -286,7 +304,7 @@ public enum MihomoConfigGenerator {
         case .reject:
             return "REJECT"
         case .proxyNode(let name):
-            return name
+            return yamlEscape(name)
         }
     }
 }

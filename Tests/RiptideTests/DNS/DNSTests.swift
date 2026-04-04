@@ -332,7 +332,7 @@ struct ClashDoTTests {
         mode: direct
         rules: []
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
         #expect(dotResolvers.count == 2)
         #expect(dotResolvers[0].address == "1.1.1.1:853")
@@ -349,7 +349,7 @@ struct ClashDoTTests {
         mode: direct
         rules: []
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
         #expect(dotResolvers.count == 1)
         #expect(dotResolvers[0].address == "1.1.1.1:853")
@@ -368,7 +368,7 @@ struct ClashDoTTests {
         mode: direct
         rules: []
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
         #expect(dotResolvers.count == 1)
         let udpResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .udp }
@@ -528,7 +528,7 @@ struct ClashConfigParserDoQTests {
           fake-ip: true
         mode: direct
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
         #expect(doqResolvers.count == 2)
         #expect(doqResolvers[0].address == "dns.adguard.com:784")
@@ -546,7 +546,7 @@ dns:
   fake-ip: true
 mode: direct
 """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
         let udpResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .udp }
         #expect(doqResolvers.count == 1)
@@ -565,7 +565,7 @@ mode: direct
           fake-ip: true
         mode: direct
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
         #expect(doqResolvers.count == 1)
         #expect(doqResolvers[0].address == "1.1.1.1:853")
@@ -587,7 +587,7 @@ mode: direct
           fake-ip: true
         mode: direct
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let resolvers = config.dnsPolicy.primaryResolvers
         #expect(resolvers.contains { $0.kind == .doh })
         #expect(resolvers.contains { $0.kind == .doq })

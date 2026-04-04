@@ -117,10 +117,12 @@ struct AppShellWorkflowTests {
 
     @Test("mode coordinator can switch to system proxy and back")
     func modeCoordinatorSystemProxySwitch() async throws {
-        let controller = MockSystemProxyController()
-        let coordinator = ModeCoordinator(systemProxyController: controller, lifecycleManager: nil)
+        let manager = MockMihomoRuntimeManager()
+        let coordinator = ModeCoordinator(mihomoManager: manager)
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
 
-        try await coordinator.start(mode: .systemProxy, profile: nil)
+        try await coordinator.start(mode: .systemProxy, profile: profile)
         let modeAfterStart = await coordinator.currentMode()
         #expect(modeAfterStart == .systemProxy)
 

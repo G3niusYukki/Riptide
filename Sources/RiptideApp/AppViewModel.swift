@@ -142,30 +142,34 @@ public final class AppViewModel {
     // Errors
     public private(set) var lastError: String?
 
+    // Helper installation
+    public private(set) var helperInstalled: Bool = false
+    public var showHelperSetup: Bool = false
+
     // MARK: - Window Reference
     public weak var mainWindow: NSWindow?
 
     // MARK: - Private
 
-    private let controlChannel: InProcessTunnelControlChannel
+    private let modeCoordinator: ModeCoordinator
     private let importService: ConfigImportService
     private var statsTask: Task<Void, Never>?
-    private let lifecycleManager: TunnelLifecycleManager
+    private let smManager = SMJobBlessManager()
 
     // MARK: - Init
 
     public init() {
-        let dnsConfig = DNSConfig()
-        let dnsPipeline = DNSPipeline(config: dnsConfig, ruleEngine: nil)
-        let runtime = LiveTunnelRuntime(
-            proxyDialer: TCPTransportDialer(),
-            directDialer: TCPTransportDialer(),
-            geoIPResolver: .none,
-            dnsPipeline: dnsPipeline
-        )
-        self.lifecycleManager = TunnelLifecycleManager(runtime: runtime)
-        self.controlChannel = InProcessTunnelControlChannel(lifecycleManager: lifecycleManager)
+        let mihomoManager = MihomoRuntimeManager()
+        self.modeCoordinator = ModeCoordinator(mihomoManager: mihomoManager)
         self.importService = ConfigImportService()
+        checkHelperInstallation()
+    }
+
+    // MARK: - Helper Installation
+
+    public func checkHelperInstallation() {
+        smManager.checkHelperStatus()
+        helperInstalled = smManager.isHelperInstalled
     }
 
     // MARK: - Actions
@@ -179,25 +183,26 @@ public final class AppViewModel {
     }
 
     public func start() async {
+        // Check helper installation before starting
+        await checkHelperInstallationAsync()
+
+        guard helperInstalled else {
+            showHelperSetup = true
+            return
+        }
+
         guard let profile = activeProfile else {
             lastError = "No active profile selected"
             return
         }
 
+        let runtimeMode: RuntimeMode = connectionMode == .tun ? .tun : .systemProxy
+
         do {
-            let response = try await controlChannel.send(.start(profile.tunnelProfile))
-            switch response {
-            case .ack:
-                tunnelState = .running
-                await refreshStatus()
-                rebuildProxyGroupDisplays()
-                startStatsPolling()
-                lastError = nil
-            case .error(let message):
-                lastError = "Start failed: \(message)"
-            case .status:
-                lastError = "Start failed: unexpected status response"
-            }
+            try await modeCoordinator.start(mode: runtimeMode, profile: profile.tunnelProfile)
+            tunnelState = .running
+            startStatsPolling()
+            lastError = nil
         } catch {
             lastError = String(describing: error)
         }
@@ -210,8 +215,7 @@ public final class AppViewModel {
 
     public func stop() async {
         do {
-            let response = try await controlChannel.send(.stop)
-            guard case .ack = response else { return }
+            try await modeCoordinator.stop()
             tunnelState = .stopped
             stopStatsPolling()
             lastError = nil
@@ -235,13 +239,7 @@ public final class AppViewModel {
         )
         profile = Profile(name: profile.name, config: updatedConfig)
         activeProfile = profile
-
-        do {
-            let response = try await controlChannel.send(.update(profile.tunnelProfile))
-            guard case .ack = response else { return }
-        } catch {
-            lastError = String(describing: error)
-        }
+        rebuildProxyGroupDisplays()
     }
 
     public func selectProxy(groupID: String, nodeName: String) async {
@@ -290,21 +288,10 @@ public final class AppViewModel {
 
     // MARK: - Status & Polling
 
-    private func refreshStatus() async {
-        do {
-            let response = try await controlChannel.send(.status)
-            if case .status(let snapshot) = response {
-                tunnelState = snapshot.state
-                currentSpeedUp = Int64(snapshot.bytesUp)
-                currentSpeedDown = Int64(snapshot.bytesDown)
-                totalTrafficUp = Int64(snapshot.bytesUp)
-                totalTrafficDown = Int64(snapshot.bytesDown)
-                if let errorMsg = snapshot.lastError {
-                    lastError = errorMsg
-                }
-            }
-        } catch {
-            // Ignore polling errors silently
+    private func checkHelperInstallationAsync() async {
+        let installed = await modeCoordinator.isHelperInstalled()
+        await MainActor.run {
+            helperInstalled = installed
         }
     }
 
@@ -312,7 +299,7 @@ public final class AppViewModel {
         statsTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                await refreshStatus()
+                await refreshStats()
             }
         }
     }
@@ -322,6 +309,22 @@ public final class AppViewModel {
         statsTask = nil
         currentSpeedUp = 0
         currentSpeedDown = 0
+    }
+
+    private func refreshStats() async {
+        let traffic = await modeCoordinator.getTraffic()
+        let connections = await modeCoordinator.getConnections()
+
+        await MainActor.run {
+            currentSpeedUp = traffic.up
+            currentSpeedDown = traffic.down
+            totalTrafficUp += traffic.up
+            totalTrafficDown += traffic.down
+            // Update active connections count
+            if connections != activeConnections.count {
+                // For now, just track the count - full connection list would need API support
+            }
+        }
     }
 
     // MARK: - Helpers

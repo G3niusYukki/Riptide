@@ -100,7 +100,7 @@ public actor SubscriptionManager {
 
     private func parseClashYAML(_ yaml: String) throws -> [ProxyNode] {
         do {
-            let config = try ClashConfigParser.parse(yaml: yaml)
+            let (config, _) = try ClashConfigParser.parse(yaml: yaml)
             return config.proxies
         } catch {
             throw SubscriptionError.parseFailed(String(describing: error))

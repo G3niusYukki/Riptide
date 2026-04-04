@@ -3,10 +3,14 @@ import UniformTypeIdentifiers
 
 struct ConfigTabView: View {
     @Bindable var vm: AppViewModel
+    @State private var showHelperSetup = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Mode selector card
+                modeSelectorCard
+
                 // Active profile card
                 if let profile = vm.activeProfile {
                     ProfileCard(profile: profile, isActive: true) {
@@ -100,6 +104,86 @@ struct ConfigTabView: View {
             .padding()
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
+        .sheet(isPresented: $showHelperSetup) {
+            HelperSetupView()
+        }
+        .onChange(of: vm.showHelperSetup) { _, newValue in
+            showHelperSetup = newValue
+        }
+        .onChange(of: showHelperSetup) { _, newValue in
+            if !newValue {
+                vm.showHelperSetup = false
+                // Recheck helper status when sheet closes
+                vm.checkHelperInstallation()
+            }
+        }
+    }
+
+    // MARK: - Mode Selector Card
+
+    private var modeSelectorCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "network")
+                    .foregroundStyle(Theme.accent)
+                Text("运行模式")
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+
+                // Helper status indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(vm.helperInstalled ? Theme.success : Theme.danger)
+                        .frame(width: 8, height: 8)
+                    Text(vm.helperInstalled ? "Helper已安装" : "Helper未安装")
+                        .font(.caption)
+                        .foregroundStyle(vm.helperInstalled ? Theme.success : Theme.danger)
+                }
+            }
+
+            // Mode selector
+            Picker("模式", selection: $vm.connectionMode) {
+                Text("系统代理")
+                    .tag(ConnectionMode.systemProxy)
+                Text("TUN模式")
+                    .tag(ConnectionMode.tun)
+            }
+            .pickerStyle(.segmented)
+            .disabled(vm.isRunning)
+
+            // Helper installation button (shown when TUN selected but helper not installed)
+            if vm.connectionMode == .tun && !vm.helperInstalled {
+                Button {
+                    showHelperSetup = true
+                } label: {
+                    HStack {
+                        Image(systemName: "lock.shield")
+                        Text("安装Helper工具")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.danger)
+                .padding(.top, 4)
+
+                Text("TUN模式需要安装Helper工具才能配置网络接口")
+                    .font(.caption)
+                    .foregroundStyle(Theme.subtext)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Warning when running and mode is disabled
+            if vm.isRunning {
+                Text("运行中无法切换模式，请先停止代理")
+                    .font(.caption)
+                    .foregroundStyle(Theme.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 
     private func importConfig() {

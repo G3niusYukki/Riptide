@@ -27,7 +27,7 @@ struct ClashConfigParserTests {
           - MATCH,my-socks
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.mode == .rule)
         #expect(config.proxies.count == 2)
@@ -83,7 +83,7 @@ struct ClashConfigParserTests {
         mode: direct
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.mode == .direct)
         #expect(config.proxies.isEmpty)
@@ -101,7 +101,7 @@ struct ClashConfigParserTests {
             port: 1080
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.mode == .global)
         #expect(config.proxies.count == 1)
@@ -131,7 +131,7 @@ struct ClashConfigParserTests {
           - MATCH,DIRECT
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.proxies.count == 1)
         let node = config.proxies[0]
@@ -183,7 +183,7 @@ struct ClashConfigParserTests {
           - MATCH,DIRECT
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.proxies.count == 1)
         let node = config.proxies[0]
@@ -210,7 +210,7 @@ struct ClashConfigParserTests {
           - MATCH,DIRECT
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.proxies.count == 1)
         let node = config.proxies[0]
@@ -255,7 +255,7 @@ struct ClashConfigParserTests {
           - MATCH,DIRECT
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.rules.count == 5)
         #expect(config.rules[0] == .ipCIDR6(cidr: "2001:db8::/32", policy: .proxyNode(name: "proxy-a")))
@@ -323,10 +323,85 @@ struct ClashConfigParserTests {
           - MATCH,proxy-a
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.dnsPolicy.hosts["example.com"] == "1.2.3.4")
         #expect(config.dnsPolicy.hosts["*.google.com"] == "8.8.8.8")
         #expect(config.dnsPolicy.hosts["localhost"] == "127.0.0.1")
+    }
+
+    @Test("parses rule-providers section and RULE-SET rules")
+    func parsesRuleProvidersAndRuleSet() throws {
+        let yaml = """
+        mode: rule
+        rule-providers:
+          test-provider:
+            type: http
+            behavior: domain
+            url: "https://example.com/rules.yaml"
+            interval: 86400
+        proxies:
+          - name: "proxy-a"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        rules:
+          - RULE-SET,test-provider,proxy-a
+          - MATCH,DIRECT
+        """
+
+        let (config, providers) = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.rules.count == 2)
+        #expect(config.rules[0] == .ruleSet(name: "test-provider", policy: .proxyNode(name: "proxy-a")))
+        #expect(config.rules[1] == .final(policy: .direct))
+        #expect(providers.count == 1)
+        #expect(providers["test-provider"] != nil)
+    }
+
+    @Test("fails when RULE-SET references unknown provider")
+    func failsOnUnknownRuleSetProvider() {
+        let yaml = """
+        mode: rule
+        proxies:
+          - name: "proxy-a"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        rules:
+          - RULE-SET,nonexistent-provider,proxy-a
+          - MATCH,DIRECT
+        """
+
+        #expect(throws: ClashConfigError.self) {
+            _ = try ClashConfigParser.parse(yaml: yaml)
+        }
+    }
+
+    @Test("parses RULE-SET with default DIRECT policy")
+    func parsesRuleSetWithDefaultPolicy() throws {
+        let yaml = """
+        mode: rule
+        rule-providers:
+          my-provider:
+            type: http
+            behavior: classical
+            url: "https://example.com/rules.yaml"
+            interval: 3600
+        proxies:
+          - name: "proxy-a"
+            type: socks5
+            server: "5.6.7.8"
+            port: 1080
+        rules:
+          - RULE-SET,my-provider
+          - MATCH,DIRECT
+        """
+
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.rules.count == 2)
+        #expect(config.rules[0] == .ruleSet(name: "my-provider", policy: .direct))
+        #expect(config.rules[1] == .final(policy: .direct))
     }
 }

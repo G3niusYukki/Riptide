@@ -7,6 +7,7 @@ enum Theme {
     static let accent = Color(hex: "0fbcf9")
     static let success = Color(hex: "0be881")
     static let danger = Color(hex: "fd7272")
+    static let warning = Color(hex: "ffaa00")
     static let text = Color.white
     static let subtext = Color.secondary
     static let cardRadius: CGFloat = 12

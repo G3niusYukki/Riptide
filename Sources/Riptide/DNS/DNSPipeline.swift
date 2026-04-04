@@ -217,7 +217,7 @@ public actor DNSPipeline {
     private func shouldResolveViaProxy(domain: String) async -> Bool {
         guard let engine = ruleEngine else { return false }
         let target = RuleTarget(domain: domain, ipAddress: nil)
-        let policy = engine.resolve(target: target)
+        let policy = await engine.resolve(target: target)
         if case .proxyNode = policy { return true }
         return false
     }

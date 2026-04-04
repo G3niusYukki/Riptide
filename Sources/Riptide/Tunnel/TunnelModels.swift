@@ -8,13 +8,15 @@ public enum TunnelLifecycleState: Equatable, Sendable, Codable {
     case error
 }
 
-public struct TunnelProfile: Equatable, Sendable {
+public struct TunnelProfile: Sendable {
     public let name: String
     public let config: RiptideConfig
+    public let ruleSetProviders: [String: RuleSetProvider]
 
-    public init(name: String, config: RiptideConfig) {
+    public init(name: String, config: RiptideConfig, ruleSetProviders: [String: RuleSetProvider] = [:]) {
         self.name = name
         self.config = config
+        self.ruleSetProviders = ruleSetProviders
     }
 
     /// Proxy provider configurations sourced from the profile's config file.

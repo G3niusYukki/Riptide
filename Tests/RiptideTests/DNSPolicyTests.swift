@@ -83,7 +83,7 @@ struct DNSPolicyTests {
             - 8.8.8.8
           fake-ip-range: "198.19.0.0/16"
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.dnsPolicy.fakeIPEnabled == true)
         #expect(config.dnsPolicy.fakeIPCIDR == "198.19.0.0/16")
         #expect(config.dnsPolicy.primaryResolvers.count == 1)
@@ -106,7 +106,7 @@ struct DNSPolicyTests {
           respect-rules: true
           fake-ip: false
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.dnsPolicy.primaryResolvers[0].kind == .doh)
         #expect(config.dnsPolicy.fallbackResolvers.count == 1)
         #expect(config.dnsPolicy.respectRules == true)
@@ -121,7 +121,7 @@ struct DNSPolicyTests {
         rules:
           - MATCH,DIRECT
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.dnsPolicy.primaryResolvers.count == 2)
         #expect(config.dnsPolicy.fakeIPEnabled == true)
         #expect(config.dnsPolicy.respectRules == false)
@@ -143,7 +143,7 @@ struct DNSPolicyTests {
               nameserver:
                 - 1.1.1.1
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.dnsPolicy.primaryResolvers.count == 1)
     }
 }

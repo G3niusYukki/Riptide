@@ -18,6 +18,42 @@ public enum RuntimeError: Error, Equatable, Sendable {
     case notRunning
 }
 
+// MARK: - Protocol Definition
+
+/// Protocol defining the interface for mihomo runtime management.
+/// This allows for mocking in tests.
+public protocol MihomoRuntimeManaging: Actor {
+    /// Whether the runtime is currently running.
+    var isRunning: Bool { get }
+    /// Current runtime mode (system proxy or TUN).
+    var currentMode: RuntimeMode? { get }
+    /// Current active profile.
+    var currentProfile: TunnelProfile? { get }
+    /// XPC connection to the privileged helper tool.
+    var helperConnection: HelperToolConnection { get }
+
+    /// Sets up the runtime by creating necessary directories.
+    func setup() async throws
+
+    /// Starts the mihomo runtime with the specified mode and profile.
+    func start(mode: RuntimeMode, profile: TunnelProfile) async throws
+
+    /// Stops the mihomo runtime.
+    func stop() async throws
+
+    /// Switches the active proxy in the GLOBAL proxy group.
+    func switchProxy(to proxyName: String) async throws
+
+    /// Gets the list of available proxies.
+    func getProxyStatus() async throws -> [ProxyInfo]
+
+    /// Gets the list of active connections.
+    func getConnections() async throws -> [ConnectionInfo]
+
+    /// Gets current traffic statistics.
+    func getTraffic() async throws -> (up: Int, down: Int)
+}
+
 // MARK: - Sendable Wrapper for API Client
 
 /// Wrapper for MihomoAPIClient that provides @unchecked Sendable conformance.
@@ -34,7 +70,7 @@ private final class SendableAPIClient: @unchecked Sendable {
 
 /// Main orchestrator that coordinates config generation, XPC helper connection, and API control.
 /// Manages the complete lifecycle of the mihomo core process.
-public actor MihomoRuntimeManager {
+public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
     // MARK: - Properties
 
@@ -84,7 +120,7 @@ public actor MihomoRuntimeManager {
 
     /// Sets up the runtime by creating necessary directories.
     /// - Throws: FileManager errors if directory creation fails.
-    public func setup() throws {
+    public func setup() async throws {
         try paths.createDirectories()
     }
 
@@ -147,7 +183,7 @@ public actor MihomoRuntimeManager {
 
         // 3. Setup directories
         do {
-            try setup()
+            try await setup()
         } catch {
             throw RuntimeError.configGenerationFailed("Failed to create directories: \(error.localizedDescription)")
         }
