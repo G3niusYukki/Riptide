@@ -128,7 +128,7 @@ public actor MihomoAPIClient {
             let (data, response) = try await urlSession.data(for: request)
             return (data, response)
         } catch {
-            throw MihomoAPIError.networkError(error.localizedDescription)
+            throw MihomoAPIError.networkError(String(describing: error))
         }
     }
 
@@ -181,6 +181,8 @@ public actor MihomoAPIClient {
             }
             return (200...299).contains(httpResponse.statusCode)
         } catch {
+            // Log error for diagnostics without throwing
+            print("[MihomoAPIClient] Health check failed: \(String(describing: error))")
             return false
         }
     }
@@ -197,7 +199,7 @@ public actor MihomoAPIClient {
             let response = try decoder.decode(ProxiesResponse.self, from: data)
             return Array(response.proxies.values)
         } catch {
-            throw MihomoAPIError.decodingError("Failed to decode proxies: \(error.localizedDescription)")
+            throw MihomoAPIError.decodingError("Failed to decode proxies: \(String(describing: error))")
         }
     }
 
@@ -206,8 +208,7 @@ public actor MihomoAPIClient {
     ///   - proxyName: The name of the proxy to switch to
     ///   - group: The name of the proxy group (defaults to "GLOBAL")
     public func switchProxy(to proxyName: String, inGroup group: String = "GLOBAL") async throws {
-        let encodedGroup = group.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? group
-        let url = baseURL.appendingPathComponent("proxies").appendingPathComponent(encodedGroup)
+        let url = baseURL.appendingPathComponent("proxies").appendingPathComponent(group)
 
         let bodyDict: [String: String] = ["name": proxyName]
         guard let body = try? JSONSerialization.data(withJSONObject: bodyDict) else {
@@ -224,28 +225,26 @@ public actor MihomoAPIClient {
     ///   - url: The test URL to use (typically https://www.google.com)
     ///   - timeout: Timeout in milliseconds
     /// - Returns: The measured delay in milliseconds
-    public func testProxyDelay(name: String, url testURL: String, timeout: Int) async throws -> Int {
-        let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
-
+    public func testProxyDelay(name: String, url: String, timeout: Int) async throws -> Int {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: true)
-        components?.path = "/proxies/\(encodedName)/delay"
+        components?.path = "/proxies/\(name)/delay"
         components?.queryItems = [
-            URLQueryItem(name: "url", value: testURL),
+            URLQueryItem(name: "url", value: url),
             URLQueryItem(name: "timeout", value: String(timeout))
         ]
 
-        guard let url = components?.url else {
+        guard let requestURL = components?.url else {
             throw MihomoAPIError.invalidURL
         }
 
-        let (data, response) = try await makeRequest(url: url, method: "GET")
+        let (data, response) = try await makeRequest(url: requestURL, method: "GET")
         try validateResponse(response, data: data)
 
         do {
             let delayResponse = try decoder.decode(DelayResponse.self, from: data)
             return delayResponse.delay
         } catch {
-            throw MihomoAPIError.decodingError("Failed to decode delay response: \(error.localizedDescription)")
+            throw MihomoAPIError.decodingError("Failed to decode delay response: \(String(describing: error))")
         }
     }
 
@@ -261,15 +260,14 @@ public actor MihomoAPIClient {
             let response = try decoder.decode(ConnectionsResponse.self, from: data)
             return response.connections
         } catch {
-            throw MihomoAPIError.decodingError("Failed to decode connections: \(error.localizedDescription)")
+            throw MihomoAPIError.decodingError("Failed to decode connections: \(String(describing: error))")
         }
     }
 
     /// Closes a specific connection by ID
     /// - Parameter id: The connection ID to close
     public func closeConnection(id: String) async throws {
-        let encodedId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
-        let url = baseURL.appendingPathComponent("connections").appendingPathComponent(encodedId)
+        let url = baseURL.appendingPathComponent("connections").appendingPathComponent(id)
 
         let (data, response) = try await makeRequest(url: url, method: "DELETE")
         try validateResponse(response, data: data)
@@ -295,7 +293,7 @@ public actor MihomoAPIClient {
             let traffic = try decoder.decode(TrafficResponse.self, from: data)
             return (up: traffic.up, down: traffic.down)
         } catch {
-            throw MihomoAPIError.decodingError("Failed to decode traffic: \(error.localizedDescription)")
+            throw MihomoAPIError.decodingError("Failed to decode traffic: \(String(describing: error))")
         }
     }
 

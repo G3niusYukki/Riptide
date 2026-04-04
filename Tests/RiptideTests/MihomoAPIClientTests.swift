@@ -249,6 +249,7 @@ struct MihomoAPIClientTests {
                 let tempData = NSMutableData()
                 stream.open()
                 let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1024)
+                defer { buffer.deallocate() }
                 while stream.hasBytesAvailable {
                     let read = stream.read(buffer, maxLength: 1024)
                     if read > 0 {
@@ -256,7 +257,6 @@ struct MihomoAPIClientTests {
                     }
                 }
                 stream.close()
-                buffer.deallocate()
                 bodyData = tempData as Data
             }
 
@@ -488,6 +488,7 @@ struct MihomoAPIClientTests {
                 let tempData = NSMutableData()
                 stream.open()
                 let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1024)
+                defer { buffer.deallocate() }
                 while stream.hasBytesAvailable {
                     let read = stream.read(buffer, maxLength: 1024)
                     if read > 0 {
@@ -495,7 +496,6 @@ struct MihomoAPIClientTests {
                     }
                 }
                 stream.close()
-                buffer.deallocate()
                 bodyData = tempData as Data
             }
 
