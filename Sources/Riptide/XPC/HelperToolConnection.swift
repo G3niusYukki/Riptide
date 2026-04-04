@@ -14,8 +14,8 @@ private final class SendableXPCConnection: @unchecked Sendable {
 
 /// Wrapper for HelperToolProtocol that provides @unchecked Sendable conformance.
 /// XPC proxy objects are thread-safe by design (all calls are serialized through XPC).
-private final class SendableHelperProxy: @unchecked Sendable {
-    let proxy: HelperToolProtocol
+public final class SendableHelperProxy: @unchecked Sendable {
+    public let proxy: HelperToolProtocol
 
     init(_ proxy: HelperToolProtocol) {
         self.proxy = proxy
@@ -143,6 +143,19 @@ public actor HelperToolConnection {
         }
     }
 
+    /// Gets the XPC proxy object for the helper tool.
+    /// - Returns: The SendableHelperProxy wrapper containing the proxy object.
+    /// - Throws: ConnectionError if connection fails.
+    public func getHelperProxy() async throws -> SendableHelperProxy {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            throw ConnectionError.notInstalled
+        }
+
+        return wrapper
+    }
+
     /// Gets the current mihomo status from the helper tool.
     /// - Returns: Tuple of (statusData, error).
     public func getMihomoStatus() async -> (Data?, Error?) {
@@ -160,7 +173,7 @@ public actor HelperToolConnection {
     }
 
     /// Disconnects from the helper tool and cleans up resources.
-    public func disconnect() {
+    public func disconnect() async {
         proxyWrapper = nil
         connectionWrapper?.connection.invalidate()
         connectionWrapper = nil

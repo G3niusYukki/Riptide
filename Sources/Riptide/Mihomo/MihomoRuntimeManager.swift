@@ -88,10 +88,42 @@ public actor MihomoRuntimeManager {
         try paths.createDirectories()
     }
 
-    /// Checks if the helper tool is installed and available.
-    /// - Returns: true if the helper tool is installed.
-    public func checkHelperStatus() async -> Bool {
-        return await helperConnection.isHelperInstalled()
+    /// Gets the XPC proxy to the helper tool wrapped in a Sendable container.
+    /// - Returns: Sendable wrapper containing the HelperToolProtocol proxy.
+    /// - Throws: RuntimeError if helper is not installed.
+    public func getHelperProxy() async throws -> SendableHelperProxy {
+        let helperInstalled = await helperConnection.isHelperInstalled()
+        guard helperInstalled else {
+            throw RuntimeError.helperNotInstalled
+        }
+        return try await helperConnection.getHelperProxy()
+    }
+
+    /// Gets the current mihomo status from the helper tool.
+    /// - Returns: The decoded MihomoStatus if available.
+    /// - Throws: RuntimeError if helper is not installed or status cannot be decoded.
+    public func getMihomoStatus() async throws -> MihomoStatus {
+        let helperInstalled = await helperConnection.isHelperInstalled()
+        guard helperInstalled else {
+            throw RuntimeError.helperNotInstalled
+        }
+
+        let (data, error) = await helperConnection.getMihomoStatus()
+
+        if let error {
+            throw RuntimeError.launchFailed(error.localizedDescription)
+        }
+
+        guard let data else {
+            throw RuntimeError.notRunning
+        }
+
+        do {
+            let status = try JSONDecoder().decode(MihomoStatus.self, from: data)
+            return status
+        } catch {
+            throw RuntimeError.apiNotAvailable
+        }
     }
 
     // MARK: - Lifecycle Control
