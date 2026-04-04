@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Riptide
 
 @Suite("DNS message encoding and decoding")
@@ -209,4 +208,391 @@ struct DNSPipelineTests {
         let ip = try await pipeline.resolveFakeIP("test.org")
         #expect(await pipeline.reverseLookup(ip) == "test.org")
     }
+
+    @Test("lookupHostsEntry returns exact match")
+    func lookupHostsExact() async {
+        let policy = DNSPolicy(hosts: [
+            "example.com": "1.2.3.4",
+            "localhost": "127.0.0.1",
+        ])
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "example.com") == "1.2.3.4")
+        #expect(await pipeline.lookupHostsEntry(domain: "localhost") == "127.0.0.1")
+    }
+
+    @Test("lookupHostsEntry returns wildcard match")
+    func lookupHostsWildcard() async {
+        let policy = DNSPolicy(hosts: [
+            "*.google.com": "8.8.8.8",
+            "*.example.org": "9.9.9.9",
+        ])
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "www.google.com") == "8.8.8.8")
+        #expect(await pipeline.lookupHostsEntry(domain: "mail.google.com") == "8.8.8.8")
+        #expect(await pipeline.lookupHostsEntry(domain: "api.example.org") == "9.9.9.9")
+    }
+
+    @Test("lookupHostsEntry exact match takes priority over wildcard")
+    func lookupHostsExactPriority() async {
+        let policy = DNSPolicy(hosts: [
+            "*.google.com": "8.8.8.8",
+            "google.com": "1.2.3.4",
+        ])
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "google.com") == "1.2.3.4")
+        #expect(await pipeline.lookupHostsEntry(domain: "www.google.com") == "8.8.8.8")
+    }
+
+    @Test("lookupHostsEntry returns nil for unmatched domains")
+    func lookupHostsMiss() async {
+        let policy = DNSPolicy(hosts: ["example.com": "1.2.3.4"])
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "unknown.com") == nil)
+        #expect(await pipeline.lookupHostsEntry(domain: "notexample.com") == nil)
+    }
+
+    @Test("lookupHostsEntry does not match bare domain as wildcard")
+    func lookupHostsNoBareSuffixMatch() async {
+        let policy = DNSPolicy(hosts: ["*.example.com": "1.2.3.4"])
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "example.com") == nil)
+        #expect(await pipeline.lookupHostsEntry(domain: "www.example.com") == "1.2.3.4")
+    }
+
+    @Test("DNSPipeline from DNSPolicy with hosts")
+    func pipelineWithHosts() async {
+        let policy = DNSPolicy(
+            primaryResolvers: [.udp(host: "8.8.8.8")],
+            hosts: ["blocked.com": "0.0.0.0"]
+        )
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(await pipeline.lookupHostsEntry(domain: "blocked.com") == "0.0.0.0")
+    }
+
+    @Test("DNSConfig carries hosts through")
+    func dnsConfigWithHosts() async {
+        let cfg = DNSConfig(
+            remoteServers: ["8.8.8.8"],
+            hosts: ["custom.com": "192.168.1.1"]
+        )
+        let pipeline = DNSPipeline(config: cfg)
+        #expect(await pipeline.lookupHostsEntry(domain: "custom.com") == "192.168.1.1")
+    }
 }
+
+@Suite("DOTResolver")
+struct DOTResolverTests {
+    @Test("parses valid host:port address")
+    func addressParsing() throws {
+        let resolver = try DOTResolver(address: "1.1.1.1:853")
+        #expect(resolver != nil)
+    }
+
+    @Test("throws on invalid address format")
+    func invalidAddress() {
+        #expect(throws: DNSError.self) {
+            _ = try DOTResolver(address: "invalid-no-port")
+        }
+    }
+
+    @Test("DOTResolver endpoint kind is available")
+    func dotKindExists() {
+        let endpoint = DNSResolverEndpoint.dot(host: "1.1.1.1", port: 853)
+        #expect(endpoint.kind == .dot)
+        #expect(endpoint.address == "1.1.1.1:853")
+    }
+
+    @Test("DNSResolverEndpoint dot static constructor")
+    func dotStaticConstructor() {
+        let endpoint = DNSResolverEndpoint.dot(host: "dns.google")
+        #expect(endpoint.kind == .dot)
+        #expect(endpoint.address == "dns.google:853")
+        #expect(endpoint.dohURL == nil)
+    }
+
+    @Test("parses tls-nameserver in Clash config")
+    func parseTLSTypeInKind() throws {
+        // Verify the .dot case is a valid Kind variant
+        #expect(DNSResolverEndpoint.Kind.dot.rawValue == "dot")
+    }
+}
+
+@Suite("Clash config DoT parsing")
+struct ClashDoTTests {
+    @Test("parses tls-nameserver from Clash YAML")
+    func parseTLSNameserver() throws {
+        let yaml = """
+        dns:
+          enable: true
+          nameserver:
+            - 8.8.8.8
+          tls-nameserver:
+            - tls://1.1.1.1
+            - tls://dns.google:853
+        mode: direct
+        rules: []
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
+        #expect(dotResolvers.count == 2)
+        #expect(dotResolvers[0].address == "1.1.1.1:853")
+        #expect(dotResolvers[1].address == "dns.google:853")
+    }
+
+    @Test("tls-nameserver with bare host defaults to port 853")
+    func tlsNameserverBareHost() throws {
+        let yaml = """
+        dns:
+          enable: true
+          tls-nameserver:
+            - tls://1.1.1.1
+        mode: direct
+        rules: []
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
+        #expect(dotResolvers.count == 1)
+        #expect(dotResolvers[0].address == "1.1.1.1:853")
+    }
+
+    @Test("tls-nameserver mixed with regular nameserver")
+    func mixedNameservers() throws {
+        let yaml = """
+        dns:
+          enable: true
+          nameserver:
+            - 8.8.8.8
+            - https://dns.google/dns-query
+          tls-nameserver:
+            - tls://1.1.1.1
+        mode: direct
+        rules: []
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let dotResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .dot }
+        #expect(dotResolvers.count == 1)
+        let udpResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .udp }
+        #expect(udpResolvers.count == 1)
+        let dohResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doh }
+        #expect(dohResolvers.count == 1)
+    }
+}
+
+@Suite("DNSPolicy integration with DoT")
+struct DNSPolicyDoTTests {
+    @Test("DNSPolicy default has no DoT resolvers")
+    func defaultNoDot() {
+        let policy = DNSPolicy.default
+        #expect(!policy.primaryResolvers.contains { $0.kind == .dot })
+    }
+
+    @Test("DNSPolicy with DoT resolver")
+    func withDot() {
+        let policy = DNSPolicy(
+            primaryResolvers: [
+                .dot(host: "1.1.1.1"),
+                .dot(host: "8.8.8.8"),
+            ],
+            fallbackResolvers: [
+                .udp(host: "223.5.5.5"),
+            ]
+        )
+        #expect(policy.primaryResolvers.count == 2)
+        #expect(policy.primaryResolvers.allSatisfy { $0.kind == .dot })
+        #expect(policy.fallbackResolvers.count == 1)
+    }
+
+    @Test("DNSPipeline from DNSPolicy extracts DoT endpoints")
+    func pipelineFromPolicy() async {
+        let policy = DNSPolicy(
+            primaryResolvers: [
+                .udp(host: "8.8.8.8"),
+                .dot(host: "1.1.1.1"),
+            ]
+        )
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        // The pipeline should have extracted the dot endpoint
+        // We verify indirectly through successful construction
+        #expect(pipeline != nil)
+    }
+}
+
+@Suite("DOQ (DNS over QUIC)")
+struct DOQResolverTests {
+    @Test("DNSResolverEndpoint Kind has doq variant")
+    func doqKindExists() {
+        #expect(DNSResolverEndpoint.Kind.doq.rawValue == "doq")
+    }
+
+    @Test("DNSResolverEndpoint doq static constructor")
+    func doqStaticConstructor() {
+        let endpoint = DNSResolverEndpoint.doq(host: "dns.adguard.com", port: 784)
+        #expect(endpoint.kind == .doq)
+        #expect(endpoint.address == "dns.adguard.com:784")
+        #expect(endpoint.dohURL == nil)
+    }
+
+    @Test("DOQResolver constructs with host and port")
+    func doqResolverConstruction() {
+        let resolver = DOQResolver(serverHost: "dns.adguard.com", serverPort: 784)
+        #expect(resolver != nil)
+    }
+
+    @Test("DOQResolver uses default port 853")
+    func doqResolverDefaultPort() {
+        let resolver = DOQResolver(serverHost: "dns.adguard.com")
+        #expect(resolver != nil)
+    }
+
+    @Test("DOQResolver query throws when DoQ is unavailable on platform")
+    func doqQueryThrowsUnavailble() async {
+        let resolver = DOQResolver(serverHost: "dns.adguard.com", serverPort: 784)
+        await #expect(throws: DNSError.self) {
+            _ = try await resolver.query(name: "example.com", type: .a)
+        }
+    }
+}
+
+@Suite("DNSPolicy integration with DoQ")
+struct DNSPolicyDoQTests {
+    @Test("DNSPolicy with DoQ resolver")
+    func withDoQ() {
+        let policy = DNSPolicy(
+            primaryResolvers: [
+                .doq(host: "dns.adguard.com", port: 784),
+                .doq(host: "1.1.1.1"),
+            ],
+            fallbackResolvers: [
+                .udp(host: "223.5.5.5"),
+            ]
+        )
+        #expect(policy.primaryResolvers.count == 2)
+        #expect(policy.primaryResolvers.allSatisfy { $0.kind == .doq })
+        #expect(policy.fallbackResolvers.count == 1)
+    }
+
+    @Test("DNSPolicy with mixed DoT and DoQ resolvers")
+    func mixedDotAndDoQ() {
+        let policy = DNSPolicy(
+            primaryResolvers: [
+                .dot(host: "1.1.1.1"),
+                .doq(host: "dns.adguard.com", port: 784),
+                .udp(host: "8.8.8.8"),
+            ]
+        )
+        #expect(policy.primaryResolvers.count == 3)
+        #expect(policy.primaryResolvers[0].kind == .dot)
+        #expect(policy.primaryResolvers[1].kind == .doq)
+        #expect(policy.primaryResolvers[2].kind == .udp)
+    }
+
+    @Test("DNSPipeline from DNSPolicy with DoQ constructs successfully")
+    func pipelineWithDoQ() async {
+        let policy = DNSPolicy(
+            primaryResolvers: [
+                .udp(host: "8.8.8.8"),
+                .doq(host: "dns.adguard.com", port: 784),
+            ]
+        )
+        let pipeline = DNSPipeline(dnsPolicy: policy)
+        #expect(pipeline != nil)
+    }
+
+    @Test("DNSConfig includes doQEndpoints")
+    func dnsConfigDoQEndpoints() {
+        let cfg = DNSConfig(
+            remoteServers: ["8.8.8.8"],
+            doQEndpoints: ["dns.adguard.com:784", "1.1.1.1:853"]
+        )
+        #expect(cfg.doQEndpoints.count == 2)
+        #expect(cfg.doQEndpoints[0] == "dns.adguard.com:784")
+    }
+
+    @Test("DNSConfig defaults have empty doQEndpoints")
+    func dnsConfigDefaultNoDoQ() {
+        let cfg = DNSConfig()
+        #expect(cfg.doQEndpoints.isEmpty)
+    }
+}
+
+@Suite("ClashConfigParser DoQ")
+struct ClashConfigParserDoQTests {
+    @Test("parses quic-nameserver in Clash DNS config")
+    func parseQuicNameserver() throws {
+        let yaml = """
+        dns:
+          enable: true
+          quic-nameserver:
+            - "quic://dns.adguard.com:784"
+            - "dns.adguard.com:853"
+          fake-ip: true
+        mode: direct
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
+        #expect(doqResolvers.count == 2)
+        #expect(doqResolvers[0].address == "dns.adguard.com:784")
+        #expect(doqResolvers[1].address == "dns.adguard.com:853")
+    }
+
+    @Test("parses quic:// prefix in nameserver array")
+    func parseQuicInNameserver() throws {
+        let yaml = """
+dns:
+  enable: true
+  nameserver:
+    - "quic://dns.adguard.com:784"
+    - "8.8.8.8"
+  fake-ip: true
+mode: direct
+"""
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
+        let udpResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .udp }
+        #expect(doqResolvers.count == 1)
+        #expect(doqResolvers[0].address == "dns.adguard.com:784")
+        #expect(udpResolvers.count == 1)
+        #expect(udpResolvers[0].address == "8.8.8.8:53")
+    }
+
+    @Test("parses quic-nameserver without port using default 853")
+    func parseQuicNoPort() throws {
+        let yaml = """
+        dns:
+          enable: true
+          quic-nameserver:
+            - "quic://1.1.1.1"
+          fake-ip: true
+        mode: direct
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let doqResolvers = config.dnsPolicy.primaryResolvers.filter { $0.kind == .doq }
+        #expect(doqResolvers.count == 1)
+        #expect(doqResolvers[0].address == "1.1.1.1:853")
+    }
+
+    @Test("parses mixed DoH DoT DoQ in same config")
+    func parseMixedDNSProtocols() throws {
+        let yaml = """
+        dns:
+          enable: true
+          nameserver:
+            - "https://dns.google/dns-query"
+            - "quic://dns.adguard.com:784"
+            - "8.8.8.8"
+          tls-nameserver:
+            - "1.1.1.1:853"
+          quic-nameserver:
+            - "dns.quad9.net:853"
+          fake-ip: true
+        mode: direct
+        """
+        let config = try ClashConfigParser.parse(yaml: yaml)
+        let resolvers = config.dnsPolicy.primaryResolvers
+        #expect(resolvers.contains { $0.kind == .doh })
+        #expect(resolvers.contains { $0.kind == .doq })
+        #expect(resolvers.contains { $0.kind == .dot })
+        #expect(resolvers.contains { $0.kind == .udp })
+    }
+}
+

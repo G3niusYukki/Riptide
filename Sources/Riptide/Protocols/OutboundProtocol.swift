@@ -3,10 +3,13 @@ import Foundation
 public struct ConnectionTarget: Equatable, Sendable {
     public let host: String
     public let port: Int
+    /// Domain extracted from HTTP Host header or TLS SNI for rule matching.
+    public let sniffedDomain: String?
 
-    public init(host: String, port: Int) {
+    public init(host: String, port: Int, sniffedDomain: String? = nil) {
         self.host = host
         self.port = port
+        self.sniffedDomain = sniffedDomain
     }
 }
 

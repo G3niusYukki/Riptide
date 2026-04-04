@@ -16,6 +16,11 @@ public struct TunnelProfile: Equatable, Sendable {
         self.name = name
         self.config = config
     }
+
+    /// Proxy provider configurations sourced from the profile's config file.
+    public var proxyProviders: [String: ProxyProviderConfig] {
+        config.proxyProviders
+    }
 }
 
 public struct TunnelRuntimeStatus: Equatable, Sendable, Codable {

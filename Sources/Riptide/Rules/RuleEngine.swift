@@ -21,16 +21,39 @@ public struct RuleTarget: Equatable, Sendable {
 }
 
 public struct RuleEngine: Sendable {
-    private let rules: [ProxyRule]
+    /// The flat, fully-expanded rule list.
+    private let expandedRules: [ProxyRule]
     private let geoIPResolver: GeoIPResolver
 
-    public init(rules: [ProxyRule], geoIPResolver: GeoIPResolver = .none) {
-        self.rules = rules
+    /// Initialize a RuleEngine.
+    /// - Parameters:
+    ///   - rules: The top-level rules from the config. May contain `.ruleSet` entries.
+    ///   - ruleSets: A mapping of rule-set provider name to its loaded rules.
+    ///   - geoIPResolver: Optional GeoIP resolver for GEOIP rule matching.
+    public init(
+        rules: [ProxyRule],
+        ruleSets: [String: [ProxyRule]] = [:],
+        geoIPResolver: GeoIPResolver = .none
+    ) {
         self.geoIPResolver = geoIPResolver
+        // Expand all .ruleSet entries inline at init time.
+        var expanded: [ProxyRule] = []
+        for rule in rules {
+            if case .ruleSet(let name, _) = rule {
+                if let rsRules = ruleSets[name], !rsRules.isEmpty {
+                    // Inject each rule from the set, preserving its own policy.
+                    expanded.append(contentsOf: rsRules)
+                }
+                // If the set is not yet loaded or empty, skip it silently.
+            } else {
+                expanded.append(rule)
+            }
+        }
+        self.expandedRules = expanded
     }
 
     public func resolve(target: RuleTarget) -> RoutingPolicy {
-        for rule in rules {
+        for rule in expandedRules {
             if let policy = matchedPolicy(for: rule, target: target) {
                 return policy
             }
@@ -120,6 +143,10 @@ public struct RuleEngine: Sendable {
 
         case .ruleSet(_, let policy):
             return policy
+
+        case .script(let code, let policy):
+            let engine = RuleScriptEngine(code: code)
+            return engine.evaluate(target: target) ? policy : nil
 
         case .matchAll:
             return .direct

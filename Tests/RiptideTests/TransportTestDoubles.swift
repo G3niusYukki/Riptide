@@ -1,49 +1,98 @@
 import Foundation
+import os.lock
 
 @testable import Riptide
 
-actor MockTransportSession: TransportSession {
-    private var queuedResponses: [Data]
-    private(set) var sentFrames: [Data]
-    private(set) var isClosed: Bool
+final class MockTransportSession: @unchecked Sendable, TransportSession {
+    private var sentFramesLock = _UnfairLock()
+    private var _sentFrames: [Data] = []
+    private var _isClosed: Bool = false
+    private var receiveQueueLock = _UnfairLock()
+    private var _queuedResponses: [Data]
+
+    var sentFrames: [Data] {
+        sentFramesLock.withLock { _sentFrames }
+    }
+
+    var isClosed: Bool {
+        sentFramesLock.withLock { _isClosed }
+    }
 
     init(receiveQueue: [Data]) {
-        self.queuedResponses = receiveQueue
-        self.sentFrames = []
-        self.isClosed = false
+        self._queuedResponses = receiveQueue
     }
 
     func send(_ data: Data) async throws {
-        sentFrames.append(data)
+        sentFramesLock.withLock { _sentFrames.append(data) }
     }
 
     func receive() async throws -> Data {
-        if queuedResponses.isEmpty {
-            return Data()
+        receiveQueueLock.withLock {
+            if _queuedResponses.isEmpty {
+                return Data()
+            }
+            return _queuedResponses.removeFirst()
         }
-        return queuedResponses.removeFirst()
     }
 
     func close() async {
-        isClosed = true
+        sentFramesLock.withLock { _isClosed = true }
+    }
+
+    func getSentFrames() -> [Data] {
+        sentFrames
+    }
+
+    func getIsClosed() -> Bool {
+        isClosed
     }
 }
 
-actor MockTransportDialer: TransportDialer {
-    private var sessions: [MockTransportSession]
-    private(set) var openCount: Int
+final class MockTransportDialer: @unchecked Sendable, TransportDialer {
+    private var openCountLock = _UnfairLock()
+    private var _openCount: Int = 0
+    private var sessionsLock = _UnfairLock()
+    private var _sessions: [MockTransportSession]
+
+    var openCount: Int {
+        openCountLock.withLock { _openCount }
+    }
 
     init(_ sessions: [MockTransportSession]) {
-        self.sessions = sessions
-        self.openCount = 0
+        self._sessions = sessions
     }
 
     func openSession(to node: ProxyNode) async throws -> any TransportSession {
         _ = node
-        openCount += 1
-        if sessions.isEmpty {
-            throw TransportError.noSessionAvailable
+        openCountLock.withLock { _openCount += 1 }
+
+        var session: (any TransportSession)?
+        var sessionError: Error?
+        sessionsLock.withLock {
+            if _sessions.isEmpty {
+                sessionError = TransportError.noSessionAvailable
+            } else {
+                session = _sessions.removeFirst()
+            }
         }
-        return sessions.removeFirst()
+        if let err = sessionError {
+            throw err
+        }
+        return session!
+    }
+
+    func getOpenCount() -> Int {
+        openCount
+    }
+}
+
+private struct _UnfairLock: @unchecked Sendable {
+    private var _lock = os_unfair_lock()
+
+    @inline(__always)
+    mutating func withLock<T>(_ body: () -> T) -> T {
+        os_unfair_lock_lock(&_lock)
+        defer { os_unfair_lock_unlock(&_lock) }
+        return body()
     }
 }

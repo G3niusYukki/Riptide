@@ -79,7 +79,8 @@ struct LiveTunnelRuntimeTests {
             rules: [
                 .geoIP(countryCode: "CN", policy: .proxyNode(name: "socks-node")),
                 .final(policy: .direct),
-            ]
+            ],
+            dnsPolicy: DNSPolicy(fakeIPEnabled: false)
         )
         let profile = TunnelProfile(name: "geoip-proxy", config: config)
 

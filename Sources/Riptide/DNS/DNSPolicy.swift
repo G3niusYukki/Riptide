@@ -12,6 +12,8 @@ public struct DNSResolverEndpoint: Sendable, Equatable, Codable {
         case udp
         case tcp
         case doh
+        case dot
+        case doq
     }
 
     public let kind: Kind
@@ -26,6 +28,14 @@ public struct DNSResolverEndpoint: Sendable, Equatable, Codable {
 
     public static func udp(host: String, port: Int = 53) -> DNSResolverEndpoint {
         DNSResolverEndpoint(kind: .udp, address: "\(host):\(port)")
+    }
+
+    public static func dot(host: String, port: Int = 853) -> DNSResolverEndpoint {
+        DNSResolverEndpoint(kind: .dot, address: "\(host):\(port)")
+    }
+
+    public static func doq(host: String, port: Int = 853) -> DNSResolverEndpoint {
+        DNSResolverEndpoint(kind: .doq, address: "\(host):\(port)")
     }
 
     public static func doh(url: String) -> DNSResolverEndpoint {
@@ -66,6 +76,8 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
     public let fakeIPEnabled: Bool
     /// CIDR for the fake IP pool.
     public let fakeIPCIDR: String
+    /// Static host mappings (domain -> IP). Supports exact match and wildcard (`*.domain.com`).
+    public let hosts: [String: String]
 
     public init(
         primaryResolvers: [DNSResolverEndpoint] = [],
@@ -73,7 +85,8 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
         domainPolicies: [DNSDomainPolicy] = [],
         respectRules: Bool = false,
         fakeIPEnabled: Bool = true,
-        fakeIPCIDR: String = "198.18.0.0/16"
+        fakeIPCIDR: String = "198.18.0.0/16",
+        hosts: [String: String] = [:]
     ) {
         self.primaryResolvers = primaryResolvers
         self.fallbackResolvers = fallbackResolvers
@@ -81,6 +94,7 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
         self.respectRules = respectRules
         self.fakeIPEnabled = fakeIPEnabled
         self.fakeIPCIDR = fakeIPCIDR
+        self.hosts = hosts
     }
 
     /// Default DNS policy with public resolvers.

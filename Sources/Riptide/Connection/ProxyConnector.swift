@@ -4,11 +4,19 @@ public struct ConnectedProxyContext: Sendable {
     public let node: ProxyNode
     public let connection: PooledTransportConnection
     public let encryptedStream: ShadowsocksStream?
+    /// Outer relay session when this context is the inner hop of a relay chain.
+    public let relaySession: (any TransportSession)?
 
-    public init(node: ProxyNode, connection: PooledTransportConnection, encryptedStream: ShadowsocksStream? = nil) {
+    public init(
+        node: ProxyNode,
+        connection: PooledTransportConnection,
+        encryptedStream: ShadowsocksStream? = nil,
+        relaySession: (any TransportSession)? = nil
+    ) {
         self.node = node
         self.connection = connection
         self.encryptedStream = encryptedStream
+        self.relaySession = relaySession
     }
 }
 
@@ -20,8 +28,7 @@ public struct ProxyConnector: Sendable {
     }
 
     public func connect(via node: ProxyNode, to target: ConnectionTarget) async throws -> ConnectedProxyContext {
-        let dialer = selectDialer(for: node)
-        let connection = try await pool.acquire(for: node, using: dialer)
+        let connection = try await pool.acquire(for: node)
         do {
             switch node.kind {
             case .http:
@@ -34,8 +41,15 @@ public struct ProxyConnector: Sendable {
                 return try await performVLESSConnect(connection: connection, node: node, target: target)
             case .trojan:
                 return try await performTrojanConnect(connection: connection, node: node, target: target)
-            case .vmess, .hysteria2:
-                throw ProtocolError.malformedResponse("\(node.kind) protocol not supported yet")
+            case .vmess:
+                return try await performVMessConnect(connection: connection, node: node, target: target)
+            case .hysteria2:
+                return try await performHysteria2Connect(connection: connection, node: node, target: target)
+            case .relay:
+                // Relay is handled at the LiveTunnelRuntime level where the full proxy
+                // profile is available to resolve the chain. A relay node should never
+                // reach ProxyConnector.connect() directly; it is always unwrapped there.
+                throw ProtocolError.malformedResponse("unexpected relay node in ProxyConnector")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {
@@ -132,17 +146,30 @@ public struct ProxyConnector: Sendable {
         return ConnectedProxyContext(node: node, connection: connection)
     }
 
-    private func selectDialer(for node: ProxyNode) -> any TransportDialer {
-        let useTLS = node.port == 443 || node.sni != nil || node.skipCertVerify == true
-        if node.network == "ws" {
-            return WSTransportDialer()
-        } else if node.network == "grpc" {
-            // gRPC transport not yet wired; fall back to TLS for now.
-            return TLSTransportDialer()
-        } else if useTLS {
-            return TLSTransportDialer()
-        } else {
-            return TCPTransportDialer()
+    private func performVMessConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString) else {
+            throw ProtocolError.malformedResponse("VMess node missing uuid")
         }
+        let vmessStream = VMessStream(session: connection.session, uuid: uuid)
+        try await vmessStream.connect(to: target)
+        return ConnectedProxyContext(node: node, connection: connection)
     }
+
+    private func performHysteria2Connect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let password = node.password else {
+            throw ProtocolError.malformedResponse("Hysteria2 node missing password")
+        }
+        let hysteria2Stream = Hysteria2Stream(session: connection.session, password: password)
+        try await hysteria2Stream.connect(to: target)
+        return ConnectedProxyContext(node: node, connection: connection)
+    }
+
 }

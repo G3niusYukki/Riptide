@@ -81,4 +81,72 @@ struct RuleEngineTests {
         let policy = engine.resolve(target: RuleTarget(domain: "unknown.com", ipAddress: nil))
         #expect(policy == .reject)
     }
+
+    @Test("matches IPv6 CIDR")
+    func matchesIPCIDR6() {
+        let rules: [ProxyRule] = [
+            .ipCIDR6(cidr: "2001:db8::/32", policy: .proxyNode(name: "ipv6-proxy")),
+            .final(policy: .direct),
+        ]
+        let engine = RuleEngine(rules: rules)
+
+        let inside = engine.resolve(target: RuleTarget(domain: nil, ipAddress: "2001:db8::1"))
+        let outside = engine.resolve(target: RuleTarget(domain: nil, ipAddress: "2001:4860:4860::8888"))
+        let noIP = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil))
+
+        #expect(inside == .proxyNode(name: "ipv6-proxy"))
+        #expect(outside == .direct)
+        #expect(noIP == .direct)
+    }
+
+    @Test("matches source IP CIDR")
+    func matchesSrcIPCIDR() {
+        let rules: [ProxyRule] = [
+            .srcIPCIDR(cidr: "192.168.0.0/16", policy: .proxyNode(name: "lan-proxy")),
+            .final(policy: .direct),
+        ]
+        let engine = RuleEngine(rules: rules)
+
+        let inside = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourceIP: "192.168.1.100"))
+        let outside = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourceIP: "10.0.0.1"))
+        let noSourceIP = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourceIP: nil))
+
+        #expect(inside == .proxyNode(name: "lan-proxy"))
+        #expect(outside == .direct)
+        #expect(noSourceIP == .direct)
+    }
+
+    @Test("matches source port")
+    func matchesSrcPort() {
+        let rules: [ProxyRule] = [
+            .srcPort(port: 443, policy: .proxyNode(name: "https-proxy")),
+            .final(policy: .direct),
+        ]
+        let engine = RuleEngine(rules: rules)
+
+        let match = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourcePort: 443))
+        let noMatch = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourcePort: 80))
+        let noPort = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, sourcePort: nil))
+
+        #expect(match == .proxyNode(name: "https-proxy"))
+        #expect(noMatch == .direct)
+        #expect(noPort == .direct)
+    }
+
+    @Test("matches destination port")
+    func matchesDstPort() {
+        let rules: [ProxyRule] = [
+            .dstPort(port: 80, policy: .proxyNode(name: "http-proxy")),
+            .final(policy: .direct),
+        ]
+        let engine = RuleEngine(rules: rules)
+
+        let match = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, destinationPort: 80))
+        let noMatch = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, destinationPort: 443))
+        let noPort = engine.resolve(target: RuleTarget(domain: nil, ipAddress: nil, destinationPort: nil))
+
+        #expect(match == .proxyNode(name: "http-proxy"))
+        #expect(noMatch == .direct)
+        #expect(noPort == .direct)
+    }
 }

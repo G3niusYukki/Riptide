@@ -231,6 +231,7 @@ public actor ExternalController {
         case .vless: return "VLESS"
         case .trojan: return "Trojan"
         case .hysteria2: return "Hysteria2"
+        case .relay: return "Relay"
         }
     }
 
@@ -249,6 +250,7 @@ public actor ExternalController {
         case .ipASN: return "IP-ASN"
         case .geoSite: return "GEOSITE"
         case .ruleSet: return "RULE-SET"
+        case .script: return "SCRIPT"
         case .matchAll: return "MATCH"
         case .final: return "FINAL"
         }
@@ -269,6 +271,7 @@ public actor ExternalController {
         case .ipASN(let a, _): return "\(a)"
         case .geoSite(let c, let cat, _): return "\(c),\(cat)"
         case .ruleSet(let n, _): return n
+        case .script(let code, _): return code.prefix(50) + "..."
         case .matchAll: return "*"
         case .final: return ""
         }

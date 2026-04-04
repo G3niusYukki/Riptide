@@ -107,6 +107,7 @@ extension ProxyKind {
         case .vless: return "VLESS"
         case .trojan: return "Trojan"
         case .hysteria2: return "H2"
+        case .relay: return "Relay"
         }
     }
 }

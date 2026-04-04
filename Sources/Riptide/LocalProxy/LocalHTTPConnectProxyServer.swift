@@ -55,8 +55,33 @@ public enum HTTPConnectRequestParser {
         }
 
         let target = try parseAuthority(String(parts[1]))
+
+        // Extract Host header for domain sniffing
+        var sniffedDomain: String? = nil
+        for line in lines.dropFirst() {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.lowercased().hasPrefix("host:") {
+                let hostValue = trimmed.dropFirst(5).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Extract just the host (remove port if present)
+                if let colonIndex = hostValue.lastIndex(of: ":") {
+                    sniffedDomain = String(hostValue[..<colonIndex])
+                } else {
+                    sniffedDomain = hostValue
+                }
+                break
+            }
+        }
+
+        // Create target with sniffed domain if different from CONNECT authority
+        let finalTarget: ConnectionTarget
+        if let sniffed = sniffedDomain, sniffed != target.host {
+            finalTarget = ConnectionTarget(host: target.host, port: target.port, sniffedDomain: sniffed)
+        } else {
+            finalTarget = target
+        }
+
         let remaining = Data(data[headerRange.upperBound...])
-        return ParsedHTTPConnectRequest(target: target, remainingData: remaining)
+        return ParsedHTTPConnectRequest(target: finalTarget, remainingData: remaining)
     }
 
     private static func parseAuthority(_ authority: String) throws -> ConnectionTarget {

@@ -161,6 +161,7 @@ extension ProxyRule {
         case .ipASN: return "IP-ASN"
         case .geoSite: return "GEOSITE"
         case .ruleSet: return "RULE-SET"
+        case .script: return "SCRIPT"
         case .matchAll: return "MATCH"
         case .final: return "FINAL"
         }
@@ -181,6 +182,7 @@ extension ProxyRule {
         case .ipASN(let a, _): return "AS\(a)"
         case .geoSite(let c, let cat, _): return "\(c),\(cat)"
         case .ruleSet(let n, _): return n
+        case .script(let code, _): return String(code.prefix(30)) + "..."
         case .matchAll: return "*"
         case .final: return "FINAL"
         }

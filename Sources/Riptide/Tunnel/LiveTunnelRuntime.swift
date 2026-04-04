@@ -17,6 +17,13 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private var currentProfile: TunnelProfile?
     private var currentStatus: TunnelRuntimeStatus
     private var activeConnections: [UUID: ConnectedProxyContext]
+    /// Active rule-set providers, keyed by provider name.
+    private var ruleSetProviders: [String: RuleSetProvider] = [:]
+    /// Most-recently-loaded rules for each provider.
+    private var ruleSetRules: [String: [ProxyRule]] = [:]
+    private var ruleSetRefreshTask: Task<Void, Never>?
+    /// Active proxy providers, keyed by provider name.
+    private var proxyProviders: [String: ProxyProvider] = [:]
 
     public init(
         proxyDialer: any TransportDialer,
@@ -45,6 +52,45 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         connector = ProxyConnector(pool: proxyPool)
         // Fake-IP pool is initialized in DNSPipeline.init from dnsPolicy.fakeIPRange;
         // no separate start call needed.
+
+        // Start rule-set providers.
+        ruleSetProviders.removeAll()
+        ruleSetRules.removeAll()
+        ruleSetRefreshTask?.cancel()
+        ruleSetRefreshTask = nil
+
+        for (_, config) in profile.config.ruleProviders {
+            let provider = RuleSetProvider(config: config)
+            ruleSetProviders[config.name] = provider
+            await provider.start()
+        }
+
+        // Start proxy providers.
+        proxyProviders.removeAll()
+        for (_, config) in profile.proxyProviders {
+            let provider = ProxyProvider(config: config)
+            proxyProviders[config.name] = provider
+            await provider.start()
+        }
+
+        // Wait for initial load of all providers before accepting connections.
+        await refreshRuleSets()
+
+        // Schedule periodic refreshes every 60 seconds.
+        ruleSetRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                await refreshRuleSets()
+            }
+        }
+    }
+
+    /// Refresh all rule-set providers and update the cached rules.
+    private func refreshRuleSets() async {
+        for (name, provider) in ruleSetProviders {
+            let rules = await provider.rules()
+            ruleSetRules[name] = rules
+        }
     }
 
     public func stop() async throws {
@@ -54,6 +100,19 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         activeConnections.removeAll()
         currentProfile = nil
         currentStatus = TunnelRuntimeStatus()
+
+        ruleSetRefreshTask?.cancel()
+        ruleSetRefreshTask = nil
+        for provider in ruleSetProviders.values {
+            await provider.stop()
+        }
+        ruleSetProviders.removeAll()
+        ruleSetRules.removeAll()
+
+        for provider in proxyProviders.values {
+            await provider.stop()
+        }
+        proxyProviders.removeAll()
     }
 
     public func update(profile: TunnelProfile) async throws {
@@ -95,7 +154,28 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             guard let node = profile.config.proxies.first(where: { $0.name == name }) else {
                 throw LiveTunnelRuntimeError.missingProxyNode(name)
             }
-            let context = try await connector.connect(via: node, to: target)
+            let context: ConnectedProxyContext
+            if node.kind == .relay {
+                // Relay: follow the chain to find the terminal non-relay node, connect to it,
+                // and wrap the connection in a RelayTransportSession so all traffic is tunneled
+                // through the relay hop.
+                guard let chainName = node.chainProxyName else {
+                    throw LiveTunnelRuntimeError.missingProxyNode("\(name) (relay with no chain target)")
+                }
+                guard let terminalNode = profile.config.proxies.first(where: { $0.name == chainName }) else {
+                    throw LiveTunnelRuntimeError.missingProxyNode(chainName)
+                }
+                let innerContext = try await connector.connect(via: terminalNode, to: target)
+                let relaySession: any TransportSession = RelayTransportSession(inner: innerContext.connection.session)
+                context = ConnectedProxyContext(
+                    node: node,
+                    connection: innerContext.connection,
+                    encryptedStream: innerContext.encryptedStream,
+                    relaySession: relaySession
+                )
+            } else {
+                context = try await connector.connect(via: node, to: target)
+            }
             activeConnections[context.connection.id] = context
             currentStatus = TunnelRuntimeStatus(
                 bytesUp: currentStatus.bytesUp,
@@ -121,6 +201,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     public func closeConnection(id: UUID) async {
         guard let context = activeConnections.removeValue(forKey: id) else {
             return
+        }
+
+        // Close the relay session wrapping the inner connection, if any.
+        if let relaySession = context.relaySession as? RelayTransportSession {
+            await relaySession.close()
         }
 
         if context.node.name == "DIRECT" {
@@ -169,8 +254,15 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             resolvedIP = target.host
         }
 
-        let ruleTarget = RuleTarget(domain: target.host, ipAddress: resolvedIP)
-        let engine = RuleEngine(rules: profile.config.rules, geoIPResolver: geoIPResolver)
+        // Use sniffed domain (from Host header) for rule matching if available,
+        // otherwise fall back to the CONNECT authority host.
+        let domainForRules = target.sniffedDomain ?? target.host
+        let ruleTarget = RuleTarget(domain: domainForRules, ipAddress: resolvedIP)
+        let engine = RuleEngine(
+            rules: profile.config.rules,
+            ruleSets: ruleSetRules,
+            geoIPResolver: geoIPResolver
+        )
         return engine.resolve(target: ruleTarget)
     }
 }

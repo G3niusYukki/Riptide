@@ -13,24 +13,40 @@ public enum ClashConfigError: Error, Equatable, Sendable {
 
 public enum ClashConfigParser {
     public static func parse(yaml: String) throws -> RiptideConfig {
-        let raw: ClashRawConfig
+        let rawMap: [String: Any]
         do {
-            raw = try YAMLDecoder().decode(ClashRawConfig.self, from: yaml)
+            guard let node = try Yams.load(yaml: yaml) as? [String: Any] else {
+                throw ClashConfigError.invalidYAML("root must be a mapping")
+            }
+            rawMap = node
         } catch {
             throw ClashConfigError.invalidYAML(error.localizedDescription)
         }
 
-        let mode = try parseMode(raw.mode)
+        let mode = try parseMode(rawMap["mode"] as? String)
+        let raw = try YAMLDecoder().decode(ClashRawConfig.self, from: yaml)
         let proxies = try parseProxies(raw.proxies)
         let proxyGroups = try parseProxyGroups(raw.proxyGroups)
+
+        let ruleProviders = try parseRuleProviders(rawMap["rule-providers"] as? [String: Any])
+        let proxyProviders = try parseProxyProviders(rawMap["proxy-providers"] as? [String: Any])
+
         // Include both leaf proxy names and group IDs so rules can reference either.
         let proxyNameSet = Set(proxies.map(\.name))
         let groupIDSet = Set(proxyGroups.map(\.id))
         let knownProxySet = proxyNameSet.union(groupIDSet)
-        let rules = try parseRules(raw.rules, knownProxies: knownProxySet, mode: mode)
+        let rules = try parseRules(raw.rules, mode: mode, knownProxies: knownProxySet, ruleProviders: ruleProviders)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
         let dnsPolicy = parseDNSPolicy(raw.dns)
-        return RiptideConfig(mode: mode, proxies: proxies, rules: rules, proxyGroups: proxyGroups, dnsPolicy: dnsPolicy)
+        return RiptideConfig(
+            mode: mode,
+            proxies: proxies,
+            rules: rules,
+            proxyGroups: proxyGroups,
+            dnsPolicy: dnsPolicy,
+            ruleProviders: ruleProviders,
+            proxyProviders: proxyProviders
+        )
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {
@@ -60,10 +76,13 @@ public enum ClashConfigParser {
             guard !proxy.server.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ClashConfigError.invalidProxy(index: index, reason: "server is required")
             }
-            guard let port = proxy.port, (1...65_535).contains(port) else {
+            let kind = try parseProxyKind(proxy.type, index: index)
+
+            // Relay nodes use the chain proxy for transport; port is not required.
+            guard kind == .relay || (proxy.port != nil && (1...65_535).contains(proxy.port!)) else {
                 throw ClashConfigError.invalidProxy(index: index, reason: "valid port is required")
             }
-            let kind = try parseProxyKind(proxy.type, index: index)
+            let port = proxy.port ?? 0
 
             switch kind {
             case .shadowsocks:
@@ -118,7 +137,27 @@ public enum ClashConfigParser {
                     network: proxy.network
                 )
 
-            case .socks5, .http, .vmess, .hysteria2:
+            case .vmess:
+                guard let uuid = proxy.uuid, !uuid.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VMess")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .vmess,
+                    server: proxy.server,
+                    port: port,
+                    uuid: uuid,
+                    alterId: proxy.alterId,
+                    security: proxy.security,
+                    sni: proxy.sni,
+                    alpn: proxy.alpn,
+                    skipCertVerify: proxy.skipCertVerify,
+                    network: proxy.network,
+                    wsPath: proxy.wsOpts?.path,
+                    wsHost: proxy.wsOpts?.headers?["Host"]
+                )
+
+            case .socks5, .http:
                 return ProxyNode(
                     name: proxy.name,
                     kind: kind,
@@ -126,6 +165,32 @@ public enum ClashConfigParser {
                     port: port,
                     cipher: proxy.cipher,
                     password: proxy.password
+                )
+
+            case .hysteria2:
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Hysteria2")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .hysteria2,
+                    server: proxy.server,
+                    port: port,
+                    password: password,
+                    sni: proxy.sni,
+                    skipCertVerify: proxy.skipCertVerify
+                )
+
+            case .relay:
+                guard let chainName = proxy.chain, !chainName.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "chain proxy name is required for relay")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .relay,
+                    server: proxy.server,
+                    port: port,
+                    chainProxyName: chainName
                 )
             }
         }
@@ -147,6 +212,8 @@ public enum ClashConfigParser {
             return .trojan
         case "hysteria2":
             return .hysteria2
+        case "relay":
+            return .relay
         default:
             throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type: \(rawType ?? "nil")")
         }
@@ -154,8 +221,9 @@ public enum ClashConfigParser {
 
     private static func parseRules(
         _ rawRules: [String]?,
+        mode: ProxyMode,
         knownProxies: Set<String>,
-        mode: ProxyMode
+        ruleProviders: [String: RuleSetProviderConfig]
     ) throws -> [ProxyRule] {
         guard let rawRules, !rawRules.isEmpty else {
             switch mode {
@@ -211,6 +279,48 @@ public enum ClashConfigParser {
                     policy: try parsePolicy(parts[2], knownProxies: knownProxies)
                 )
 
+            case "IP-CIDR6":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "IP-CIDR6 requires CIDR and policy")
+                }
+                return .ipCIDR6(
+                    cidr: parts[1],
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "SRC-IP-CIDR":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-IP-CIDR requires CIDR and policy")
+                }
+                return .srcIPCIDR(
+                    cidr: parts[1],
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "SRC-PORT":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-PORT requires port and policy")
+                }
+                guard let port = Int(parts[1]), (1...65535).contains(port) else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "SRC-PORT requires a valid port number (1-65535)")
+                }
+                return .srcPort(
+                    port: port,
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
+            case "DST-PORT":
+                guard parts.count == 3 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "DST-PORT requires port and policy")
+                }
+                guard let port = Int(parts[1]), (1...65535).contains(port) else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "DST-PORT requires a valid port number (1-65535)")
+                }
+                return .dstPort(
+                    port: port,
+                    policy: try parsePolicy(parts[2], knownProxies: knownProxies)
+                )
+
             case "GEOIP":
                 guard parts.count == 3 else {
                     throw ClashConfigError.invalidRule(index: index, reason: "GEOIP requires country and policy")
@@ -225,6 +335,21 @@ public enum ClashConfigParser {
                     throw ClashConfigError.invalidRule(index: index, reason: "MATCH requires policy")
                 }
                 return .final(policy: try parsePolicy(parts[1], knownProxies: knownProxies))
+
+            case "RULE-SET":
+                guard parts.count >= 2 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "RULE-SET requires provider name")
+                }
+                let providerName = parts[1]
+                let policyName = parts.count > 2 ? parts[2] : "DIRECT"
+                guard ruleProviders[providerName] != nil else {
+                    throw ClashConfigError.unknownProxyReference(providerName)
+                }
+                // RULE-SET default policy can be DIRECT/REJECT or any known proxy.
+                return .ruleSet(
+                    name: providerName,
+                    policy: try parsePolicyOrBuiltin(policyName, knownProxies: knownProxies)
+                )
 
             default:
                 throw ClashConfigError.invalidRule(index: index, reason: "unsupported rule type")
@@ -248,6 +373,23 @@ public enum ClashConfigParser {
                 throw ClashConfigError.unknownProxyReference(normalized)
             }
             return .proxyNode(name: normalized)
+        }
+    }
+
+    /// Like parsePolicy but also accepts DIRECT/REJECT even if not in knownProxies.
+    /// Used for RULE-SET default policies where the set's own rules carry their own policy.
+    private static func parsePolicyOrBuiltin(_ rawPolicy: String, knownProxies: Set<String>) throws -> RoutingPolicy {
+        let normalized = rawPolicy.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        switch normalized {
+        case "DIRECT":
+            return .direct
+        case "REJECT":
+            return .reject
+        default:
+            guard knownProxies.contains(rawPolicy) else {
+                throw ClashConfigError.unknownProxyReference(rawPolicy)
+            }
+            return .proxyNode(name: rawPolicy)
         }
     }
 
@@ -317,8 +459,23 @@ public enum ClashConfigParser {
         let primary: [DNSResolverEndpoint]
         if let ns = raw.nameserver, !ns.isEmpty {
             primary = ns.map { addr in
-                if addr.lowercased().hasPrefix("https://") {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("https://") {
                     return .doh(url: addr)
+                } else if normalized.hasPrefix("tls://") {
+                    let stripped = String(addr.dropFirst(6))
+                    if stripped.contains(":") {
+                        return DNSResolverEndpoint(kind: .dot, address: stripped)
+                    } else {
+                        return .dot(host: stripped)
+                    }
+                } else if normalized.hasPrefix("quic://") {
+                    let stripped = String(addr.dropFirst(7))
+                    if stripped.contains(":") {
+                        return DNSResolverEndpoint(kind: .doq, address: stripped)
+                    } else {
+                        return .doq(host: stripped)
+                    }
                 } else if addr.contains(":") {
                     return DNSResolverEndpoint(kind: .udp, address: addr)
                 } else {
@@ -342,14 +499,137 @@ public enum ClashConfigParser {
             fb = []
         }
 
+        // Parse tls-nameserver (DoT entries) — add to primary resolvers.
+        // Entries may be in "tls://host:port" format.
+        var dotResolvers: [DNSResolverEndpoint] = []
+        if let tlsNS = raw.tlsNameserver, !tlsNS.isEmpty {
+            for addr in tlsNS {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("https://") {
+                    // Some configs may put DoH URLs in tls-nameserver
+                    dotResolvers.append(.doh(url: addr))
+                } else {
+                    // Strip "tls://" prefix if present, then treat as DoT
+                    let stripped = normalized.hasPrefix("tls://") ? String(addr.dropFirst(6)) : addr
+                    if stripped.contains(":") {
+                        dotResolvers.append(DNSResolverEndpoint(kind: .dot, address: stripped))
+                    } else {
+                        dotResolvers.append(.dot(host: stripped))
+                    }
+                }
+            }
+        }
+
+        let allPrimary = primary + dotResolvers
+
+        // Parse quic-nameserver (DoQ entries).
+        var doqResolvers: [DNSResolverEndpoint] = []
+        if let quicNS = raw.quicNameserver, !quicNS.isEmpty {
+            for addr in quicNS {
+                let normalized = addr.lowercased()
+                if normalized.hasPrefix("quic://") {
+                    let stripped = String(addr.dropFirst(7))  // drop "quic://"
+                    if stripped.contains(":") {
+                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: stripped))
+                    } else {
+                        doqResolvers.append(.doq(host: stripped))
+                    }
+                } else if normalized.hasPrefix("https://") {
+                    doqResolvers.append(.doh(url: addr))
+                } else {
+                    // Bare address — treat as DoQ on default port 853
+                    if addr.contains(":") {
+                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: addr))
+                    } else {
+                        doqResolvers.append(.doq(host: addr))
+                    }
+                }
+            }
+        }
+
+        let finalPrimary = allPrimary + doqResolvers
+
         return DNSPolicy(
-            primaryResolvers: primary,
+            primaryResolvers: finalPrimary,
             fallbackResolvers: fb,
             domainPolicies: [],
             respectRules: raw.respectRules ?? false,
             fakeIPEnabled: raw.fakeIP ?? true,
-            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16"
+            fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16",
+            hosts: raw.hosts ?? [:]
         )
+    }
+    private static func parseRuleProviders(
+        _ raw: [String: Any]?
+    ) throws -> [String: RuleSetProviderConfig] {
+        guard let raw, !raw.isEmpty else { return [:] }
+
+        var providers: [String: RuleSetProviderConfig] = [:]
+        for (name, value) in raw {
+            guard let dict = value as? [String: Any],
+                  let type = dict["type"] as? String,
+                  let url = dict["url"] as? String,
+                  let interval = dict["interval"] as? Int else {
+                continue
+            }
+
+            let behaviorStr = (dict["behavior"] as? String) ?? "classical"
+            let behavior: RuleSetBehavior
+            switch behaviorStr {
+            case "domain": behavior = .domain
+            case "ipcidr": behavior = .ipcidr
+            default: behavior = .classical
+            }
+
+            providers[name] = RuleSetProviderConfig(
+                name: name,
+                type: type,
+                url: url,
+                interval: interval,
+                behavior: behavior
+            )
+        }
+        return providers
+    }
+
+    private static func parseProxyProviders(
+        _ raw: [String: Any]?
+    ) throws -> [String: ProxyProviderConfig] {
+        guard let raw, !raw.isEmpty else { return [:] }
+
+        var providers: [String: ProxyProviderConfig] = [:]
+        for (name, value) in raw {
+            guard let dict = value as? [String: Any],
+                  let type = dict["type"] as? String else {
+                continue
+            }
+
+            let url = dict["url"] as? String
+            let path = dict["path"] as? String
+            let interval = dict["interval"] as? Int
+
+            let healthCheckDict = dict["health-check"] as? [String: Any]
+            let healthCheck: HealthCheckConfig?
+            if let hc = healthCheckDict {
+                healthCheck = HealthCheckConfig(
+                    enable: (hc["enable"] as? Bool) ?? false,
+                    url: hc["url"] as? String,
+                    interval: hc["interval"] as? Int
+                )
+            } else {
+                healthCheck = nil
+            }
+
+            providers[name] = ProxyProviderConfig(
+                name: name,
+                type: type,
+                url: url,
+                path: path,
+                interval: interval,
+                healthCheck: healthCheck
+            )
+        }
+        return providers
     }
 }
 
@@ -370,10 +650,13 @@ private struct ClashRawDNS: Decodable {
     let enable: Bool?
     let nameserver: [String]?
     let fallback: [String]?
+    let tlsNameserver: [String]?
+    let quicNameserver: [String]?
     let fakeIP: Bool?
     let fakeIPRange: String?
     let respectRules: Bool?
     let defaultNameserver: [String]?
+    let hosts: [String: String]?
 
     enum CodingKeys: String, CodingKey {
         case enable
@@ -383,6 +666,9 @@ private struct ClashRawDNS: Decodable {
         case fakeIPRange = "fake-ip-range"
         case respectRules = "respect-rules"
         case defaultNameserver = "default-nameserver"
+        case hosts
+        case tlsNameserver = "tls-nameserver"
+        case quicNameserver = "quic-nameserver"
     }
 }
 
@@ -417,6 +703,7 @@ private struct ClashRawProxy: Decodable {
     let skipCertVerify: Bool?
     let wsOpts: WSOpts?
     let grpcOpts: GRPCOpts?
+    let chain: String?
 
     struct WSOpts: Codable {
         let path: String?
@@ -436,5 +723,6 @@ private struct ClashRawProxy: Decodable {
         case skipCertVerify = "skip-cert-verify"
         case wsOpts = "ws-opts"
         case grpcOpts = "grpc-opts"
+        case chain
     }
 }
