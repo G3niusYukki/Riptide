@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Information -->
+    <key>CFBundleIdentifier</key>
+    <string>com.riptide.helper</string>
+    <key>CFBundleName</key>
+    <string>RiptideHelper</string>
+    <key>CFBundleDisplayName</key>
+    <string>Riptide Privileged Helper</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleExecutable</key>
+    <string>RiptideHelper</string>
+    <key>CFBundlePackageType</key>
+    <string>XPC!</string>
+
+    <!-- XPC Service Configuration -->
+    <key>XPCService</key>
+    <dict>
+        <key>ServiceType</key>
+        <string>System</string>
+        <key>RunLoopType</key>
+        <string>NSRunLoop</string>
+    </dict>
+
+    <!-- SMJobBless Authorized Clients -->
+    <!-- The main app must match these requirements to connect -->
+    <key>SMAuthorizedClients</key>
+    <array>
+        <string>identifier com.riptide.app and anchor apple generic and anchor apple generic and cert leaf[subject.CN] = "Apple Development: YOUR_TEAM_ID" and cert leaf[field.1.2.840.113635.100.6.1.13] /* exists */</string>
+    </array>
+
+    <!-- Minimum required macOS version -->
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+
+    <!-- Don't show in Dock -->
+    <key>LSBackgroundOnly</key>
+    <true/>
+
+    <!-- Daemon behavior -->
+    <key>LSUIElement</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required for privileged XPC service -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- Allow execution of the mihomo binary -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Allow loading libraries (mihomo may load .dylibs) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Required for killing/launching processes -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+
+    <!-- Allow running as root -->
+    <key>com.apple.rootless.volume.ILS</key>
+    <true/>
+
+    <!-- Allow installing to /Library/Application Support -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array>
+        <string>/Library/Application Support/Riptide/</string>
+    </array>
+
+    <!-- Allow file access to system Application Support -->
+    <key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+    <array>
+        <string>/Library/Application Support/Riptide/</string>
+    </array>
+
+    <!-- Allow network operations (mihomo needs this) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+</dict>
+</plist>
