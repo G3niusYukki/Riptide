@@ -231,6 +231,7 @@ public actor ExternalController {
         case .vless: return "VLESS"
         case .trojan: return "Trojan"
         case .hysteria2: return "Hysteria2"
+        case .relay: return "Relay"
         }
     }
 

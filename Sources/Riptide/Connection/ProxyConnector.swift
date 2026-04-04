@@ -4,11 +4,19 @@ public struct ConnectedProxyContext: Sendable {
     public let node: ProxyNode
     public let connection: PooledTransportConnection
     public let encryptedStream: ShadowsocksStream?
+    /// Outer relay session when this context is the inner hop of a relay chain.
+    public let relaySession: (any TransportSession)?
 
-    public init(node: ProxyNode, connection: PooledTransportConnection, encryptedStream: ShadowsocksStream? = nil) {
+    public init(
+        node: ProxyNode,
+        connection: PooledTransportConnection,
+        encryptedStream: ShadowsocksStream? = nil,
+        relaySession: (any TransportSession)? = nil
+    ) {
         self.node = node
         self.connection = connection
         self.encryptedStream = encryptedStream
+        self.relaySession = relaySession
     }
 }
 
@@ -37,6 +45,11 @@ public struct ProxyConnector: Sendable {
                 return try await performVMessConnect(connection: connection, node: node, target: target)
             case .hysteria2:
                 return try await performHysteria2Connect(connection: connection, node: node, target: target)
+            case .relay:
+                // Relay is handled at the LiveTunnelRuntime level where the full proxy
+                // profile is available to resolve the chain. A relay node should never
+                // reach ProxyConnector.connect() directly; it is always unwrapped there.
+                throw ProtocolError.malformedResponse("unexpected relay node in ProxyConnector")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {

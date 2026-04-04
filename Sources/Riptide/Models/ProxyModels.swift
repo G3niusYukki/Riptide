@@ -14,6 +14,7 @@ public enum ProxyKind: Equatable, Sendable {
     case vless
     case trojan
     case hysteria2
+    case relay
 }
 
 public struct ProxyNode: Equatable, Sendable {
@@ -34,6 +35,7 @@ public struct ProxyNode: Equatable, Sendable {
     public let wsPath: String?
     public let wsHost: String?
     public let grpcServiceName: String?
+    public let chainProxyName: String?
 
     public init(
         name: String,
@@ -52,7 +54,8 @@ public struct ProxyNode: Equatable, Sendable {
         network: String? = nil,
         wsPath: String? = nil,
         wsHost: String? = nil,
-        grpcServiceName: String? = nil
+        grpcServiceName: String? = nil,
+        chainProxyName: String? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -71,6 +74,7 @@ public struct ProxyNode: Equatable, Sendable {
         self.wsPath = wsPath
         self.wsHost = wsHost
         self.grpcServiceName = grpcServiceName
+        self.chainProxyName = chainProxyName
     }
 }
 

@@ -74,10 +74,13 @@ public enum ClashConfigParser {
             guard !proxy.server.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ClashConfigError.invalidProxy(index: index, reason: "server is required")
             }
-            guard let port = proxy.port, (1...65_535).contains(port) else {
+            let kind = try parseProxyKind(proxy.type, index: index)
+
+            // Relay nodes use the chain proxy for transport; port is not required.
+            guard kind == .relay || (proxy.port != nil && (1...65_535).contains(proxy.port!)) else {
                 throw ClashConfigError.invalidProxy(index: index, reason: "valid port is required")
             }
-            let kind = try parseProxyKind(proxy.type, index: index)
+            let port = proxy.port ?? 0
 
             switch kind {
             case .shadowsocks:
@@ -175,6 +178,18 @@ public enum ClashConfigParser {
                     sni: proxy.sni,
                     skipCertVerify: proxy.skipCertVerify
                 )
+
+            case .relay:
+                guard let chainName = proxy.chain, !chainName.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "chain proxy name is required for relay")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .relay,
+                    server: proxy.server,
+                    port: port,
+                    chainProxyName: chainName
+                )
             }
         }
     }
@@ -195,6 +210,8 @@ public enum ClashConfigParser {
             return .trojan
         case "hysteria2":
             return .hysteria2
+        case "relay":
+            return .relay
         default:
             throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type: \(rawType ?? "nil")")
         }
@@ -644,6 +661,7 @@ private struct ClashRawProxy: Decodable {
     let skipCertVerify: Bool?
     let wsOpts: WSOpts?
     let grpcOpts: GRPCOpts?
+    let chain: String?
 
     struct WSOpts: Codable {
         let path: String?
@@ -663,5 +681,6 @@ private struct ClashRawProxy: Decodable {
         case skipCertVerify = "skip-cert-verify"
         case wsOpts = "ws-opts"
         case grpcOpts = "grpc-opts"
+        case chain
     }
 }

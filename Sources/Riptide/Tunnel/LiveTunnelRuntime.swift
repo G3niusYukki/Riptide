@@ -139,7 +139,28 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             guard let node = profile.config.proxies.first(where: { $0.name == name }) else {
                 throw LiveTunnelRuntimeError.missingProxyNode(name)
             }
-            let context = try await connector.connect(via: node, to: target)
+            let context: ConnectedProxyContext
+            if node.kind == .relay {
+                // Relay: follow the chain to find the terminal non-relay node, connect to it,
+                // and wrap the connection in a RelayTransportSession so all traffic is tunneled
+                // through the relay hop.
+                guard let chainName = node.chainProxyName else {
+                    throw LiveTunnelRuntimeError.missingProxyNode("\(name) (relay with no chain target)")
+                }
+                guard let terminalNode = profile.config.proxies.first(where: { $0.name == chainName }) else {
+                    throw LiveTunnelRuntimeError.missingProxyNode(chainName)
+                }
+                let innerContext = try await connector.connect(via: terminalNode, to: target)
+                let relaySession: any TransportSession = RelayTransportSession(inner: innerContext.connection.session)
+                context = ConnectedProxyContext(
+                    node: node,
+                    connection: innerContext.connection,
+                    encryptedStream: innerContext.encryptedStream,
+                    relaySession: relaySession
+                )
+            } else {
+                context = try await connector.connect(via: node, to: target)
+            }
             activeConnections[context.connection.id] = context
             currentStatus = TunnelRuntimeStatus(
                 bytesUp: currentStatus.bytesUp,
@@ -165,6 +186,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     public func closeConnection(id: UUID) async {
         guard let context = activeConnections.removeValue(forKey: id) else {
             return
+        }
+
+        // Close the relay session wrapping the inner connection, if any.
+        if let relaySession = context.relaySession as? RelayTransportSession {
+            await relaySession.close()
         }
 
         if context.node.name == "DIRECT" {
