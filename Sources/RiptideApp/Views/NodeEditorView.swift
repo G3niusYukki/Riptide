@@ -157,6 +157,7 @@ struct NodeRow: View {
         case .http: return "globe"
         case .socks5: return "sock"
         case .relay: return "arrow.2.squarepath"
+        case .snell: return "lock.square"
         }
     }
 }

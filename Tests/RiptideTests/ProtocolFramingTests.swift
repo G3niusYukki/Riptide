@@ -84,15 +84,15 @@ struct ProtocolFramingTests {
         let authTag = HMAC<SHA256>.authenticationCode(for: Data("hysteria2-auth".utf8), using: authKey)
 
         var expectedHandshake = Data()
-        expectedHandshake.append(0x02)
+        expectedHandshake.append(0x01) // CONNECT command
         expectedHandshake.append(contentsOf: Data(authTag))
-        expectedHandshake.append(0x02)
+        expectedHandshake.append(0x03) // Domain address type
         expectedHandshake.append(0x0B)
         expectedHandshake.append(contentsOf: "example.com".utf8)
         expectedHandshake.append(0x01)
         expectedHandshake.append(0xBB)
 
-        let session = MockTransportSession(receiveQueue: [])
+        let session = MockTransportSession(receiveQueue: [Data([0x00])])
         let stream = Hysteria2Stream(session: session, password: password)
         try await stream.connect(to: target)
 
@@ -109,14 +109,14 @@ struct ProtocolFramingTests {
         let authTag = HMAC<SHA256>.authenticationCode(for: Data("hysteria2-auth".utf8), using: authKey)
 
         var expectedHandshake = Data()
-        expectedHandshake.append(0x02)
+        expectedHandshake.append(0x01) // CONNECT command
         expectedHandshake.append(contentsOf: Data(authTag))
-        expectedHandshake.append(0x01)
+        expectedHandshake.append(0x01) // IPv4 address type
         expectedHandshake.append(contentsOf: [0x01, 0x02, 0x03, 0x04])
         expectedHandshake.append(0x00)
         expectedHandshake.append(0x50)
 
-        let session = MockTransportSession(receiveQueue: [])
+        let session = MockTransportSession(receiveQueue: [Data([0x00])])
         let stream = Hysteria2Stream(session: session, password: password)
         try await stream.connect(to: target)
 

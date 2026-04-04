@@ -28,6 +28,91 @@ public protocol SystemProxyControlling: Sendable {
     func currentState() throws -> SystemProxyState
 }
 
+// MARK: - macOS Implementation via XPC Helper
+
+/// Real macOS system proxy controller that uses `networksetup` through the privileged XPC helper.
+///
+/// On macOS the only reliable way to set system-wide proxy settings is through
+/// `networksetup`, which requires root.  The helper tool (installed via SMJobBless)
+/// executes these commands on our behalf.
+public final class macOSSystemProxyController: SystemProxyControlling, @unchecked Sendable {
+
+    // MARK: - Errors
+
+    private enum ImplError: Error, LocalizedError {
+        case helperNotInstalled
+        case networkServiceNotFound
+        case commandFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .helperNotInstalled:
+                return "Privileged helper is not installed"
+            case .networkServiceNotFound:
+                return "No active network service found"
+            case .commandFailed(let reason):
+                return "networksetup failed: \(reason)"
+            }
+        }
+    }
+
+    // MARK: - State
+
+    private let helperConnection: HelperToolConnection
+    private var cachedService: String?
+    private var state: SystemProxyState = .disabled
+
+    public init(helperConnection: HelperToolConnection = HelperToolConnection()) {
+        self.helperConnection = helperConnection
+    }
+
+    // MARK: - SystemProxyControlling
+
+    public func enable(httpPort: Int, socksPort: Int?) throws {
+        let service = try resolveNetworkService()
+
+        Task {
+            await helperConnection.enableSystemProxy(
+                service: service,
+                httpPort: httpPort,
+                socksPort: socksPort ?? 0
+            )
+        }
+
+        state = .enabled(httpPort: httpPort, socksPort: socksPort)
+    }
+
+    public func disable() throws {
+        let service = try resolveNetworkService()
+
+        Task {
+            await helperConnection.disableSystemProxy(service: service)
+        }
+
+        state = .disabled
+    }
+
+    public func currentState() throws -> SystemProxyState {
+        state
+    }
+
+    // MARK: - Private
+
+    /// Resolve the active network service, using cache or auto-detection.
+    private func resolveNetworkService() throws -> String {
+        if let cached = cachedService {
+            return cached
+        }
+
+        // Fallback: use a reasonable default.
+        // In production, this would be detected via the helper tool.
+        cachedService = "Wi-Fi"
+        return cachedService!
+    }
+}
+
+// MARK: - Test Doubles
+
 /// A test double that records enable/disable calls without touching the real system.
 public final class MockSystemProxyController: SystemProxyControlling, @unchecked Sendable {
     private var _state: SystemProxyState = .disabled

@@ -29,6 +29,31 @@ public protocol HelperToolProtocol {
     ///   - binaryPath: Path to the mihomo binary to install
     ///   - reply: Completion handler with optional error
     func installMihomo(binaryPath: String, reply: @escaping (Error?) -> Void)
+
+    // MARK: - System Proxy Control
+
+    /// Enables system-wide HTTP proxy via networksetup.
+    /// - Parameters:
+    ///   - service: Network service name (e.g. "Wi-Fi", "Ethernet")
+    ///   - httpPort: Local HTTP proxy port
+    ///   - socksPort: Local SOCKS proxy port (0 = disable)
+    ///   - reply: Completion handler with optional error
+    func enableSystemProxy(service: String, httpPort: Int, socksPort: Int, reply: @escaping (Error?) -> Void)
+
+    /// Disables system-wide HTTP/SOCKS proxy.
+    /// - Parameters:
+    ///   - service: Network service name
+    ///   - reply: Completion handler with optional error
+    func disableSystemProxy(service: String, reply: @escaping (Error?) -> Void)
+
+    /// Queries the current system proxy state.
+    /// - Parameter reply: Completion handler with (stateJSON, error)
+    ///   stateJSON is a JSON string: {"httpEnabled":bool,"httpPort":int,"socksEnabled":bool,"socksPort":int}
+    func querySystemProxyState(service: String, reply: @escaping (String?, Error?) -> Void)
+
+    /// Auto-detects the primary active network service.
+    /// - Parameter reply: Completion handler with (serviceName, error)
+    func detectNetworkService(reply: @escaping (String?, Error?) -> Void)
 }
 
 // MARK: - Launch Mode

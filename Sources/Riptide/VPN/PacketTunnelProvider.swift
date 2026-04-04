@@ -229,16 +229,40 @@ public class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     private func handleSnapshotCallback(completionHandler: ((Data?) -> Void)?) {
-        // routingEngine and getStatsInternal are both nonisolated(unsafe), so we can call them synchronously
-        let stats = routingEngine?.getStatsInternal()
-        let snapshot = TunnelProviderSnapshotMessage(
-            packetsHandled: stats?.packetsHandled ?? 0,
-            activeTCPConnections: stats?.activeTCPConnections ?? 0,
-            activeUDPSessions: stats?.activeUDPSessions ?? 0
-        )
-        let data = try? JSONEncoder().encode(snapshot)
-        completionHandler?(data)
+        guard let engine = routingEngine else {
+            let snapshot = TunnelProviderSnapshotMessage(
+                packetsHandled: 0,
+                activeTCPConnections: 0,
+                activeUDPSessions: 0
+            )
+            let data = try? JSONEncoder().encode(snapshot)
+            completionHandler?(data)
+            return
+        }
+
+        // Use unchecked Sendable wrapper for the callback
+        let handler = UncheckedSendableHandler(completionHandler)
+
+        Task {
+            let stats = await engine.getStatsInternal()
+            let snapshot = TunnelProviderSnapshotMessage(
+                packetsHandled: stats.packetsHandled,
+                activeTCPConnections: stats.activeTCPConnections,
+                activeUDPSessions: stats.activeUDPSessions
+            )
+            let data = try? JSONEncoder().encode(snapshot)
+            handler.value?(data)
+        }
     }
+}
+
+// MARK: - Helper Types
+
+/// Unchecked Sendable wrapper for completion handlers.
+/// Safe because the handler is only accessed from one task at a time.
+private struct UncheckedSendableHandler: @unchecked Sendable {
+    let value: ((Data?) -> Void)?
+    init(_ value: ((Data?) -> Void)?) { self.value = value }
 }
 
 // ============================================================

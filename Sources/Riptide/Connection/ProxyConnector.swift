@@ -45,6 +45,8 @@ public struct ProxyConnector: Sendable {
                 return try await performVMessConnect(connection: connection, node: node, target: target)
             case .hysteria2:
                 return try await performHysteria2Connect(connection: connection, node: node, target: target)
+            case .snell:
+                return try await performSnellConnect(connection: connection, node: node, target: target)
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never
@@ -167,8 +169,46 @@ public struct ProxyConnector: Sendable {
         guard let password = node.password else {
             throw ProtocolError.malformedResponse("Hysteria2 node missing password")
         }
-        let hysteria2Stream = Hysteria2Stream(session: connection.session, password: password)
-        try await hysteria2Stream.connect(to: target)
+
+        // Try QUIC first, fall back to the provided transport session
+        let h2Stream: Hysteria2Stream
+        let useQuic = node.sni != nil || true // Always try QUIC for Hysteria2
+
+        if useQuic {
+            do {
+                let quicSession = QUICTransportSession.makeSession(
+                    host: node.server,
+                    port: UInt16(node.port),
+                    alpn: ["hysteria2"]
+                )
+                try await quicSession.connect()
+                h2Stream = Hysteria2Stream(quicSession: quicSession, password: password, obfuscated: false)
+                try await h2Stream.connect(to: target)
+                return ConnectedProxyContext(node: node, connection: connection)
+            } catch QUICTransportSession.QUICTransportError.quicNotAvailable {
+                // Fall through to TCP fallback
+                let fallbackStream = Hysteria2Stream(session: connection.session, password: password)
+                try await fallbackStream.connect(to: target)
+                return ConnectedProxyContext(node: node, connection: connection)
+            }
+        } else {
+            let fallbackStream = Hysteria2Stream(session: connection.session, password: password)
+            try await fallbackStream.connect(to: target)
+            return ConnectedProxyContext(node: node, connection: connection)
+        }
+    }
+
+    private func performSnellConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let password = node.password else {
+            throw ProtocolError.malformedResponse("Snell node missing PSK")
+        }
+        let version = node.snellVersion ?? 2
+        let snellStream = SnellStream(session: connection.session, password: password, version: version)
+        try await snellStream.connect(to: target)
         return ConnectedProxyContext(node: node, connection: connection)
     }
 

@@ -226,6 +226,7 @@ extension ProxyKind {
         case .vless: return "VLESS"
         case .trojan: return "Trojan"
         case .hysteria2: return "Hysteria2"
+        case .snell: return "Snell"
         case .relay: return "Relay"
         }
     }
@@ -237,6 +238,7 @@ extension ProxyKind {
         case .vless: return "vless"
         case .trojan: return "trojan"
         case .hysteria2: return "hysteria2"
+        case .snell: return "snell"
         case .http: return "http"
         case .socks5: return "socks5"
         case .relay: return "relay"

@@ -24,18 +24,26 @@ public struct RuleEngine: Sendable {
     /// The flat, fully-expanded rule list.
     private let expandedRules: [ProxyRule]
     private let geoIPResolver: GeoIPResolver
+    private let geoSiteResolver: GeoSiteResolver?
+    private let asnResolver: ASNResolver?
 
     /// Initialize a RuleEngine.
     /// - Parameters:
     ///   - rules: The top-level rules from the config. May contain `.ruleSet` entries.
     ///   - ruleSets: A mapping of rule-set provider name to its loaded rules.
     ///   - geoIPResolver: Optional GeoIP resolver for GEOIP rule matching.
+    ///   - geoSiteResolver: Optional GeoSite resolver for GEOSITE rule matching.
+    ///   - asnResolver: Optional ASN resolver for IP-ASN rule matching.
     public init(
         rules: [ProxyRule],
         ruleSets: [String: [ProxyRule]] = [:],
-        geoIPResolver: GeoIPResolver = .none
+        geoIPResolver: GeoIPResolver = .none,
+        geoSiteResolver: GeoSiteResolver? = nil,
+        asnResolver: ASNResolver? = nil
     ) {
         self.geoIPResolver = geoIPResolver
+        self.geoSiteResolver = geoSiteResolver
+        self.asnResolver = asnResolver
         // Expand all .ruleSet entries inline at init time.
         var expanded: [ProxyRule] = []
         for rule in rules {
@@ -135,11 +143,16 @@ public struct RuleEngine: Sendable {
             }
             return resolvedCountryCode == countryCode.uppercased() ? policy : nil
 
-        case .ipASN(_, let policy):
-            return policy
+        case .ipASN(let asn, let policy):
+            guard let ipAddress = target.ipAddress else { return nil }
+            guard let resolver = asnResolver else { return nil }
+            return resolver.matches(ip: ipAddress, asn: asn) ? policy : nil
 
-        case .geoSite(_, _, let policy):
-            return policy
+        case .geoSite(let code, let category, let policy):
+            guard let domain = target.domain else { return nil }
+            guard let resolver = geoSiteResolver else { return nil }
+            let _ = category
+            return resolver.matchesWithSuffix(domain: domain, code: code) ? policy : nil
 
         case .ruleSet(_, let policy):
             return policy
@@ -147,6 +160,15 @@ public struct RuleEngine: Sendable {
         case .script(let code, let policy):
             let engine = RuleScriptEngine(code: code)
             return engine.evaluate(target: target) ? policy : nil
+
+        case .not(let ruleType, let value, let policy):
+            // NOT rule: check if the inner rule would match, then negate.
+            let innerRule = Self.makeInnerRule(from: ruleType, value: value)
+            let innerMatches = innerRule != nil && matchedPolicy(for: innerRule!, target: target) != nil
+            return innerMatches ? nil : policy
+
+        case .reject:
+            return .reject
 
         case .matchAll:
             return .direct
@@ -160,6 +182,39 @@ public struct RuleEngine: Sendable {
         guard let domain else { return nil }
         let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Create an inner ProxyRule from a NOT rule's stored type and value.
+    /// This reconstructs the inner rule for negation checking.
+    private static func makeInnerRule(from ruleType: String, value: String) -> ProxyRule? {
+        // We create a dummy rule with DIRECT policy since we only care about
+        // whether it matches, not what policy it returns.
+        switch ruleType.uppercased() {
+        case "DOMAIN":
+            return .domain(domain: value, policy: .direct)
+        case "DOMAIN-SUFFIX":
+            return .domainSuffix(suffix: value, policy: .direct)
+        case "DOMAIN-KEYWORD":
+            return .domainKeyword(keyword: value, policy: .direct)
+        case "IP-CIDR":
+            return .ipCIDR(cidr: value, policy: .direct)
+        case "IP-CIDR6":
+            return .ipCIDR6(cidr: value, policy: .direct)
+        case "GEOIP":
+            return .geoIP(countryCode: value, policy: .direct)
+        case "SRC-IP-CIDR":
+            return .srcIPCIDR(cidr: value, policy: .direct)
+        case "DST-PORT":
+            guard let port = Int(value) else { return nil }
+            return .dstPort(port: port, policy: .direct)
+        case "SRC-PORT":
+            guard let port = Int(value) else { return nil }
+            return .srcPort(port: port, policy: .direct)
+        case "PROCESS-NAME":
+            return .processName(name: value, policy: .direct)
+        default:
+            return nil
+        }
     }
 }
 

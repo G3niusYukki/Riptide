@@ -40,6 +40,12 @@ public actor TUNRoutingEngine {
     private let dnsPipeline: DNSPipeline
     private let configuration: VPNConfiguration
 
+    /// Registry mapping TCP connection 4-tuples to their logical ConnectionTarget.
+    private let connectionTargetRegistry: TCPConnectionTargetRegistry
+
+    /// Active TCP forwarders, keyed by connection ID.
+    private var tcpForwarders: [TCPConnectionID: TCPTunnelForwarder] = [:]
+
     /// Stats counters.
     private nonisolated(unsafe) var packetsHandled: Int = 0
     private nonisolated(unsafe) var tcpPacketsHandled: Int = 0
@@ -57,6 +63,7 @@ public actor TUNRoutingEngine {
         self.configuration = configuration
         self.tcpStateMachine = TCPStateMachine()
         self.udpSessionManager = UDPSessionManager()
+        self.connectionTargetRegistry = TCPConnectionTargetRegistry()
     }
 
     // ============================================================
@@ -108,7 +115,6 @@ public actor TUNRoutingEngine {
 
     /// Get routing stats.
     public nonisolated func getStats() -> TUNRoutingStats {
-        // Note: accessing actor state from nonisolated requires us to make a safe copy
         TUNRoutingStats(
             packetsHandled: 0,
             tcpPacketsHandled: 0,
@@ -121,15 +127,15 @@ public actor TUNRoutingEngine {
     }
 
     /// Get routing stats from within the actor.
-    public nonisolated func getStatsInternal() -> TUNRoutingStats {
+    public func getStatsInternal() -> TUNRoutingStats {
         TUNRoutingStats(
             packetsHandled: packetsHandled,
             tcpPacketsHandled: tcpPacketsHandled,
             udpPacketsHandled: udpPacketsHandled,
             dnsPacketsHandled: dnsPacketsHandled,
             bytesProcessed: bytesProcessed,
-            activeTCPConnections: 0,
-            activeUDPSessions: 0
+            activeTCPConnections: tcpForwarders.count,
+            activeUDPSessions: 0  // UDPSessionManager doesn't expose count synchronously
         )
     }
 
@@ -145,7 +151,16 @@ public actor TUNRoutingEngine {
 
     /// Close all connections and sessions.
     public func shutdown() async {
-        // Close all TCP connections
+        // Close all TCP forwarders
+        for (_, forwarder) in tcpForwarders {
+            await forwarder.close()
+        }
+        tcpForwarders.removeAll()
+
+        // Clear connection target registry
+        // (registry doesn't have a closeAll, but forwarders are gone)
+
+        // Close all TCP connections in state machine
         let tcpIds = await tcpStateMachine.activeConnectionIDs()
         for id in tcpIds {
             await tcpStateMachine.closeConnection(id: id)
@@ -269,6 +284,10 @@ public actor TUNRoutingEngine {
             responses.append(contentsOf: finResponses)
 
             if updatedState.state == .closed {
+                // Clean up the forwarder
+                if let forwarder = tcpForwarders.removeValue(forKey: connectionID) {
+                    await forwarder.close()
+                }
                 return responses
             }
         }
@@ -311,15 +330,51 @@ public actor TUNRoutingEngine {
     }
 
     /// Forward TCP data through the proxy.
+    ///
+    /// On first call for a connection (no forwarder exists):
+    ///   1. Look up the routing entry from the registry (registered by the caller
+    ///      when the connection was initiated, after DNS + rule resolution).
+    ///   2. If no entry is registered, return empty — the caller should register first.
+    ///   3. Create a `TCPTunnelForwarder`, establish the proxy connection, and forward data.
+    ///
+    /// On subsequent calls:
+    ///   1. Send data through the existing forwarder.
     private func forwardTCPData(connectionID: TCPConnectionID, data: Data) async throws {
-        // In the full implementation, this would:
-        // 1. Look up the connection's target (from a connection table)
-        // 2. Connect via ProxyConnector
-        // 3. Send data through the proxy
-        // 4. Receive response and queue it for delivery
-        _ = connectionID
-        _ = data
-        // Stub — full implementation requires connection target registry
+        // Check if a forwarder already exists for this connection
+        if let forwarder = tcpForwarders[connectionID] {
+            try await forwarder.sendData(data)
+            return
+        }
+
+        // First data — look up the routing entry
+        guard let entry = await connectionTargetRegistry.lookup(id: connectionID) else {
+            // No routing entry registered yet. The caller needs to register
+            // routing info (target + proxy node) before forwarding data.
+            return
+        }
+
+        // Create the forwarder with the resolved proxy node
+        let forwarder = TCPTunnelForwarder(
+            connectionID: connectionID,
+            target: entry.target,
+            proxyNode: entry.proxyNode
+        )
+
+        // Establish the proxy connection
+        try await forwarder.connect(proxyConnector: proxyConnector)
+
+        // Register the forwarder
+        tcpForwarders[connectionID] = forwarder
+
+        // Send the first data
+        try await forwarder.sendData(data)
+    }
+
+    /// Register routing information for a TCP connection.
+    /// Should be called before the first data packet is forwarded, typically
+    /// after DNS resolution and rule engine determine the real target and proxy node.
+    public func registerConnectionTarget(id: TCPConnectionID, target: ConnectionTarget, proxyNode: ProxyNode) async {
+        _ = await connectionTargetRegistry.register(id: id, target: target, proxyNode: proxyNode)
     }
 
     // ============================================================
