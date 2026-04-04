@@ -494,4 +494,118 @@ struct MihomoConfigGeneratorTests {
         #expect(yaml.contains("- DIRECT"))
         #expect(yaml.contains("- REJECT"))
     }
+
+    @Test("properly escapes YAML special characters in proxy name")
+    func testYAMLEscapingInProxyName() throws {
+        let node = ProxyNode(
+            name: "test: \"proxy\"",
+            kind: .shadowsocks,
+            server: "1.2.3.4",
+            port: 443,
+            cipher: "aes-256-gcm",
+            password: "secret"
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        // Name with quotes should be escaped and wrapped in quotes
+        #expect(yaml.contains("name: \"test: \\\"proxy\\\"\""))
+    }
+
+    @Test("properly escapes YAML special characters in password")
+    func testYAMLEscapingInPassword() throws {
+        let node = ProxyNode(
+            name: "test-ss",
+            kind: .shadowsocks,
+            server: "1.2.3.4",
+            port: 443,
+            cipher: "aes-256-gcm",
+            password: "pass\\\"word\\\\test"
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        // Password with quotes and backslashes should be escaped
+        #expect(yaml.contains("password: \"pass\\\\\\\"word\\\\\\\\test\""))
+    }
+
+    @Test("properly handles IPv6 server addresses")
+    func testYAMLEscapingInServer() throws {
+        let node = ProxyNode(
+            name: "ipv6-proxy",
+            kind: .shadowsocks,
+            server: "2001:db8::1",
+            port: 443,
+            cipher: "aes-256-gcm",
+            password: "secret"
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        // IPv6 address with colons - colons don't require quoting in value position
+        #expect(yaml.contains("server: 2001:db8::1"))
+    }
+
+    @Test("proxy reference consistency between definition and group reference")
+    func testProxyReferenceConsistency() throws {
+        let proxy = ProxyNode(
+            name: "my-proxy:name",
+            kind: .shadowsocks,
+            server: "1.2.3.4",
+            port: 443,
+            cipher: "aes-256-gcm",
+            password: "secret"
+        )
+        let group = ProxyGroup(
+            id: "AutoSelect",
+            kind: .urlTest,
+            proxies: ["my-proxy:name"],
+            interval: 300,
+            tolerance: 100
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [proxy],
+            rules: [.final(policy: .proxyNode(name: "AutoSelect"))],
+            proxyGroups: [group]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        // Colon does not require quoting in this context
+        // Verify both the proxy definition and group reference use consistent escaping
+        #expect(yaml.contains("name: my-proxy:name"))
+        #expect(yaml.contains("- my-proxy:name"))
+    }
 }
