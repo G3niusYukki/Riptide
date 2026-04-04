@@ -18,6 +18,8 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
     var mockTraffic: (up: Int, down: Int) = (0, 0)
     var mockConnections: [ConnectionInfo] = []
     var mockProxies: [ProxyInfo] = []
+    var mockDelays: [String: Int] = [:]  // proxy name -> delay
+    var shouldFailDelayFor: String? = nil
 
     // Configuration methods (isolated)
     func configureThrowOnStart(_ error: Error?) {
@@ -38,6 +40,14 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
 
     func configureMockProxies(_ proxies: [ProxyInfo]) {
         mockProxies = proxies
+    }
+
+    func configureMockDelay(_ delay: Int, for proxyName: String) {
+        mockDelays[proxyName] = delay
+    }
+
+    func configureFailDelay(for proxyName: String) {
+        shouldFailDelayFor = proxyName
     }
 
     func setup() async throws {
@@ -86,6 +96,16 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.notRunning
         }
         return mockTraffic
+    }
+
+    func testProxyDelay(name: String, url: String?, timeout: Int) async throws -> Int {
+        guard isRunning else {
+            throw RuntimeError.notRunning
+        }
+        if let failProxy = shouldFailDelayFor, failProxy == name {
+            throw RuntimeError.apiNotAvailable
+        }
+        return mockDelays[name] ?? 999
     }
 }
 
@@ -310,5 +330,83 @@ struct ModeCoordinatorMihomoTests {
         // Mock helper connection doesn't have a real helper installed
         let installed = await coordinator.isHelperInstalled()
         #expect(installed == false)
+    }
+}
+
+// MARK: - Proxy Delay Tests
+
+@Suite("Proxy delay testing")
+struct ProxyDelayTests {
+
+    @Test("testProxyDelay returns configured delay value")
+    func testProxyDelayReturnsValue() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        await manager.configureMockDelay(150, for: "proxy1")
+
+        let delay = try await manager.testProxyDelay(name: "proxy1", url: nil, timeout: 5000)
+
+        #expect(delay == 150)
+    }
+
+    @Test("testProxyDelay throws when runtime not running")
+    func testProxyDelayThrowsWhenNotRunning() async {
+        let manager = MockMihomoRuntimeManager()
+        // Don't start the manager
+
+        await #expect(throws: RuntimeError.self) {
+            _ = try await manager.testProxyDelay(name: "proxy1", url: nil, timeout: 5000)
+        }
+    }
+
+    @Test("testProxyDelay propagates API errors when configured to fail")
+    func testProxyDelayPropagatesErrors() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        await manager.configureFailDelay(for: "proxy1")
+
+        await #expect(throws: RuntimeError.self) {
+            _ = try await manager.testProxyDelay(name: "proxy1", url: nil, timeout: 5000)
+        }
+    }
+
+    @Test("testProxyDelay returns default delay when not configured")
+    func testProxyDelayReturnsDefault() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        // Don't configure any delay
+
+        let delay = try await manager.testProxyDelay(name: "unknown-proxy", url: nil, timeout: 5000)
+
+        #expect(delay == 999)
+    }
+
+    @Test("testProxyDelay returns different delays for different proxies")
+    func testProxyDelayDifferentProxies() async throws {
+        let manager = MockMihomoRuntimeManager()
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "test", config: config)
+
+        try await manager.start(mode: .systemProxy, profile: profile)
+        await manager.configureMockDelay(100, for: "proxy1")
+        await manager.configureMockDelay(250, for: "proxy2")
+        await manager.configureMockDelay(500, for: "proxy3")
+
+        let delay1 = try await manager.testProxyDelay(name: "proxy1", url: nil, timeout: 5000)
+        let delay2 = try await manager.testProxyDelay(name: "proxy2", url: nil, timeout: 5000)
+        let delay3 = try await manager.testProxyDelay(name: "proxy3", url: nil, timeout: 5000)
+
+        #expect(delay1 == 100)
+        #expect(delay2 == 250)
+        #expect(delay3 == 500)
     }
 }

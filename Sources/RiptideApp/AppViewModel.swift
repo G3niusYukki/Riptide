@@ -81,20 +81,6 @@ public struct RuleMatchLog: Identifiable {
     public let resolvedNode: String
 }
 
-public struct LogEntry: Identifiable {
-    public let id: UUID
-    public let timestamp: Date
-    public let level: LogLevel
-    public let message: String
-}
-
-public enum LogLevel: String, CaseIterable, Equatable {
-    case all
-    case info
-    case warn
-    case error
-}
-
 public enum ConnectionMode: String, Equatable {
     case systemProxy
     case tun
@@ -123,6 +109,7 @@ public final class AppViewModel {
     // Proxies
     public private(set) var proxyGroups: [ProxyGroupDisplay] = []
     public private(set) var allProxies: [ProxyNodeDisplay] = []
+    private var proxyDelays: [String: Int] = [:]  // proxy name -> delay ms
 
     // Traffic
     public private(set) var currentSpeedUp: Int64 = 0
@@ -136,8 +123,8 @@ public final class AppViewModel {
     public private(set) var ruleMatches: [RuleMatchLog] = []
 
     // Logs
-    public private(set) var logEntries: [LogEntry] = []
-    public var logLevelFilter: LogLevel = .all
+    public private(set) var logEntries: [Riptide.LogEntry] = []
+    public var logLevelFilter: Riptide.LogLevel = .debug
 
     // Errors
     public private(set) var lastError: String?
@@ -248,7 +235,112 @@ public final class AppViewModel {
     }
 
     public func testDelay(groupID: String? = nil) async {
-        rebuildProxyGroupDisplays()
+        guard let profile = activeProfile else { return }
+        guard isRunning else {
+            lastError = "请先启动代理服务"
+            return
+        }
+
+        // Get list of proxies to test
+        var proxiesToTest: [(name: String, groupID: String?)] = []
+
+        if let groupID = groupID {
+            // Test specific group
+            if let group = profile.config.proxyGroups.first(where: { $0.id == groupID }) {
+                for proxyName in group.proxies {
+                    proxiesToTest.append((proxyName, groupID))
+                }
+            }
+        } else {
+            // Test all proxies
+            for proxy in profile.config.proxies {
+                proxiesToTest.append((proxy.name, nil))
+            }
+        }
+
+        // Test each proxy and update delays
+        for (proxyName, _) in proxiesToTest {
+            if let delay = await modeCoordinator.testProxyDelay(proxyName: proxyName) {
+                // Store delay result
+                await MainActor.run {
+                    self.updateProxyDelay(proxyName: proxyName, delay: delay)
+                }
+            } else {
+                // Mark as timeout/error
+                await MainActor.run {
+                    self.updateProxyDelay(proxyName: proxyName, delay: nil)
+                }
+            }
+            // Small delay between tests to avoid overwhelming the API
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+
+        await MainActor.run {
+            self.rebuildProxyGroupDisplaysWithDelays()
+        }
+    }
+
+    private func updateProxyDelay(proxyName: String, delay: Int?) {
+        // This will be called from MainActor
+        proxyDelays[proxyName] = delay
+    }
+
+    private func rebuildProxyGroupDisplaysWithDelays() {
+        guard let profile = activeProfile else {
+            proxyGroups = []
+            allProxies = []
+            rules = []
+            return
+        }
+
+        // Build proxy group displays with delays
+        var groups: [ProxyGroupDisplay] = []
+        for group in profile.config.proxyGroups {
+            var nodes: [ProxyNodeDisplay] = []
+            for nodeName in group.proxies {
+                if let node = profile.config.proxies.first(where: { $0.name == nodeName }) {
+                    let isSelected = nodeName == group.proxies.first
+                    let delay = proxyDelays[node.name]
+                    let status: ProxyNodeDisplay.ProxyStatus = delay != nil ? .available : .timeout
+
+                    nodes.append(ProxyNodeDisplay(
+                        id: node.name,
+                        name: node.name,
+                        kind: node.kind,
+                        delayMs: delay,
+                        isSelected: isSelected,
+                        status: status
+                    ))
+                }
+            }
+            groups.append(ProxyGroupDisplay(
+                id: group.id,
+                name: group.id,
+                kind: group.kind,
+                nodes: nodes,
+                selectedNodeName: group.proxies.first
+            ))
+        }
+        proxyGroups = groups
+
+        // All leaf proxies with delays
+        let groupIDs = Set(profile.config.proxyGroups.map { $0.id })
+        allProxies = profile.config.proxies
+            .filter { !groupIDs.contains($0.name) }
+            .map { node in
+                let delay = proxyDelays[node.name]
+                let status: ProxyNodeDisplay.ProxyStatus = delay != nil ? .available : .timeout
+                return ProxyNodeDisplay(
+                    id: node.name,
+                    name: node.name,
+                    kind: node.kind,
+                    delayMs: delay,
+                    isSelected: false,
+                    status: status
+                )
+            }
+
+        rules = profile.config.rules
     }
 
     public func importConfig(from url: URL) async {

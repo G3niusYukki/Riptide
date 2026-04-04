@@ -122,7 +122,7 @@ public actor ProxyProvider {
 
     /// Parse a Clash YAML string containing a proxies list.
     private func parseClashYAML(_ yaml: String) throws -> [ProxyNode] {
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         return config.proxies
     }
 

@@ -153,31 +153,20 @@ struct RuleEngineTests {
 
     @Test("ruleSet resolves inner rules against target")
     func ruleSetResolvesInnerRules() async {
-        // Create a mock rule set provider with domain-suffix and domain-keyword rules.
-        let providerConfig = RuleSetProviderConfig(
-            name: "test-provider",
-            type: "http",
-            url: URL(string: "https://example.com/rules.txt")!,
-            interval: 86400,
-            behavior: .classical
-        )
-        let provider = RuleSetProvider(config: providerConfig)
-
-        // Seed the provider with a rule set containing inner rules.
+        // Seed with a rule set containing inner rules.
         let innerRules: [ProxyRule] = [
             .domainSuffix(suffix: "google.com", policy: .proxyNode(name: "rs-proxy")),
             .domainKeyword(keyword: "ads", policy: .reject),
         ]
-        var ruleSet = RuleSet(name: "test-provider", behavior: .classical, rules: innerRules)
+        let ruleSet = RuleSet(name: "test-provider", behavior: .classical, rules: innerRules, updatedAt: Date())
 
-        // Pre-populate the provider's rule set by directly calling refresh with mock data.
-        // We test the RuleEngine's async resolution by checking that a ruleSet rule
+        // Test the RuleEngine's async resolution by checking that a ruleSet rule
         // with no inner rules (empty provider) falls through to the next rule.
         let rules: [ProxyRule] = [
             .ruleSet(name: "test-provider", policy: .proxyNode(name: "fallback")),
             .final(policy: .direct),
         ]
-        let engine = RuleEngine(rules: rules, ruleSetProviders: ["test-provider": provider])
+        let engine = RuleEngine(rules: rules, ruleSets: ["test-provider": ruleSet.rules])
 
         // Since the provider has no loaded rules, ruleSet matching returns nil
         // and the engine falls through to the final rule.

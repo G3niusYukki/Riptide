@@ -146,6 +146,8 @@ public enum MihomoConfigGenerator {
             return "http"
         case .socks5:
             return "socks5"
+        case .relay:
+            return "relay"
         }
     }
 
@@ -234,6 +236,11 @@ public enum MihomoConfigGenerator {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
             }
 
+        case .relay:
+            if let chainProxyName = proxy.chainProxyName {
+                lines.append("    relay: \(yamlEscape(chainProxyName))")
+            }
+
         case .http, .socks5:
             // For HTTP/SOCKS5, cipher is used as username
             if let cipher = proxy.cipher {
@@ -281,8 +288,12 @@ public enum MihomoConfigGenerator {
         case .ipASN(let asn, let policy):
             return "IP-ASN,\(asn),\(mihomoPolicyString(for: policy))"
 
-        case .geoSite(let code, let category, let policy):
+        case .geoSite(let code, _, let policy):
             return "GEOSITE,\(yamlEscape(code)),\(mihomoPolicyString(for: policy))"
+
+        case .script(_, let policy):
+            // Script rules are handled by mihomo's script configuration, not inline
+            return "SCRIPT,\(mihomoPolicyString(for: policy))"
 
         case .ruleSet(let name, let policy):
             return "RULE-SET,\(yamlEscape(name)),\(mihomoPolicyString(for: policy))"

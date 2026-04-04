@@ -27,7 +27,7 @@ struct RelayProxyChainTests {
         rules:
           - MATCH,node-b
         """
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         let nodeA = config.proxies.first { $0.name == "node-a" }
         #expect(nodeA != nil)

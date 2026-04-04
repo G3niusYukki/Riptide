@@ -12,7 +12,7 @@ public enum ClashConfigError: Error, Equatable, Sendable {
 }
 
 public enum ClashConfigParser {
-    public static func parse(yaml: String) throws -> RiptideConfig {
+    public static func parse(yaml: String) throws -> (RiptideConfig, [String: RuleSetProvider]) {
         let rawMap: [String: Any]
         do {
             guard let node = try Yams.load(yaml: yaml) as? [String: Any] else {
@@ -38,7 +38,14 @@ public enum ClashConfigParser {
         let rules = try parseRules(raw.rules, mode: mode, knownProxies: knownProxySet, ruleProviders: ruleProviders)
         try validateModeRequirements(mode: mode, proxies: proxies, rules: rules)
         let dnsPolicy = parseDNSPolicy(raw.dns)
-        return RiptideConfig(
+
+        // Build RuleSetProvider objects from configs
+        var ruleSetProviders: [String: RuleSetProvider] = [:]
+        for (name, config) in ruleProviders {
+            ruleSetProviders[name] = RuleSetProvider(config: config)
+        }
+
+        let config = RiptideConfig(
             mode: mode,
             proxies: proxies,
             rules: rules,
@@ -47,6 +54,8 @@ public enum ClashConfigParser {
             ruleProviders: ruleProviders,
             proxyProviders: proxyProviders
         )
+
+        return (config, ruleSetProviders)
     }
 
     private static func parseMode(_ mode: String?) throws -> ProxyMode {

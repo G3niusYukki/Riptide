@@ -119,7 +119,7 @@ struct ProxyProviderTests {
           - MATCH,DIRECT
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.proxies.count == 2)
         #expect(config.proxies[0].name == "yaml-ss")
         #expect(config.proxies[1].name == "yaml-socks")
@@ -149,7 +149,7 @@ struct ProxyProviderTests {
         #expect(readBack.contains("1.1.1.1"))
 
         // Parse via ClashConfigParser to verify it works.
-        let config = try ClashConfigParser.parse(yaml: readBack)
+        let (config, _) = try ClashConfigParser.parse(yaml: readBack)
         #expect(config.proxies.count == 1)
         #expect(config.proxies[0].name == "node-a")
 
@@ -317,7 +317,7 @@ struct ProxyProviderTests {
           - MATCH,local-proxy
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
 
         #expect(config.proxyProviders.count == 1)
         let provider = config.proxyProviders["my-provider"]!
@@ -342,7 +342,7 @@ struct ProxyProviderTests {
             port: 1080
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.proxyProviders.isEmpty)
     }
 
@@ -364,7 +364,7 @@ struct ProxyProviderTests {
           - MATCH,proxy
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         #expect(config.proxyProviders.count == 1)
         let provider = config.proxyProviders["file-provider"]!
         #expect(provider.type == "file")
@@ -391,7 +391,7 @@ struct ProxyProviderTests {
           - MATCH,proxy
         """
 
-        let config = try ClashConfigParser.parse(yaml: yaml)
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
         let provider = config.proxyProviders["minimal-provider"]!
         #expect(provider.healthCheck == nil)
     }
