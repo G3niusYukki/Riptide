@@ -254,7 +254,10 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             resolvedIP = target.host
         }
 
-        let ruleTarget = RuleTarget(domain: target.host, ipAddress: resolvedIP)
+        // Use sniffed domain (from Host header) for rule matching if available,
+        // otherwise fall back to the CONNECT authority host.
+        let domainForRules = target.sniffedDomain ?? target.host
+        let ruleTarget = RuleTarget(domain: domainForRules, ipAddress: resolvedIP)
         let engine = RuleEngine(
             rules: profile.config.rules,
             ruleSets: ruleSetRules,
