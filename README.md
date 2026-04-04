@@ -1,165 +1,319 @@
 # Riptide
 
-Riptide is an open-source Swift proxy engine project targeting a Surge-like architecture: strict config parsing, deterministic rule routing, protocol framing, transport orchestration, tunnel lifecycle management, and executable CLI/App entrypoints.
+Riptide is a macOS proxy client built with Swift 6, integrating the [mihomo](https://github.com/MetaCubeX/mihomo) core to provide production-grade proxy and TUN mode support.
 
-**Current state: Beta** — System Proxy mode, TUN mode scaffolding, profile management, subscription workflow, runtime observability, and menu bar shell are implemented. Proxy groups and DNS policy routing are complete.
+**Current state: Beta** — Full mihomo integration complete with System Proxy mode, TUN mode (via privileged helper), profile management, subscription workflow, and menu bar UI.
+
+---
 
 ## Features
 
-- **Strict Clash-compatible parser (subset)** with explicit validation errors
-- **Rule engine**: `DOMAIN`, `DOMAIN-SUFFIX`, `DOMAIN-KEYWORD`, `IP-CIDR`, `IP-CIDR6`, `GEOIP`, `PROCESS-NAME`, `MATCH/FINAL`
-- **Protocol framing**: HTTP CONNECT, SOCKS5, Shadowsocks AEAD
-- **Transport layer**: connection contracts, pooling, and `Network.framework` TCP/TLS dialers
-- **Runtime layers**:
-  - `TunnelLifecycleManager` for lifecycle state transitions
-  - `LiveTunnelRuntime` for real policy execution (`DIRECT` / `REJECT` / proxy path)
-  - `InProcessTunnelControlChannel` for command/response/event control abstraction
-  - `ModeCoordinator` for unified system proxy / TUN mode orchestration
-- **Profile management**: `ProfileStore` actor for local and subscription-backed profiles
-- **Observability**: `RuntimeEventStore` bounded buffer for lifecycle events, connection snapshots, and throughput counters
-- **Local proxy ingress**:
-  - `LocalHTTPConnectProxyServer` for real local HTTP CONNECT traffic and relay
-  - `SystemProxyControlling` protocol for enable/disable with test doubles
-- **Entrypoints**:
-  - `riptide` CLI (`validate`, `run`, `smoke`, `serve`)
-  - `RiptideApp` SwiftUI app with menu bar shell (`MenuBarExtra`) and tabbed dashboard
+### Core Proxy Support (via mihomo)
 
-## Alpha-Ready Capabilities
+| Protocol | Status |
+|----------|--------|
+| HTTP/SOCKS5 | ✅ Supported |
+| Shadowsocks (AEAD) | ✅ Supported |
+| VMess | ✅ Supported |
+| VLESS (XTLS/Vision) | ✅ Supported |
+| Trojan | ✅ Supported |
+| Hysteria2 | ✅ Supported |
 
-| Feature | Status |
-|---------|--------|
-| System Proxy mode | Beta-ready |
-| Profile import (YAML) | Beta-ready |
-| Subscription workflow | Beta-ready |
-| Runtime observability | Beta-ready |
-| Menu bar controls | Beta-ready |
-| Proxy groups | Beta-ready |
-| DNS policy routing | Beta-ready |
-| TUN / Packet Tunnel | Scaffolded (Beta) |
+### Runtime Modes
 
-## Project Structure
+- **System Proxy Mode** — Configures macOS system proxy settings, routes traffic through mihomo's HTTP/SOCKS5 ports
+- **TUN Mode** — Uses mihomo's gVisor-based TUN stack to intercept all system traffic (requires privileged helper)
 
-```text
-Sources/
-  Riptide/
-    AppShell/      # Import workflow + app-facing status mapping
-    Config/        # Clash parser
-    Connection/    # ProxyConnector orchestration
-    Control/       # Control channel abstraction
-    Models/        # Config/rule/proxy core models
-    Protocols/     # HTTP/SOCKS5/SS framing
-    Rules/         # RuleEngine + GeoIP resolver injection
-    Transport/     # Session contracts, pooling, network dialers
-    Tunnel/        # Runtime + lifecycle manager
-  RiptideCLI/      # CLI entrypoint and command runner
-  RiptideApp/      # SwiftUI demo app entrypoint
-Tests/
-  RiptideTests/    # End-to-end unit coverage across layers
+### Configuration
+
+- **Clash-compatible YAML parser** with strict validation
+- **Rule engine**: `DOMAIN`, `DOMAIN-SUFFIX`, `DOMAIN-KEYWORD`, `IP-CIDR`, `IP-CIDR6`, `GEOIP`, `PROCESS-NAME`, `MATCH/FINAL`, `RULE-SET`
+- **Proxy groups**: `select`, `url-test`, `fallback`, `load-balance`
+- **DNS policy**: DoH, DoT, DoQ, fake-IP, nameserver fallback
+
+### Architecture
+
 ```
+┌─────────────────────────────────────────────────────────────┐
+│                    Riptide SwiftUI App                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
+│  │ Config Tab  │  │ Proxy Tab   │  │ System Proxy/TUN   │   │
+│  │             │  │             │  │ Mode Selector       │   │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘   │
+│         └─────────────────┴────────────────────┘             │
+│                           │                                 │
+│              ┌────────────▼────────────┐                    │
+│              │   MihomoRuntimeManager  │                    │
+│              │   (Config Gen + XPC + API)                  │
+│              └────────────┬────────────┘                    │
+└───────────────────────────┼─────────────────────────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │    RiptideHelper (root)   │  ← SMJobBless
+              │  launch/terminate mihomo  │
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │        mihomo (root)      │
+              │   ┌─────────────────┐    │
+              │   │ TUN Device      │    │  ← gVisor stack
+              │   │ Proxy Protocols │    │  ← VLESS/VMess/SS/etc
+              │   │ REST API :9090  │◄───┘
+              │   └─────────────────┘
+              └─────────────────────────────┘
+```
+
+---
 
 ## Requirements
 
 - macOS 14+
 - Swift 6.2+
-- Xcode 16+/26.x toolchain with Swift Package Manager support
+- Xcode 16+ with Swift Package Manager
+- Apple Developer account (for signing the privileged helper tool)
+
+---
 
 ## Quick Start
 
-### 1. Build
+### 1. Clone and Build
 
 ```bash
+git clone https://github.com/G3niusYukki/Riptide.git
+cd Riptide
 swift build
 ```
 
-### 2. Run tests
+### 2. Download mihomo Binary
+
+```bash
+./Scripts/download-mihomo.sh
+```
+
+This downloads the mihomo core binary (universal binary for Intel + Apple Silicon).
+
+### 3. Run Tests
 
 ```bash
 swift test
 ```
 
-### 3. CLI usage
+All 233 tests should pass.
 
-Build and run with:
+### 4. Build Helper Tool (for TUN mode)
+
+The privileged helper tool requires proper code signing:
+
+1. Open `RiptideHelper/Resources/Info.plist`
+2. Replace `YOUR_TEAM_ID` with your Apple Developer Team ID
+3. Build and sign the helper:
 
 ```bash
-swift run riptide --help
+cd RiptideHelper
+swift build
+codesign --sign "Developer ID Application: Your Name" --entitlements Entitlements.plist .build/debug/RiptideHelper
 ```
 
-Examples:
+### 5. Run the App
 
-```bash
-swift run riptide validate --config ./example.yaml
-swift run riptide run --config ./example.yaml
-swift run riptide smoke --config ./example.yaml --host example.com --port 443
-swift run riptide serve --config ./Examples/direct-mode.yaml --port 6152
-```
+**Via Xcode (recommended):**
+- Open the project in Xcode
+- Select `RiptideApp` scheme
+- Click Run
 
-`serve` starts a local HTTP CONNECT proxy so macOS apps, browsers, or CLI tools can send real traffic through the live runtime.
-
-### 4. Run the demo app
-
+**Via command line:**
 ```bash
 swift run RiptideApp
 ```
 
-## Example Clash Config (supported subset)
+---
+
+## Example Configuration
+
+Create a `config.yaml`:
 
 ```yaml
 mode: rule
+mixed-port: 6152
+external-controller: 127.0.0.1:9090
+
 proxies:
-  - name: "my-socks"
-    type: socks5
-    server: "127.0.0.1"
-    port: 1080
-  - name: "my-ss"
-    type: ss
-    server: "1.2.3.4"
+  - name: "hk-node"
+    type: vless
+    server: "example.com"
     port: 443
-    cipher: "aes-256-gcm"
-    password: "secret"
+    uuid: "550e8400-e29b-41d4-a716-446655440000"
+    flow: xtls-rprx-vision
+    servername: example.com
+
+  - name: "sg-ss"
+    type: ss
+    server: "sg.example.com"
+    port: 8388
+    cipher: aes-256-gcm
+    password: "your-password"
+
+proxy-groups:
+  - name: "auto-select"
+    type: url-test
+    proxies:
+      - hk-node
+      - sg-ss
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+
 rules:
-  - DOMAIN-SUFFIX,google.com,my-socks
+  - DOMAIN-SUFFIX,google.com,auto-select
   - DOMAIN-KEYWORD,ads,REJECT
   - IP-CIDR,10.0.0.0/8,DIRECT
-  - GEOIP,CN,my-ss
-  - MATCH,my-socks
+  - GEOIP,CN,DIRECT
+  - MATCH,auto-select
 ```
 
-## GeoIP Rule Baseline
+---
 
-`GEOIP` matching is implemented through **dependency injection**:
+## Usage
 
-- `RuleEngine(rules:geoIPResolver:)`
-- `LiveTunnelRuntime(proxyDialer:directDialer:geoIPResolver:)`
+### System Proxy Mode
 
-Default resolver is `.none` (no country match). Production integration (e.g., MMDB) can be added without changing rule matching call sites.
+1. Import your configuration file
+2. Select "System Proxy" mode
+3. Click "Start"
+4. The app will configure macOS system proxy settings automatically
+
+### TUN Mode
+
+1. First time only: Install the privileged helper tool
+   - Click "Install Helper Tool" button
+   - Enter your macOS administrator password
+2. Select "TUN" mode
+3. Click "Start"
+4. All system traffic is routed through the TUN interface
+
+### Switching Proxies
+
+In the Proxy tab, click any node to switch active proxy. For proxy groups, the best node is auto-selected based on latency (url-test mode).
+
+---
+
+## Project Structure
+
+```
+Sources/
+  Riptide/
+    Mihomo/           # mihomo integration layer
+      MihomoPaths.swift
+      MihomoConfigGenerator.swift
+      MihomoAPIClient.swift
+      MihomoRuntimeManager.swift
+    XPC/              # Privileged helper communication
+      HelperToolProtocol.swift
+      HelperToolConnection.swift
+    AppShell/         # Import workflow, profile store
+    Config/           # Clash YAML parser
+    Models/           # Core data models
+    Rules/            # Rule engine
+  RiptideHelper/      # Privileged helper tool (separate package)
+    Sources/
+      main.swift
+      HelperTool.swift
+      MihomoLauncher.swift
+  RiptideApp/         # SwiftUI app entrypoint
+    SMJobBlessManager.swift
+    Views/
+      HelperSetupView.swift
+      ConfigTabView.swift
+Resources/
+  mihomo              # Downloaded mihomo binary
+Scripts/
+  download-mihomo.sh  # Download script
+```
+
+---
+
+## How It Works
+
+### 1. Configuration Generation
+
+When you start a profile:
+
+1. `MihomoConfigGenerator` transforms `RiptideConfig` to mihomo-compatible YAML
+2. YAML is written to `~/Library/Application Support/Riptide/mihomo/config.yaml`
+3. Previous config is backed up to `config.yaml.bak`
+
+### 2. Helper Tool & XPC
+
+For TUN mode (requires root):
+
+1. `SMJobBlessManager` installs `RiptideHelper` to `/Library/PrivilegedHelperTools/`
+2. `HelperToolConnection` establishes XPC connection to the helper
+3. Helper launches mihomo with root privileges
+4. mihomo creates the TUN device
+
+### 3. Runtime Control
+
+Once running:
+
+1. `MihomoAPIClient` connects to mihomo's REST API (port 9090)
+2. Live traffic stats, connection list, proxy switching via API
+3. Health checks ensure mihomo is responsive
+
+### 4. Mode Coordination
+
+- **System Proxy Mode**: `ModeCoordinator` sets macOS system proxy to `127.0.0.1:6152`
+- **TUN Mode**: mihomo manages routes and DNS directly
+
+---
+
+## Security Considerations
+
+1. **Privileged Helper**: RiptideHelper runs as root via SMJobBless. It only:
+   - Launches mihomo from `/Library/Application Support/Riptide/mihomo`
+   - Accepts config paths under `~/Library/Application Support/Riptide/mihomo/`
+   - Terminates mihomo process
+
+2. **Config Path Validation**: The helper validates all paths are within allowed directories before use
+
+3. **Code Signing**: Both the main app and helper must be signed with the same Team ID
+
+---
 
 ## Roadmap
 
-### Beta (current)
-
-1. TUN / Packet Tunnel: wire `PacketTunnelProvider` and NetworkExtension target
-2. Proxy groups: `ProxyGroupResolver` for Select, URL-Test, Fallback, Load-Balance
-3. DNS policy routing: `DNSPolicy` with `respect-rules` and nameserver fallback
+### Current (Beta)
+- ✅ mihomo core integration
+- ✅ System Proxy mode
+- ✅ TUN mode with privileged helper
+- ✅ SwiftUI app with menu bar
+- ✅ Proxy switching and latency tests
 
 ### Future
+- GeoIP database auto-update
+- Rule-set provider auto-update
+- Advanced traffic statistics dashboard
+- Script/Merge configuration support
+- Web-based external controller UI
 
-4. MITM / rewrite surfaces
-5. External controller REST API expansion
-6. VMess / VLESS / Trojan / Hysteria2 stream actors wired to `ProxyConnector`
-7. Advanced dashboard and rule-set support
+---
 
 ## Contributing
 
 Contributions are welcome.
 
 - Keep changes modular and test-backed
-- Follow strict failure behavior (avoid silent fallbacks)
-- Add/adjust tests for behavior changes
+- All code must pass Swift 6 strict concurrency checks
+- Add tests for new functionality
+- Update documentation for user-facing changes
 
-For substantial changes, open an issue first to discuss design and scope.
+---
 
 ## License
 
-This project is currently **unlicensed** (no OSS license file yet).  
-If you plan public reuse, add a `LICENSE` file (e.g., MIT/Apache-2.0) in a follow-up.
+MIT License - See LICENSE file
+
+---
+
+## Acknowledgments
+
+- [mihomo](https://github.com/MetaCubeX/mihomo) - The proxy core powering Riptide
+- [Clash](https://github.com/Dreamacro/clash) - Original configuration format
