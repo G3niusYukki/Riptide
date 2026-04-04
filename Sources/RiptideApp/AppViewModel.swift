@@ -260,7 +260,7 @@ public final class AppViewModel {
                 lastError = "Could not read config file"
                 return
             }
-            let config = try ClashConfigParser.parse(yaml: yaml)
+            let (config, _) = try ClashConfigParser.parse(yaml: yaml)
             let profile = Profile(name: url.deletingPathExtension().lastPathComponent, config: config)
             profiles.append(profile)
             activeProfile = profile
