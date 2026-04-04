@@ -10,3 +10,8 @@ DerivedData/
 docs/superpowers/
 
 docs/stage-plans/
+
+# mihomo binary (downloaded during build)
+Resources/mihomo
+Resources/mihomo-*
+*.gz
