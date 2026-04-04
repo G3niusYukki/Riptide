@@ -110,16 +110,32 @@ actor MihomoLauncher {
         }
 
         // Open log file for writing
-        let logHandle = try FileHandle(forWritingTo: logURL)
+        let logHandle: FileHandle
+        do {
+            logHandle = try FileHandle(forWritingTo: logURL)
+        } catch {
+            throw MihomoLauncherError.launchFailed("Failed to open log file: \(error.localizedDescription)")
+        }
+
+        // Ensure file handle is closed if we fail to launch
+        defer {
+            // If we haven't stored the process yet, we failed to launch - close the handle
+            if self.process == nil {
+                logHandle.closeFile()
+            }
+        }
+
         logHandle.seekToEndOfFile()
         process.standardOutput = logHandle
         process.standardError = logHandle
         self.logFileHandle = logHandle
 
-        // Set up termination handler
+        // Set up termination handler - properly bridge to actor
         process.terminationHandler = { [weak self] terminatedProcess in
+            // Capture the terminated process for later use
             Task { [weak self] in
-                await self?.handleProcessTermination(terminatedProcess)
+                guard let self = self else { return }
+                await self.handleProcessTermination(terminatedProcess)
             }
         }
 
@@ -127,6 +143,7 @@ actor MihomoLauncher {
         do {
             try process.run()
         } catch {
+            // defer will close the logHandle since process won't be stored
             throw MihomoLauncherError.launchFailed(error.localizedDescription)
         }
 

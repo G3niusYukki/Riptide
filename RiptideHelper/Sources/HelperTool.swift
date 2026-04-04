@@ -6,12 +6,6 @@ import Foundation
 /// This is a critical security check since the helper runs as root.
 enum PathValidator {
 
-    /// Allowed base paths for config files.
-    static let allowedConfigPaths = [
-        "/Users/",  // User home directories
-        NSHomeDirectory()  // Current user's home
-    ]
-
     /// Allowed path for mihomo binary installation.
     static let allowedInstallPath = "/Library/Application Support/Riptide/"
 
@@ -55,6 +49,25 @@ protocol HelperToolProtocol {
     func terminateMihomo(reply: @escaping @Sendable (Error?) -> Void)
     func getMihomoStatus(reply: @escaping @Sendable (Data?, Error?) -> Void)
     func installMihomo(binaryPath: String, reply: @escaping @Sendable (Error?) -> Void)
+}
+
+// MARK: - Launch Mode
+
+/// Launch modes for mihomo core.
+enum MihomoLaunchMode: String, Sendable, Codable {
+    case systemProxy = "systemProxy"
+    case tun = "tun"
+}
+
+// MARK: - Status
+
+/// Current status of the mihomo process.
+struct MihomoStatus: Codable, Sendable {
+    let running: Bool
+    let pid: Int?
+    let mode: String?
+    let configPath: String?
+    let startTime: Date?
 }
 
 // MARK: - Helper Tool
@@ -166,8 +179,8 @@ extension HelperTool: HelperToolProtocol {
     nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) {
         logMessageNonIsolated("Received launchMihomo request - config: \(configPath), mode: \(mode)")
 
-        // Validate mode
-        guard mode == "systemProxy" || mode == "tun" else {
+        // Validate mode using MihomoLaunchMode enum
+        guard MihomoLaunchMode(rawValue: mode) != nil else {
             let error = NSError(
                 domain: "RiptideHelper",
                 code: 1,
@@ -347,16 +360,4 @@ extension HelperTool: HelperToolProtocol {
             reply(nsError)
         }
     }
-}
-
-// MARK: - MihomoStatus (Helper Tool Version)
-
-/// Status structure used within the helper tool.
-/// Must match the definition in HelperToolProtocol.swift
-struct MihomoStatus: Codable {
-    let running: Bool
-    let pid: Int?
-    let mode: String?
-    let configPath: String?
-    let startTime: Date?
 }
