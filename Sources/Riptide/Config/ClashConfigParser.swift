@@ -29,6 +29,7 @@ public enum ClashConfigParser {
         let proxyGroups = try parseProxyGroups(raw.proxyGroups)
 
         let ruleProviders = try parseRuleProviders(rawMap["rule-providers"] as? [String: Any])
+        let proxyProviders = try parseProxyProviders(rawMap["proxy-providers"] as? [String: Any])
 
         // Include both leaf proxy names and group IDs so rules can reference either.
         let proxyNameSet = Set(proxies.map(\.name))
@@ -43,7 +44,8 @@ public enum ClashConfigParser {
             rules: rules,
             proxyGroups: proxyGroups,
             dnsPolicy: dnsPolicy,
-            ruleProviders: ruleProviders
+            ruleProviders: ruleProviders,
+            proxyProviders: proxyProviders
         )
     }
 
@@ -585,6 +587,46 @@ public enum ClashConfigParser {
                 url: url,
                 interval: interval,
                 behavior: behavior
+            )
+        }
+        return providers
+    }
+
+    private static func parseProxyProviders(
+        _ raw: [String: Any]?
+    ) throws -> [String: ProxyProviderConfig] {
+        guard let raw, !raw.isEmpty else { return [:] }
+
+        var providers: [String: ProxyProviderConfig] = [:]
+        for (name, value) in raw {
+            guard let dict = value as? [String: Any],
+                  let type = dict["type"] as? String else {
+                continue
+            }
+
+            let url = dict["url"] as? String
+            let path = dict["path"] as? String
+            let interval = dict["interval"] as? Int
+
+            let healthCheckDict = dict["health-check"] as? [String: Any]
+            let healthCheck: HealthCheckConfig?
+            if let hc = healthCheckDict {
+                healthCheck = HealthCheckConfig(
+                    enable: (hc["enable"] as? Bool) ?? false,
+                    url: hc["url"] as? String,
+                    interval: hc["interval"] as? Int
+                )
+            } else {
+                healthCheck = nil
+            }
+
+            providers[name] = ProxyProviderConfig(
+                name: name,
+                type: type,
+                url: url,
+                path: path,
+                interval: interval,
+                healthCheck: healthCheck
             )
         }
         return providers

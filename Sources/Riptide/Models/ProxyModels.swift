@@ -110,6 +110,8 @@ public struct RiptideConfig: Equatable, Sendable {
     public let dnsPolicy: DNSPolicy
     /// Static rule-set provider configurations parsed from the config file.
     public let ruleProviders: [String: RuleSetProviderConfig]
+    /// Static proxy provider configurations parsed from the config file.
+    public let proxyProviders: [String: ProxyProviderConfig]
 
     public init(
         mode: ProxyMode,
@@ -117,7 +119,8 @@ public struct RiptideConfig: Equatable, Sendable {
         rules: [ProxyRule],
         proxyGroups: [ProxyGroup] = [],
         dnsPolicy: DNSPolicy = .default,
-        ruleProviders: [String: RuleSetProviderConfig] = [:]
+        ruleProviders: [String: RuleSetProviderConfig] = [:],
+        proxyProviders: [String: ProxyProviderConfig] = [:]
     ) {
         self.mode = mode
         self.proxies = proxies
@@ -125,5 +128,45 @@ public struct RiptideConfig: Equatable, Sendable {
         self.proxyGroups = proxyGroups
         self.dnsPolicy = dnsPolicy
         self.ruleProviders = ruleProviders
+        self.proxyProviders = proxyProviders
+    }
+}
+
+/// Configuration for a Clash-style proxy provider.
+public struct ProxyProviderConfig: Codable, Sendable, Equatable {
+    public let name: String
+    public let type: String  // "http" or "file"
+    public let url: String?
+    public let path: String?
+    public let interval: Int?  // seconds
+    public let healthCheck: HealthCheckConfig?
+
+    public init(
+        name: String,
+        type: String,
+        url: String? = nil,
+        path: String? = nil,
+        interval: Int? = nil,
+        healthCheck: HealthCheckConfig? = nil
+    ) {
+        self.name = name
+        self.type = type
+        self.url = url
+        self.path = path
+        self.interval = interval
+        self.healthCheck = healthCheck
+    }
+}
+
+/// Health check configuration for a proxy provider.
+public struct HealthCheckConfig: Codable, Sendable, Equatable {
+    public let enable: Bool
+    public let url: String?
+    public let interval: Int?
+
+    public init(enable: Bool, url: String? = nil, interval: Int? = nil) {
+        self.enable = enable
+        self.url = url
+        self.interval = interval
     }
 }

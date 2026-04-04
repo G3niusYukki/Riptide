@@ -22,6 +22,8 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     /// Most-recently-loaded rules for each provider.
     private var ruleSetRules: [String: [ProxyRule]] = [:]
     private var ruleSetRefreshTask: Task<Void, Never>?
+    /// Active proxy providers, keyed by provider name.
+    private var proxyProviders: [String: ProxyProvider] = [:]
 
     public init(
         proxyDialer: any TransportDialer,
@@ -63,6 +65,14 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             await provider.start()
         }
 
+        // Start proxy providers.
+        proxyProviders.removeAll()
+        for (_, config) in profile.proxyProviders {
+            let provider = ProxyProvider(config: config)
+            proxyProviders[config.name] = provider
+            await provider.start()
+        }
+
         // Wait for initial load of all providers before accepting connections.
         await refreshRuleSets()
 
@@ -98,6 +108,11 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         }
         ruleSetProviders.removeAll()
         ruleSetRules.removeAll()
+
+        for provider in proxyProviders.values {
+            await provider.stop()
+        }
+        proxyProviders.removeAll()
     }
 
     public func update(profile: TunnelProfile) async throws {
