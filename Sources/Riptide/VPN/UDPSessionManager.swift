@@ -106,6 +106,7 @@ public enum UDPSessionManagerError: Error, Equatable, Sendable {
 /// Each UDP flow (identified by srcIP:srcPort -> dstIP:dstPort) gets its own session.
 public actor UDPSessionManager {
     private var sessions: [UDPSessionID: UDPSession] = [:]
+    private var tunnelSessions: [UDPSessionID: UDPTunnelSession] = [:]
     private var cleanupTasks: [UDPSessionID: Task<Void, Never>] = [:]
     private let maxSessions: Int
     private let sessionTimeout: Duration
@@ -130,7 +131,7 @@ public actor UDPSessionManager {
         }
 
         // Create new UDP session
-        guard sessions.count < maxSessions else {
+        guard sessions.count + tunnelSessions.count < maxSessions else {
             throw UDPSessionManagerError.sessionLimitReached
         }
 
@@ -154,39 +155,42 @@ public actor UDPSessionManager {
         data: Data,
         proxyConnector: ProxyConnector
     ) async throws -> [Data] {
-        // Get or create session
-        var session = sessions[sessionID]
+        // Get or create tunnel session
+        var tunnelSession = tunnelSessions[sessionID]
 
-        if session == nil {
-            guard sessions.count < maxSessions else {
+        if tunnelSession == nil {
+            guard sessions.count + tunnelSessions.count < maxSessions else {
                 throw UDPSessionManagerError.sessionLimitReached
             }
 
-            // Determine if direct or proxy routing based on destination
             let target = ConnectionTarget(host: sessionID.dstIP, port: Int(sessionID.dstPort))
 
-            // For now, establish the proxy connection
-            // In a full implementation, this would determine routing policy
-            // and either connect directly or through a proxy node
-            let context: ConnectedProxyContext? = nil  // Will be connected via proxyConnector
+            let session = UDPTunnelSession(
+                sessionID: sessionID,
+                target: target,
+                relayMode: .socks5UDP
+            )
 
-            let newSession = UDPSession(id: sessionID, remoteContext: context)
-            sessions[sessionID] = newSession
-            session = newSession
+            // Establish the UDP relay (proxyNode will be resolved by the caller if needed)
+            try await session.establish(proxyConnector: proxyConnector)
 
-            // Start cleanup task
+            tunnelSessions[sessionID] = session
+            tunnelSession = session
+
+            // Start cleanup task for this tunnel session
             let task = Task {
                 try? await Task.sleep(for: sessionTimeout)
-                await cleanupSession(id: sessionID)
+                await cleanupTunnelSession(id: sessionID)
             }
             cleanupTasks[sessionID] = task
         }
 
-        guard let currentSession = session else {
+        guard let currentSession = tunnelSession else {
             throw UDPSessionManagerError.sessionNotFound(sessionID)
         }
 
-        return try await currentSession.process(data: data)
+        let response = try await currentSession.forward(data)
+        return [response]
     }
 
     /// Close a specific session.
@@ -196,6 +200,9 @@ public actor UDPSessionManager {
         if let session = sessions[id] {
             await session.close()
             sessions.removeValue(forKey: id)
+        }
+        if let tunnelSession = tunnelSessions.removeValue(forKey: id) {
+            await tunnelSession.close()
         }
     }
 
@@ -207,7 +214,11 @@ public actor UDPSessionManager {
                 await session.close()
             }
         }
+        for tunnelSession in tunnelSessions.values {
+            await tunnelSession.close()
+        }
         sessions.removeAll()
+        tunnelSessions.removeAll()
         cleanupTasks.removeAll()
     }
 
@@ -230,6 +241,14 @@ public actor UDPSessionManager {
             await session.close()
         }
         sessions.removeValue(forKey: id)
+    }
+
+    private func cleanupTunnelSession(id: UDPSessionID) async {
+        cleanupTasks[id]?.cancel()
+        cleanupTasks.removeValue(forKey: id)
+        if let tunnelSession = tunnelSessions.removeValue(forKey: id) {
+            await tunnelSession.close()
+        }
     }
 
     private func resetSessionTimeout(sessionID: UDPSessionID) {

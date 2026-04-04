@@ -74,6 +74,8 @@ struct RuleRow: View {
         case .geoSite(let cc, let cat, let policy): return "GEOSITE \(cc),\(cat) → \(policyText(policy))"
         case .ruleSet(let name, let policy): return "RULE-SET \(name) → \(policyText(policy))"
         case .script(let code, let policy): return "SCRIPT \(code.prefix(20))... → \(policyText(policy))"
+        case .not(let ruleType, let value, let policy): return "NOT \(ruleType) \(value) → \(policyText(policy))"
+        case .reject: return "REJECT"
         case .matchAll: return "MATCH → \(policyText(.proxyNode(name: "代理")))"
         case .final(let policy): return "FINAL → \(policyText(policy))"
         }

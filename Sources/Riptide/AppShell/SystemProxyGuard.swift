@@ -13,14 +13,14 @@ public actor SystemProxyGuard {
     }
 
     /// Enables the guard with expected proxy settings
-    public func enable(expectedHTTPPort: Int, expectedSOCKSPort: Int?) throws {
+    public func enable(expectedHTTPPort: Int, expectedSOCKSPort: Int?) async throws {
         self.expectedHTTPPort = expectedHTTPPort
         self.expectedSOCKSPort = expectedSOCKSPort
         self.isGuardEnabled = true
         self.violationCount = 0
 
         // Immediately set the proxy to expected values
-        try controller.enable(httpPort: expectedHTTPPort, socksPort: expectedSOCKSPort)
+        try await controller.enable(httpPort: expectedHTTPPort, socksPort: expectedSOCKSPort)
     }
 
     /// Disables the guard
@@ -66,13 +66,13 @@ public actor SystemProxyGuard {
     }
 
     /// Restores proxy settings to expected values
-    public func restore() throws {
+    public func restore() async throws {
         guard isGuardEnabled,
               let httpPort = expectedHTTPPort else {
             return
         }
 
-        try controller.enable(httpPort: httpPort, socksPort: expectedSOCKSPort)
+        try await controller.enable(httpPort: httpPort, socksPort: expectedSOCKSPort)
     }
 
     /// Returns the number of detected violations

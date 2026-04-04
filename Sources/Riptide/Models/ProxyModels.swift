@@ -15,6 +15,7 @@ public enum ProxyKind: Equatable, Sendable {
     case trojan
     case hysteria2
     case relay
+    case snell
 }
 
 public struct ProxyNode: Equatable, Sendable {
@@ -36,6 +37,7 @@ public struct ProxyNode: Equatable, Sendable {
     public let wsHost: String?
     public let grpcServiceName: String?
     public let chainProxyName: String?
+    public let snellVersion: Int?
 
     public init(
         name: String,
@@ -55,7 +57,8 @@ public struct ProxyNode: Equatable, Sendable {
         wsPath: String? = nil,
         wsHost: String? = nil,
         grpcServiceName: String? = nil,
-        chainProxyName: String? = nil
+        chainProxyName: String? = nil,
+        snellVersion: Int? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -75,6 +78,7 @@ public struct ProxyNode: Equatable, Sendable {
         self.wsHost = wsHost
         self.grpcServiceName = grpcServiceName
         self.chainProxyName = chainProxyName
+        self.snellVersion = snellVersion
     }
 }
 
@@ -99,6 +103,12 @@ public enum ProxyRule: Equatable, Sendable {
     case geoSite(code: String, category: String, policy: RoutingPolicy)
     case ruleSet(name: String, policy: RoutingPolicy)
     case script(code: String, policy: RoutingPolicy)
+    /// Negates the result of a specific rule type. The ruleType and value are stored
+    /// as strings, and the negation is applied at match time.
+    /// Equivalent to Clash's `NOT,DOMAIN,example.com,DIRECT` syntax.
+    case not(ruleType: String, value: String, policy: RoutingPolicy)
+    /// Rejects the connection unconditionally.
+    case reject
     case matchAll
     case final(policy: RoutingPolicy)
 }

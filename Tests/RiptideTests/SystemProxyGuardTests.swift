@@ -45,11 +45,11 @@ struct SystemProxyGuardTests {
         let proxyGuard = SystemProxyGuard(controller: mockController)
 
         // Enable guard and set proxy
-        try mockController.enable(httpPort: 6152, socksPort: 6153)
+        try await mockController.enable(httpPort: 6152, socksPort: 6153)
         try await proxyGuard.enable(expectedHTTPPort: 6152, expectedSOCKSPort: 6153)
 
         // Simulate external disable
-        try mockController.disable()
+        try await mockController.disable()
 
         // Check should detect the change
         let violation = await proxyGuard.checkForViolation()
@@ -62,11 +62,11 @@ struct SystemProxyGuardTests {
         let proxyGuard = SystemProxyGuard(controller: mockController)
 
         // Enable guard with expected port 6152
-        try mockController.enable(httpPort: 6152, socksPort: nil)
+        try await mockController.enable(httpPort: 6152, socksPort: nil)
         try await proxyGuard.enable(expectedHTTPPort: 6152, expectedSOCKSPort: nil)
 
         // Simulate external change to different port
-        try mockController.enable(httpPort: 8080, socksPort: nil)
+        try await mockController.enable(httpPort: 8080, socksPort: nil)
 
         let violation = await proxyGuard.checkForViolation()
         #expect(violation == true)
@@ -77,7 +77,7 @@ struct SystemProxyGuardTests {
         let mockController = MockSystemProxyController()
         let proxyGuard = SystemProxyGuard(controller: mockController)
 
-        try mockController.enable(httpPort: 6152, socksPort: 6153)
+        try await mockController.enable(httpPort: 6152, socksPort: 6153)
         try await proxyGuard.enable(expectedHTTPPort: 6152, expectedSOCKSPort: 6153)
 
         let violation = await proxyGuard.checkForViolation()
@@ -90,14 +90,14 @@ struct SystemProxyGuardTests {
         let proxyGuard = SystemProxyGuard(controller: mockController)
 
         // Setup and change externally
-        try mockController.enable(httpPort: 6152, socksPort: nil)
+        try await mockController.enable(httpPort: 6152, socksPort: nil)
         try await proxyGuard.enable(expectedHTTPPort: 6152, expectedSOCKSPort: nil)
-        try mockController.enable(httpPort: 8080, socksPort: nil)
+        try await mockController.enable(httpPort: 8080, socksPort: nil)
 
         // Restore should fix it
         try await proxyGuard.restore()
 
-        let state = try mockController.currentState()
+        let state = mockController.currentState()
         if case .enabled(let httpPort, _) = state {
             #expect(httpPort == 6152)
         } else {
@@ -117,7 +117,7 @@ struct SystemProxyGuardTests {
         #expect(initialCount == 0)
 
         // Simulate violations
-        try mockController.enable(httpPort: 8080, socksPort: nil)
+        try await mockController.enable(httpPort: 8080, socksPort: nil)
         _ = await proxyGuard.checkForViolation()
 
         let count = await proxyGuard.getViolationCount()
@@ -155,14 +155,14 @@ struct SystemProxyMonitorTests {
         let proxyGuard = SystemProxyGuard(controller: mockController)
 
         // Setup
-        try mockController.enable(httpPort: 6152, socksPort: nil)
+        try await mockController.enable(httpPort: 6152, socksPort: nil)
         try await proxyGuard.enable(expectedHTTPPort: 6152, expectedSOCKSPort: nil)
 
         // Start monitor with the guard
         await monitor.start(interval: 0.1, guard: proxyGuard)
 
         // Simulate external change
-        try mockController.enable(httpPort: 9999, socksPort: nil)
+        try await mockController.enable(httpPort: 9999, socksPort: nil)
 
         // Wait for monitor to detect
         try await Task.sleep(nanoseconds: 200_000_000) // 200ms

@@ -10,6 +10,8 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private let proxyDialer: any TransportDialer
     private let directDialer: any TransportDialer
     private let geoIPResolver: GeoIPResolver
+    private let geoSiteResolver: GeoSiteResolver?
+    private let asnResolver: ASNResolver?
     private let dnsPipeline: DNSPipeline
     private var proxyPool: TransportConnectionPool
     private var directPool: TransportConnectionPool
@@ -29,11 +31,15 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         proxyDialer: any TransportDialer,
         directDialer: any TransportDialer,
         geoIPResolver: GeoIPResolver = .none,
+        geoSiteResolver: GeoSiteResolver? = nil,
+        asnResolver: ASNResolver? = nil,
         dnsPipeline: DNSPipeline
     ) {
         self.proxyDialer = proxyDialer
         self.directDialer = directDialer
         self.geoIPResolver = geoIPResolver
+        self.geoSiteResolver = geoSiteResolver
+        self.asnResolver = asnResolver
         self.dnsPipeline = dnsPipeline
         self.proxyPool = TransportConnectionPool(dialer: proxyDialer)
         self.directPool = TransportConnectionPool(dialer: directDialer)
@@ -261,7 +267,9 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         let engine = RuleEngine(
             rules: profile.config.rules,
             ruleSets: ruleSetRules,
-            geoIPResolver: geoIPResolver
+            geoIPResolver: geoIPResolver,
+            geoSiteResolver: geoSiteResolver,
+            asnResolver: asnResolver
         )
         return engine.resolve(target: ruleTarget)
     }

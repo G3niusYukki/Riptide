@@ -142,6 +142,8 @@ public enum MihomoConfigGenerator {
             return "trojan"
         case .hysteria2:
             return "hysteria2"
+        case .snell:
+            return "snell"
         case .http:
             return "http"
         case .socks5:
@@ -236,6 +238,14 @@ public enum MihomoConfigGenerator {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
             }
 
+        case .snell:
+            if let password = proxy.password {
+                lines.append("    password: \(yamlEscape(password))")
+            }
+            if let version = proxy.snellVersion {
+                lines.append("    version: \(version)")
+            }
+
         case .relay:
             if let chainProxyName = proxy.chainProxyName {
                 lines.append("    relay: \(yamlEscape(chainProxyName))")
@@ -297,6 +307,12 @@ public enum MihomoConfigGenerator {
 
         case .ruleSet(let name, let policy):
             return "RULE-SET,\(yamlEscape(name)),\(mihomoPolicyString(for: policy))"
+
+        case .not(let ruleType, let value, let policy):
+            return "NOT,\(ruleType),\(yamlEscape(value)),\(mihomoPolicyString(for: policy))"
+
+        case .reject:
+            return "REJECT"
 
         case .matchAll:
             // matchAll is typically rendered as MATCH,DIRECT by convention

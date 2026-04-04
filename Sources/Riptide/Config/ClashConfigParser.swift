@@ -201,6 +201,19 @@ public enum ClashConfigParser {
                     port: port,
                     chainProxyName: chainName
                 )
+
+            case .snell:
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "psk is required for Snell")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .snell,
+                    server: proxy.server,
+                    port: port,
+                    password: password,
+                    snellVersion: proxy.snellVersion
+                )
             }
         }
     }
@@ -223,6 +236,8 @@ public enum ClashConfigParser {
             return .hysteria2
         case "relay":
             return .relay
+        case "snell":
+            return .snell
         default:
             throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type: \(rawType ?? "nil")")
         }
@@ -338,6 +353,19 @@ public enum ClashConfigParser {
                     countryCode: parts[1].uppercased(),
                     policy: try parsePolicy(parts[2], knownProxies: knownProxies)
                 )
+
+            case "NOT":
+                guard parts.count == 4 else {
+                    throw ClashConfigError.invalidRule(index: index, reason: "NOT requires rule-type, value, and policy")
+                }
+                return .not(
+                    ruleType: parts[1],
+                    value: parts[2],
+                    policy: try parsePolicy(parts[3], knownProxies: knownProxies)
+                )
+
+            case "REJECT":
+                return .reject
 
             case "MATCH", "FINAL":
                 guard parts.count == 2 else {
@@ -713,6 +741,7 @@ private struct ClashRawProxy: Decodable {
     let wsOpts: WSOpts?
     let grpcOpts: GRPCOpts?
     let chain: String?
+    let snellVersion: Int?
 
     struct WSOpts: Codable {
         let path: String?
@@ -733,5 +762,6 @@ private struct ClashRawProxy: Decodable {
         case wsOpts = "ws-opts"
         case grpcOpts = "grpc-opts"
         case chain
+        case snellVersion = "version"
     }
 }

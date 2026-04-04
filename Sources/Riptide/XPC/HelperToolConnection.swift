@@ -172,6 +172,68 @@ public actor HelperToolConnection {
         }
     }
 
+    // MARK: - System Proxy Control
+
+    /// Enables system-wide proxy via the helper tool.
+    public func enableSystemProxy(service: String, httpPort: Int, socksPort: Int) async -> Error? {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            return ConnectionError.notInstalled
+        }
+
+        return await withCheckedContinuation { continuation in
+            wrapper.proxy.enableSystemProxy(service: service, httpPort: httpPort, socksPort: socksPort) { error in
+                continuation.resume(returning: error)
+            }
+        }
+    }
+
+    /// Disables system-wide proxy via the helper tool.
+    public func disableSystemProxy(service: String) async -> Error? {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            return ConnectionError.notInstalled
+        }
+
+        return await withCheckedContinuation { continuation in
+            wrapper.proxy.disableSystemProxy(service: service) { error in
+                continuation.resume(returning: error)
+            }
+        }
+    }
+
+    /// Queries the current system proxy state via the helper tool.
+    public func querySystemProxyState(service: String) async -> (String?, Error?) {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            return (nil, ConnectionError.notInstalled)
+        }
+
+        return await withCheckedContinuation { continuation in
+            wrapper.proxy.querySystemProxyState(service: service) { json, error in
+                continuation.resume(returning: (json, error))
+            }
+        }
+    }
+
+    /// Auto-detects the primary network service.
+    public func detectNetworkService() async -> (String?, Error?) {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            return (nil, ConnectionError.notInstalled)
+        }
+
+        return await withCheckedContinuation { continuation in
+            wrapper.proxy.detectNetworkService { service, error in
+                continuation.resume(returning: (service, error))
+            }
+        }
+    }
+
     /// Disconnects from the helper tool and cleans up resources.
     public func disconnect() async {
         proxyWrapper = nil

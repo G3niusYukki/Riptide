@@ -162,8 +162,10 @@ extension ProxyRule {
         case .geoSite: return "GEOSITE"
         case .ruleSet: return "RULE-SET"
         case .script: return "SCRIPT"
+        case .not: return "NOT"
         case .matchAll: return "MATCH"
         case .final: return "FINAL"
+        case .reject: return "REJECT"
         }
     }
 
@@ -183,8 +185,10 @@ extension ProxyRule {
         case .geoSite(let c, let cat, _): return "\(c),\(cat)"
         case .ruleSet(let n, _): return n
         case .script(let code, _): return String(code.prefix(30)) + "..."
+        case .not(let ruleType, let value, _): return "\(ruleType) \(value)"
         case .matchAll: return "*"
         case .final: return "FINAL"
+        case .reject: return "REJECT"
         }
     }
 }

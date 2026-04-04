@@ -133,6 +133,9 @@ public struct EditableProxyNode: Equatable, Sendable {
         case .hysteria2:
             node.port = 443
 
+        case .snell:
+            node.port = 6100
+
         case .http, .socks5:
             node.port = kind == .http ? 8080 : 1080
 
@@ -203,6 +206,16 @@ public struct ProxyFieldRequirements {
                 requiresPassword: true,
                 requiresUUID: false,
                 requiresSNI: true,
+                supportsNetwork: false,
+                supportsWebSocket: false
+            )
+
+        case .snell:
+            return ProxyFieldRequirements(
+                requiresCipher: false,
+                requiresPassword: true,
+                requiresUUID: false,
+                requiresSNI: false,
                 supportsNetwork: false,
                 supportsWebSocket: false
             )

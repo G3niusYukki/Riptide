@@ -231,6 +231,7 @@ public actor ExternalController {
         case .vless: return "VLESS"
         case .trojan: return "Trojan"
         case .hysteria2: return "Hysteria2"
+        case .snell: return "Snell"
         case .relay: return "Relay"
         }
     }
@@ -251,6 +252,8 @@ public actor ExternalController {
         case .geoSite: return "GEOSITE"
         case .ruleSet: return "RULE-SET"
         case .script: return "SCRIPT"
+        case .not: return "NOT"
+        case .reject: return "REJECT"
         case .matchAll: return "MATCH"
         case .final: return "FINAL"
         }
@@ -272,6 +275,8 @@ public actor ExternalController {
         case .geoSite(let c, let cat, _): return "\(c),\(cat)"
         case .ruleSet(let n, _): return n
         case .script(let code, _): return code.prefix(50) + "..."
+        case .not(let ruleType, let value, _): return "\(ruleType),\(value)"
+        case .reject: return "*"
         case .matchAll: return "*"
         case .final: return ""
         }

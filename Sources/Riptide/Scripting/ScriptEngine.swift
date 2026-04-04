@@ -18,8 +18,14 @@ public enum ScriptType: String, Sendable {
     case ruleProvider = "rule-provider"
 }
 
+// Wrapper for JSContext to allow @unchecked Sendable
+private final class JSContextWrapper: @unchecked Sendable {
+    let context: JSContext
+    init(_ context: JSContext) { self.context = context }
+}
+
 public actor ScriptEngine {
-    private var contexts: [String: JSValue]
+    private var contexts: [String: JSContextWrapper]
 
     public init() {
         self.contexts = [:]
@@ -28,29 +34,68 @@ public actor ScriptEngine {
     @discardableResult
     public func loadScript(_ context: ScriptContext) throws -> String {
         let vm = JSVirtualMachine()
-        let jsContext = JSContext(virtualMachine: vm)
+        guard let jsContext = JSContext(virtualMachine: vm) else {
+            throw ScriptError.compilationFailed("failed to create JSContext")
+        }
 
-        jsContext?.evaluateScript(context.source)
-        if let exception = jsContext?.exception {
+        jsContext.evaluateScript(context.source)
+        if let exception = jsContext.exception {
             throw ScriptError.compilationFailed(exception.toString() ?? "unknown error")
         }
 
-        let value = JSValue(object: jsContext?.globalObject, in: jsContext)
-        contexts[context.name] = value
+        let wrapper = JSContextWrapper(jsContext)
+        contexts[context.name] = wrapper
         return context.name
     }
 
     public func executeRequestModify(scriptName: String, requestHeaders: [String: String]) throws -> [String: String] {
-        guard contexts[scriptName] != nil else {
+        guard let wrapper = contexts[scriptName] else {
             throw ScriptError.runtimeError("script not loaded: \(scriptName)")
         }
-        return requestHeaders
+
+        let jsContext = wrapper.context
+        let nsHeaders = NSDictionary(dictionary: requestHeaders)
+
+        let jsRequest = NSMutableDictionary(dictionary: nsHeaders)
+        jsContext.setObject(jsRequest, forKeyedSubscript: "request" as NSCopying & NSObjectProtocol)
+
+        let result = jsContext.evaluateScript("handleRequestModify(request)")
+        if let exception = jsContext.exception {
+            throw ScriptError.runtimeError(exception.toString() ?? "unknown error")
+        }
+
+        guard let jsResult = result as? NSDictionary else {
+            return requestHeaders
+        }
+
+        // Safe type conversion
+        var output: [String: String] = [:]
+        for (key, value) in jsResult {
+            if let keyStr = key as? String, let valStr = value as? String {
+                output[keyStr] = valStr
+            }
+        }
+        return output.isEmpty ? requestHeaders : output
     }
 
     public func executeResponseModify(scriptName: String, responseBody: Data) throws -> Data {
-        guard contexts[scriptName] != nil else {
+        guard let wrapper = contexts[scriptName] else {
             throw ScriptError.runtimeError("script not loaded: \(scriptName)")
         }
+
+        let jsContext = wrapper.context
+
+        jsContext.setObject(responseBody, forKeyedSubscript: "response" as NSCopying & NSObjectProtocol)
+
+        let result = jsContext.evaluateScript("handleResponseModify(response)")
+        if let exception = jsContext.exception {
+            throw ScriptError.runtimeError(exception.toString() ?? "unknown error")
+        }
+
+        if let jsResult = result as? Data {
+            return jsResult
+        }
+
         return responseBody
     }
 

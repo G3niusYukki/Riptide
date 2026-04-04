@@ -103,6 +103,11 @@ public actor ProxyNodeValidator {
                 errors.append("Hysteria2 requires a password")
             }
 
+        case .snell:
+            if node.password == nil || node.password?.isEmpty == true {
+                errors.append("Snell requires a password")
+            }
+
         case .http, .socks5, .relay:
             // No additional required fields
             break
