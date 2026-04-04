@@ -1,28 +1,29 @@
 import SwiftUI
+import Riptide
 
 struct LogTabView: View {
     @Bindable var vm: AppViewModel
     @State private var searchText = ""
-    @State private var selectedLevel: LogLevel? = nil
+    @State private var selectedLevel: Riptide.LogLevel? = nil
 
-    private var effectiveLevel: LogLevel? {
-        selectedLevel == nil ? nil : (selectedLevel == .all ? nil : selectedLevel)
+    private var effectiveLevel: Riptide.LogLevel? {
+        selectedLevel
     }
 
-    private var filteredLogs: [LogEntry] {
+    private var filteredLogs: [Riptide.LogEntry] {
         vm.logEntries.filter { entry in
-            let matchesLevel = effectiveLevel == nil || entry.level == effectiveLevel
+            let matchesLevel = effectiveLevel == nil || entry.level.rawValue >= (effectiveLevel?.rawValue ?? 0)
             let matchesSearch = searchText.isEmpty || entry.message.localizedCaseInsensitiveContains(searchText)
             return matchesLevel && matchesSearch
         }
     }
 
-    private func levelColor(_ level: LogLevel) -> Color {
+    private func levelColor(_ level: Riptide.LogLevel) -> Color {
         switch level {
+        case .debug: return Color.gray
         case .info: return Theme.accent
-        case .warn: return Color.yellow
+        case .warning: return Color.yellow
         case .error: return Theme.danger
-        case .all: return Theme.subtext
         }
     }
 
@@ -31,9 +32,9 @@ struct LogTabView: View {
             // Filters
             HStack {
                 Picker("级别", selection: $selectedLevel) {
-                    Text("全部").tag(LogLevel?.none)
-                    ForEach([LogLevel.info, .warn, .error], id: \.self) { level in
-                        Text(level.rawValue.uppercased()).tag(Optional(level))
+                    Text("全部").tag(Riptide.LogLevel?.none)
+                    ForEach([Riptide.LogLevel.debug, .info, .warning, .error], id: \.self) { level in
+                        Text(level.displayName).tag(Optional(level))
                     }
                 }
                 .pickerStyle(.segmented)
@@ -64,10 +65,10 @@ struct LogTabView: View {
                         } else {
                             ForEach(filteredLogs) { entry in
                                 HStack(alignment: .top, spacing: 8) {
-                                    Text("[\(entry.level.rawValue.uppercased())]")
+                                    Text("[\(entry.level.displayName)]")
                                         .font(.system(.caption, design: .monospaced))
                                         .foregroundStyle(levelColor(entry.level))
-                                        .frame(width: 50, alignment: .leading)
+                                        .frame(width: 70, alignment: .leading)
                                     Text(entry.timestamp, style: .time)
                                         .font(.system(.caption2, design: .monospaced))
                                         .foregroundStyle(Theme.subtext)
