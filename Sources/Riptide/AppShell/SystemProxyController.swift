@@ -19,13 +19,13 @@ public enum SystemProxyError: Error, Equatable, Sendable {
 /// Protocol-backed so test doubles can be injected without mutating the real system.
 public protocol SystemProxyControlling: Sendable {
     /// Enable the system proxy with the given HTTP and SOCKS5 ports.
-    func enable(httpPort: Int, socksPort: Int?) throws
+    func enable(httpPort: Int, socksPort: Int?) async throws
 
     /// Disable the system proxy.
-    func disable() throws
+    func disable() async throws
 
     /// Query the current system proxy state.
-    func currentState() throws -> SystemProxyState
+    func currentState() -> SystemProxyState
 }
 
 // MARK: - macOS Implementation via XPC Helper
@@ -68,44 +68,48 @@ public final class macOSSystemProxyController: SystemProxyControlling, @unchecke
 
     // MARK: - SystemProxyControlling
 
-    public func enable(httpPort: Int, socksPort: Int?) throws {
-        let service = try resolveNetworkService()
+    public func enable(httpPort: Int, socksPort: Int?) async throws {
+        let service = try await resolveNetworkService()
 
-        Task {
-            await helperConnection.enableSystemProxy(
-                service: service,
-                httpPort: httpPort,
-                socksPort: socksPort ?? 0
-            )
+        if let error = await helperConnection.enableSystemProxy(
+            service: service,
+            httpPort: httpPort,
+            socksPort: socksPort ?? 0
+        ) {
+            throw SystemProxyError.unknown(error.localizedDescription)
         }
 
         state = .enabled(httpPort: httpPort, socksPort: socksPort)
     }
 
-    public func disable() throws {
-        let service = try resolveNetworkService()
+    public func disable() async throws {
+        let service = try await resolveNetworkService()
 
-        Task {
-            await helperConnection.disableSystemProxy(service: service)
-        }
+        await helperConnection.disableSystemProxy(service: service)
 
         state = .disabled
     }
 
-    public func currentState() throws -> SystemProxyState {
+    public func currentState() -> SystemProxyState {
         state
     }
 
     // MARK: - Private
 
-    /// Resolve the active network service, using cache or auto-detection.
-    private func resolveNetworkService() throws -> String {
+    /// Resolve the active network service, using cache or auto-detection via the helper.
+    private func resolveNetworkService() async throws -> String {
         if let cached = cachedService {
             return cached
         }
 
-        // Fallback: use a reasonable default.
-        // In production, this would be detected via the helper tool.
+        // Try to detect via helper first
+        let (detected, _) = await helperConnection.detectNetworkService()
+        if let detected {
+            cachedService = detected
+            return detected
+        }
+
+        // Fallback: use a reasonable default
         cachedService = "Wi-Fi"
         return cachedService!
     }
@@ -119,15 +123,15 @@ public final class MockSystemProxyController: SystemProxyControlling, @unchecked
 
     public init() {}
 
-    public func enable(httpPort: Int, socksPort: Int?) throws {
+    public func enable(httpPort: Int, socksPort: Int?) async throws {
         _state = .enabled(httpPort: httpPort, socksPort: socksPort)
     }
 
-    public func disable() throws {
+    public func disable() async throws {
         _state = .disabled
     }
 
-    public func currentState() throws -> SystemProxyState {
+    public func currentState() -> SystemProxyState {
         _state
     }
 }
@@ -136,15 +140,15 @@ public final class MockSystemProxyController: SystemProxyControlling, @unchecked
 public final class FailingSystemProxyController: SystemProxyControlling, @unchecked Sendable {
     public init() {}
 
-    public func enable(httpPort: Int, socksPort: Int?) throws {
+    public func enable(httpPort: Int, socksPort: Int?) async throws {
         throw SystemProxyError.permissionDenied
     }
 
-    public func disable() throws {
+    public func disable() async throws {
         // no-op
     }
 
-    public func currentState() throws -> SystemProxyState {
+    public func currentState() -> SystemProxyState {
         .disabled
     }
 }

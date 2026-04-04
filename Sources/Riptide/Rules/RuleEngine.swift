@@ -151,8 +151,7 @@ public struct RuleEngine: Sendable {
         case .geoSite(let code, let category, let policy):
             guard let domain = target.domain else { return nil }
             guard let resolver = geoSiteResolver else { return nil }
-            let _ = category
-            return resolver.matchesWithSuffix(domain: domain, code: code) ? policy : nil
+            return resolver.matchesWithSuffix(domain: domain, code: code, category: category) ? policy : nil
 
         case .ruleSet(_, let policy):
             return policy

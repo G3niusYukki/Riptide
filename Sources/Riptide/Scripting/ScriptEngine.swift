@@ -34,14 +34,16 @@ public actor ScriptEngine {
     @discardableResult
     public func loadScript(_ context: ScriptContext) throws -> String {
         let vm = JSVirtualMachine()
-        let jsContext = JSContext(virtualMachine: vm)
+        guard let jsContext = JSContext(virtualMachine: vm) else {
+            throw ScriptError.compilationFailed("failed to create JSContext")
+        }
 
-        jsContext?.evaluateScript(context.source)
-        if let exception = jsContext?.exception {
+        jsContext.evaluateScript(context.source)
+        if let exception = jsContext.exception {
             throw ScriptError.compilationFailed(exception.toString() ?? "unknown error")
         }
 
-        let wrapper = JSContextWrapper(jsContext!)
+        let wrapper = JSContextWrapper(jsContext)
         contexts[context.name] = wrapper
         return context.name
     }
@@ -66,7 +68,14 @@ public actor ScriptEngine {
             return requestHeaders
         }
 
-        return jsResult as! [String: String]
+        // Safe type conversion
+        var output: [String: String] = [:]
+        for (key, value) in jsResult {
+            if let keyStr = key as? String, let valStr = value as? String {
+                output[keyStr] = valStr
+            }
+        }
+        return output.isEmpty ? requestHeaders : output
     }
 
     public func executeResponseModify(scriptName: String, responseBody: Data) throws -> Data {

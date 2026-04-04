@@ -195,9 +195,10 @@ public final class SnellStream {
     // MARK: - Encryption (v3)
 
     private func encryptPayload(_ data: Data) throws -> Data {
-        // Derive key from password using SHA256
+        // Derive 32-byte key from password using SHA256
         let keyData = password.data(using: .utf8) ?? Data()
-        let symmetricKey = SymmetricKey(data: keyData)
+        let hash = SHA256.hash(data: keyData)
+        let symmetricKey = SymmetricKey(data: hash)
 
         // Generate nonce (12 bytes for ChaCha20-Poly1305)
         var nonce = [UInt8](repeating: 0, count: 12)
@@ -206,9 +207,8 @@ public final class SnellStream {
         }
 
         let seal = try ChaChaPoly.seal(data, using: symmetricKey, nonce: ChaChaPoly.Nonce(data: Data(nonce)))
-        var result = Data(nonce)
-        result.append(seal.combined)
-        return result
+        // seal.combined already contains nonce + ciphertext + tag
+        return seal.combined
     }
 
     private func decryptPayload(_ data: Data) throws -> Data {
@@ -216,15 +216,16 @@ public final class SnellStream {
             throw SnellError.decryptionFailed("data too short")
         }
 
+        // seal.combined format: nonce (12 bytes) + ciphertext + tag (16 bytes)
         let nonce = data.prefix(12)
-        let ciphertext = data.suffix(from: 12)
+        let ciphertextWithTag = data.suffix(from: 12)
 
         let keyData = password.data(using: .utf8) ?? Data()
-        let symmetricKey = SymmetricKey(data: keyData)
+        let hash = SHA256.hash(data: keyData)
+        let symmetricKey = SymmetricKey(data: hash)
 
-        let sealedBox = try ChaChaPoly.SealedBox(combined: ciphertext)
-        let decrypted = try ChaChaPoly.open(sealedBox, using: symmetricKey)
-        return decrypted
+        let sealedBox = try ChaChaPoly.SealedBox(combined: Data(nonce) + ciphertextWithTag)
+        return try ChaChaPoly.open(sealedBox, using: symmetricKey)
     }
 
     // MARK: - Helpers

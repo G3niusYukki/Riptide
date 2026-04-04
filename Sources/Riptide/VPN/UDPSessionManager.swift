@@ -131,7 +131,7 @@ public actor UDPSessionManager {
         }
 
         // Create new UDP session
-        guard sessions.count < maxSessions else {
+        guard sessions.count + tunnelSessions.count < maxSessions else {
             throw UDPSessionManagerError.sessionLimitReached
         }
 
@@ -159,7 +159,7 @@ public actor UDPSessionManager {
         var tunnelSession = tunnelSessions[sessionID]
 
         if tunnelSession == nil {
-            guard sessions.count < maxSessions else {
+            guard sessions.count + tunnelSessions.count < maxSessions else {
                 throw UDPSessionManagerError.sessionLimitReached
             }
 
@@ -171,11 +171,18 @@ public actor UDPSessionManager {
                 relayMode: .socks5UDP
             )
 
-            // Establish the UDP relay
+            // Establish the UDP relay (proxyNode will be resolved by the caller if needed)
             try await session.establish(proxyConnector: proxyConnector)
 
             tunnelSessions[sessionID] = session
             tunnelSession = session
+
+            // Start cleanup task for this tunnel session
+            let task = Task {
+                try? await Task.sleep(for: sessionTimeout)
+                await cleanupTunnelSession(id: sessionID)
+            }
+            cleanupTasks[sessionID] = task
         }
 
         guard let currentSession = tunnelSession else {
@@ -207,9 +214,8 @@ public actor UDPSessionManager {
                 await session.close()
             }
         }
-        for (id, tunnelSession) in tunnelSessions {
+        for tunnelSession in tunnelSessions.values {
             await tunnelSession.close()
-            _ = id
         }
         sessions.removeAll()
         tunnelSessions.removeAll()
@@ -235,6 +241,14 @@ public actor UDPSessionManager {
             await session.close()
         }
         sessions.removeValue(forKey: id)
+    }
+
+    private func cleanupTunnelSession(id: UDPSessionID) async {
+        cleanupTasks[id]?.cancel()
+        cleanupTasks.removeValue(forKey: id)
+        if let tunnelSession = tunnelSessions.removeValue(forKey: id) {
+            await tunnelSession.close()
+        }
     }
 
     private func resetSessionTimeout(sessionID: UDPSessionID) {

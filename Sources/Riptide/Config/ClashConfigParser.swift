@@ -762,6 +762,6 @@ private struct ClashRawProxy: Decodable {
         case wsOpts = "ws-opts"
         case grpcOpts = "grpc-opts"
         case chain
-        case snellVersion = "obfs-version"
+        case snellVersion = "version"
     }
 }

@@ -48,20 +48,31 @@ public struct ConfigMerger: Sendable {
     private static func parseRule(parts: [String]) -> ProxyRule? {
         guard parts.count >= 3 else { return nil }
         let ruleType = parts[0].uppercased()
+        let policyName = parts[2]
+        let policy = parsePolicy(policyName)
 
         switch ruleType {
         case "DOMAIN":
-            return .domain(domain: parts[1], policy: .direct)
+            return .domain(domain: parts[1], policy: policy)
         case "DOMAIN-SUFFIX":
-            return .domainSuffix(suffix: parts[1], policy: .direct)
+            return .domainSuffix(suffix: parts[1], policy: policy)
         case "DOMAIN-KEYWORD":
-            return .domainKeyword(keyword: parts[1], policy: .direct)
+            return .domainKeyword(keyword: parts[1], policy: policy)
         case "REJECT":
             return .reject
         case "MATCH", "FINAL":
-            return .final(policy: .direct)
+            return .final(policy: policy)
         default:
             return nil
+        }
+    }
+
+    private static func parsePolicy(_ name: String) -> RoutingPolicy {
+        switch name.uppercased() {
+        case "DIRECT": return .direct
+        case "PROXY": return .proxyNode(name: "PROXY")
+        case "REJECT": return .reject
+        default: return .proxyNode(name: name)
         }
     }
 }

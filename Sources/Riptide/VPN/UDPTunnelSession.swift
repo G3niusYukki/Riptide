@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// A UDP tunnel session that forwards UDP datagrams through a proxy.
 ///
@@ -38,6 +39,7 @@ public actor UDPTunnelSession {
     private var relayConnection: (any TransportSession)?
     private var socks5UDPRelayAddress: String?
     private var socks5UDPRelayPort: UInt16?
+    private var udpRelayConnection: NWConnection?
     private var isClosed: Bool
     private var lastActivity: ContinuousClock.Instant
 
@@ -59,7 +61,8 @@ public actor UDPTunnelSession {
 
     /// Establish the UDP relay connection.
     /// For SOCKS5 UDP, this performs the UDP Associate handshake.
-    public func establish(proxyConnector: ProxyConnector) async throws {
+    /// - Parameter proxyNode: The routing-selected proxy node to use.
+    public func establish(proxyConnector: ProxyConnector, proxyNode: ProxyNode? = nil) async throws {
         guard !isClosed else {
             throw SessionError.sessionClosed
         }
@@ -67,23 +70,15 @@ public actor UDPTunnelSession {
         switch relayMode {
         case .direct:
             // Direct UDP — no encapsulation needed
-            // In a full TUN implementation, this would create a NWConnection to the target
             break
 
         case .socks5UDP:
             // SOCKS5 UDP Associate handshake
-            // 1. Connect to the SOCKS5 proxy
-            // 2. Send UDP ASSOCIATE request
-            // 3. Receive relay address/port
-            // 4. Create a separate UDP relay connection to the relay endpoint
-
-            try await performSocks5UDPAssociate(proxyConnector: proxyConnector)
+            try await performSocks5UDPAssociate(proxyConnector: proxyConnector, proxyNode: proxyNode)
         }
     }
 
     /// Forward a UDP datagram through the relay.
-    /// - Parameter data: The raw UDP payload (after IP/UDP headers).
-    /// - Returns: The response UDP payload.
     public func forward(_ data: Data) async throws -> Data {
         guard !isClosed else {
             throw SessionError.sessionClosed
@@ -93,12 +88,9 @@ public actor UDPTunnelSession {
 
         switch relayMode {
         case .direct:
-            // Direct forwarding — in a real implementation this would use NWConnection
-            // For now, this is a placeholder
-            return Data()
+            return try await forwardDirect(data)
 
         case .socks5UDP:
-            // Encapsulate in SOCKS5 UDP datagram and send to relay endpoint
             return try await forwardViaSocks5UDP(data)
         }
     }
@@ -108,6 +100,8 @@ public actor UDPTunnelSession {
         guard !isClosed else { return }
         isClosed = true
         relayConnection = nil
+        udpRelayConnection?.cancel()
+        udpRelayConnection = nil
         socks5UDPRelayAddress = nil
         socks5UDPRelayPort = nil
     }
@@ -122,49 +116,74 @@ public actor UDPTunnelSession {
         ContinuousClock.now - lastActivity
     }
 
+    // MARK: - Direct UDP
+
+    private func forwardDirect(_ data: Data) async throws -> Data {
+        // Create a direct NWConnection to the target
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host(sessionID.dstIP),
+            port: NWEndpoint.Port(rawValue: sessionID.dstPort)!
+        )
+
+        let connection = NWConnection(to: endpoint, using: .udp)
+        return try await withCheckedThrowingContinuation { continuation in
+            connection.stateUpdateHandler = { state in
+                if case .ready = state {
+                    connection.send(content: data, completion: .contentProcessed { error in
+                        if let error {
+                            continuation.resume(throwing: SessionError.sendFailed(error.localizedDescription))
+                            return
+                        }
+                        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, _, _ in
+                            if let content {
+                                continuation.resume(returning: content)
+                            } else {
+                                continuation.resume(throwing: SessionError.receiveFailed("empty response"))
+                            }
+                        }
+                    })
+                } else if case .failed(let error) = state {
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: SessionError.connectionFailed(error.localizedDescription))
+                }
+            }
+            connection.start(queue: .global())
+        }
+    }
+
     // MARK: - SOCKS5 UDP Associate
 
     /// Perform SOCKS5 UDP Associate handshake.
-    /// This establishes a UDP relay endpoint on the proxy server.
-    private func performSocks5UDPAssociate(proxyConnector: ProxyConnector) async throws {
-        // Step 1: Connect to the SOCKS5 proxy
-        // The proxy connector handles the TCP connection to the proxy
-        let proxyNode = ProxyNode(
+    /// Uses the routing-selected proxy node (or defaults to target server as SOCKS5).
+    private func performSocks5UDPAssociate(proxyConnector: ProxyConnector, proxyNode: ProxyNode?) async throws {
+        // Use the provided proxy node, or fall back to treating the target as a SOCKS5 proxy
+        let actualProxyNode = proxyNode ?? ProxyNode(
             name: "UDP_RELAY",
             kind: .socks5,
-            server: sessionID.dstIP,
-            port: Int(sessionID.dstPort)
+            server: target.host,
+            port: target.port
         )
 
-        let context = try await proxyConnector.connect(via: proxyNode, to: target)
+        // Connect via the proxy to establish the TCP control channel
+        let context = try await proxyConnector.connect(via: actualProxyNode, to: target)
         relayConnection = context.connection.session
 
-        // Step 2: Send UDP ASSOCIATE command
-        // SOCKS5 UDP ASSOCIATE:
-        //   VER (1) | CMD (1) | RSV (1) | ATYP (1) | DST.ADDR (var) | DST.PORT (2)
-        //   VER = 0x05 (SOCKS5)
-        //   CMD = 0x03 (UDP ASSOCIATE)
-        //   RSV = 0x00
-        //   ATYP = 0x01 (IPv4) / 0x03 (domain) / 0x04 (IPv6)
-        // The DST.ADDR/DST.PORT is the address the client expects UDP datagrams from
-
+        // Build UDP ASSOCIATE request
         var associateRequest = Data()
         associateRequest.append(0x05)  // VER
         associateRequest.append(0x03)  // CMD = UDP ASSOCIATE
         associateRequest.append(0x00)  // RSV
 
-        // Use the client's IP:port as the association target
-        // For TUN, this is the TUN client's address
         let clientIP = sessionID.srcIP
         let clientPort = sessionID.srcPort
 
         if let _ = IPv4AddressParser.parse(clientIP) {
             associateRequest.append(0x01)  // ATYP = IPv4
-            let ipBytes = clientIP.split(separator: ".").compactMap { UInt8($0) }
+            let ipBytes = clientIP.split(separator: ".").compactMap { UInt8($0, radix: 10) ?? 0 }
             associateRequest.append(contentsOf: ipBytes)
         } else {
-            associateRequest.append(0x01)  // Default to IPv4
-            associateRequest.append(contentsOf: [0, 0, 0, 0])  // 0.0.0.0
+            associateRequest.append(0x01)
+            associateRequest.append(contentsOf: [0, 0, 0, 0])
         }
         associateRequest.append(UInt8(clientPort >> 8))
         associateRequest.append(UInt8(clientPort & 0xFF))
@@ -172,13 +191,12 @@ public actor UDPTunnelSession {
         // Send the request
         try await relayConnection?.send(associateRequest)
 
-        // Step 3: Receive the response
+        // Receive the response
         let response = try await relayConnection?.receive() ?? Data()
         guard response.count >= 10 else {
             throw SessionError.connectionFailed("invalid UDP ASSOCIATE response")
         }
 
-        // Parse response
         let version = response[0]
         let replyCode = response[1]
         guard version == 0x05 else {
@@ -204,8 +222,12 @@ public actor UDPTunnelSession {
             guard offset + 16 <= response.count else {
                 throw SessionError.connectionFailed("truncated IPv6 in response")
             }
-            // Simplified IPv6 handling
-            socks5UDPRelayAddress = "::1"
+            var ipv6Parts: [String] = []
+            for i in 0..<8 {
+                let part = String(format: "%02x%02x", response[offset + i * 2], response[offset + i * 2 + 1])
+                ipv6Parts.append(part)
+            }
+            socks5UDPRelayAddress = ipv6Parts.joined(separator: ":")
             offset += 16
 
         case 0x03:  // Domain
@@ -221,40 +243,72 @@ public actor UDPTunnelSession {
             throw SessionError.connectionFailed("invalid ATYP in response")
         }
 
-        // Parse relay port
         guard offset + 2 <= response.count else {
             throw SessionError.connectionFailed("truncated port in response")
         }
         socks5UDPRelayPort = UInt16(response[offset]) << 8 | UInt16(response[offset + 1])
 
-        // Note: In a full implementation, we would now establish a separate
-        // UDP connection to the relay address/port for actual datagram forwarding.
-        // For now, the TCP connection serves as the control channel.
+        // Establish a separate UDP connection to the relay endpoint
+        try await establishUDPRelayConnection()
     }
 
-    /// Forward data via SOCKS5 UDP relay.
-    private func forwardViaSocks5UDP(_ data: Data) async throws -> Data {
-        // SOCKS5 UDP datagram format:
-        //   RSV (2) | FRAG (1) | ATYP (1) | DST.ADDR (var) | DST.PORT (2) | DATA
-        // The encapsulated datagram is sent to the relay endpoint obtained during UDP ASSOCIATE
+    /// Establish a UDP connection to the SOCKS5 relay endpoint.
+    private func establishUDPRelayConnection() async throws {
+        guard let relayHost = socks5UDPRelayAddress,
+              let relayPort = socks5UDPRelayPort,
+              let port = NWEndpoint.Port(rawValue: relayPort) else {
+            throw SessionError.connectionFailed("invalid relay endpoint")
+        }
 
-        guard socks5UDPRelayAddress != nil,
-              socks5UDPRelayPort != nil else {
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(relayHost), port: port)
+        let connection = NWConnection(to: endpoint, using: .udp)
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume()
+                case .failed(let error):
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: SessionError.connectionFailed(error.localizedDescription))
+                case .cancelled:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: SessionError.sessionClosed)
+                default:
+                    break
+                }
+            }
+            connection.start(queue: .global())
+        }
+
+        udpRelayConnection = connection
+    }
+
+    /// Forward data via SOCKS5 UDP relay using the separate UDP connection.
+    private func forwardViaSocks5UDP(_ data: Data) async throws -> Data {
+        guard let relayConn = udpRelayConnection,
+              relayConn.state == .ready else {
+            throw SessionError.connectionFailed("UDP relay connection not ready")
+        }
+
+        guard let relayAddr = socks5UDPRelayAddress,
+              let relayPort = socks5UDPRelayPort else {
             throw SessionError.connectionFailed("UDP relay endpoint not established")
         }
 
         // Build the SOCKS5 UDP datagram
         var udpDatagram = Data()
         udpDatagram.append(contentsOf: [0x00, 0x00])  // RSV
-        udpDatagram.append(0x00)  // FRAG = 0 (no fragmentation)
+        udpDatagram.append(0x00)  // FRAG = 0
 
-        // Destination address (the real target of this UDP packet)
+        // Destination address (the real target)
         let destIP = sessionID.dstIP
         let destPort = sessionID.dstPort
 
         if let _ = IPv4AddressParser.parse(destIP) {
             udpDatagram.append(0x01)  // ATYP = IPv4
-            let ipBytes = destIP.split(separator: ".").compactMap { UInt8($0) }
+            let ipBytes = destIP.split(separator: ".").compactMap { UInt8($0, radix: 10) ?? 0 }
             udpDatagram.append(contentsOf: ipBytes)
         } else {
             udpDatagram.append(0x01)
@@ -266,20 +320,32 @@ public actor UDPTunnelSession {
         // Payload
         udpDatagram.append(data)
 
-        // Send to relay endpoint
-        try await relayConnection?.send(udpDatagram)
-
-        // Receive response (if any)
-        if let responseData = try await relayConnection?.receive() {
-            return parseSocks5UDPDatagram(responseData)
+        // Send via the UDP relay connection (not the TCP control connection)
+        return try await withCheckedThrowingContinuation { continuation in
+            relayConn.send(content: udpDatagram, completion: .contentProcessed { error in
+                if let error {
+                    continuation.resume(throwing: SessionError.sendFailed(error.localizedDescription))
+                    return
+                }
+                // Receive response
+                relayConn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, _, recvError in
+                    if let recvError {
+                        continuation.resume(throwing: SessionError.receiveFailed(recvError.localizedDescription))
+                        return
+                    }
+                    if let content {
+                        let payload = self.parseSocks5UDPDatagram(content)
+                        continuation.resume(returning: payload)
+                    } else {
+                        continuation.resume(returning: Data())
+                    }
+                }
+            })
         }
-
-        return Data()
     }
 
     /// Parse a SOCKS5 UDP datagram response.
     private func parseSocks5UDPDatagram(_ data: Data) -> Data {
-        // Skip the header: RSV(2) + FRAG(1) + ATYP(1) + ADDR(var) + PORT(2)
         guard data.count >= 7 else { return data }
 
         var offset = 3  // Skip RSV + FRAG

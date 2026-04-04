@@ -90,12 +90,24 @@ public struct GeoSiteResolver: Sendable {
         return codes.contains(code.lowercased())
     }
 
-    /// Check if a domain or any of its suffixes matches a site category.
+    /// Check if a domain or any of its suffixes matches a site code and optional category.
     /// For example, `mail.google.com` should match `google.com`'s categories.
-    public func matchesWithSuffix(domain: String, code: String) -> Bool {
+    /// - Parameters:
+    ///   - domain: The domain to check.
+    ///   - code: The site code to match against.
+    ///   - category: Optional category suffix to match (e.g., "cn", "geolocation-!cn").
+    /// - Returns: true if the domain matches the code and (optionally) the category.
+    public func matchesWithSuffix(domain: String, code: String, category: String? = nil) -> Bool {
         var current = domain.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         while !current.isEmpty {
             if matches(domain: current, code: code) {
+                // If a category is specified, also check that the domain has that category
+                if let category {
+                    guard let domainCodes = lookupCodes(forDomain: current) else { return false }
+                    // Check if any of the domain's codes match the category
+                    let categoryMatched = domainCodes.contains { $0.lowercased().contains(category.lowercased()) }
+                    if !categoryMatched { return false }
+                }
                 return true
             }
             // Strip the leftmost label
