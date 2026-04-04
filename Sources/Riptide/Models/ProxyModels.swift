@@ -98,6 +98,7 @@ public enum ProxyRule: Equatable, Sendable {
     case ipASN(asn: Int, policy: RoutingPolicy)
     case geoSite(code: String, category: String, policy: RoutingPolicy)
     case ruleSet(name: String, policy: RoutingPolicy)
+    case script(code: String, policy: RoutingPolicy)
     case matchAll
     case final(policy: RoutingPolicy)
 }

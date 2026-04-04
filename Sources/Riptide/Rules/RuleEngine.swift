@@ -144,6 +144,10 @@ public struct RuleEngine: Sendable {
         case .ruleSet(_, let policy):
             return policy
 
+        case .script(let code, let policy):
+            let engine = RuleScriptEngine(code: code)
+            return engine.evaluate(target: target) ? policy : nil
+
         case .matchAll:
             return .direct
 
