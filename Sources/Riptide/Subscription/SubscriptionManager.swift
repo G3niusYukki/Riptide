@@ -1,5 +1,8 @@
 import Foundation
 
+// MARK: - Subscription Update
+
+/// Result of fetching a subscription
 public struct SubscriptionUpdate: Sendable {
     public let nodes: [ProxyNode]
     public let updatedAt: Date
@@ -12,6 +15,8 @@ public struct SubscriptionUpdate: Sendable {
     }
 }
 
+// MARK: - Subscription Error
+
 public enum SubscriptionError: Error, Sendable {
     case invalidURL
     case fetchFailed(String)
@@ -19,13 +24,176 @@ public enum SubscriptionError: Error, Sendable {
     case noNodes
 }
 
-public actor SubscriptionManager {
-    private var subscriptions: [URL: SubscriptionUpdate]
+// MARK: - Subscription Model
 
-    public init() {
-        self.subscriptions = [:]
+/// Represents a subscription to a remote proxy configuration
+public struct Subscription: Identifiable, Codable, Sendable, Equatable {
+    public let id: UUID
+    public var name: String
+    public var url: String
+    public var autoUpdate: Bool
+    public var updateInterval: TimeInterval  // in seconds, default 1 hour
+    public var lastUpdated: Date?
+    public var lastError: String?
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        url: String,
+        autoUpdate: Bool = true,
+        updateInterval: TimeInterval = 3600,
+        lastUpdated: Date? = nil,
+        lastError: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.autoUpdate = autoUpdate
+        self.updateInterval = updateInterval
+        self.lastUpdated = lastUpdated
+        self.lastError = lastError
     }
 
+    /// Calculates the next update time based on last update and interval
+    /// - Returns: The next update time, or nil if autoUpdate is disabled or never updated
+    public var nextUpdateTime: Date? {
+        guard autoUpdate else { return nil }
+        // If never updated, return nil (meaning update immediately)
+        guard let lastUpdated = lastUpdated else {
+            return nil
+        }
+        return lastUpdated.addingTimeInterval(updateInterval)
+    }
+
+    /// Checks if the subscription needs an update
+    public func needsUpdate(referenceDate: Date = Date()) -> Bool {
+        guard autoUpdate else { return false }
+        guard let nextUpdate = nextUpdateTime else { return true }
+        return referenceDate >= nextUpdate
+    }
+}
+
+// MARK: - Update Result
+
+/// Result of a subscription update operation
+public enum SubscriptionUpdateResult: Equatable, Sendable {
+    case success(proxies: [ProxyNode])
+    case failure(error: String)
+    case noChange
+}
+
+// MARK: - Subscription Manager
+
+/// Actor that manages subscriptions and their updates
+public actor SubscriptionManager {
+    private var subscriptions: [UUID: Subscription] = [:]
+    private let storage: SubscriptionStorage
+
+    public init(storage: SubscriptionStorage = UserDefaultsSubscriptionStorage()) {
+        self.storage = storage
+        // Load saved subscriptions
+        Task {
+            await loadSubscriptions()
+        }
+    }
+
+    // MARK: - CRUD Operations
+
+    /// Adds a new subscription
+    public func addSubscription(
+        name: String,
+        url: String,
+        autoUpdate: Bool = true,
+        interval: TimeInterval = 3600
+    ) -> Subscription {
+        let subscription = Subscription(
+            name: name,
+            url: url,
+            autoUpdate: autoUpdate,
+            updateInterval: interval
+        )
+        subscriptions[subscription.id] = subscription
+        Task {
+            await saveSubscriptions()
+        }
+        return subscription
+    }
+
+    /// Removes a subscription by ID
+    public func removeSubscription(id: UUID) {
+        subscriptions.removeValue(forKey: id)
+        Task {
+            await saveSubscriptions()
+        }
+    }
+
+    /// Returns a subscription by ID
+    public func subscription(id: UUID) -> Subscription? {
+        subscriptions[id]
+    }
+
+    /// Returns all subscriptions
+    public func allSubscriptions() -> [Subscription] {
+        Array(subscriptions.values)
+    }
+
+    /// Updates subscription properties
+    public func updateSubscription(
+        id: UUID,
+        name: String? = nil,
+        url: String? = nil,
+        autoUpdate: Bool? = nil,
+        interval: TimeInterval? = nil
+    ) {
+        guard var subscription = subscriptions[id] else { return }
+
+        if let name = name { subscription.name = name }
+        if let url = url { subscription.url = url }
+        if let autoUpdate = autoUpdate { subscription.autoUpdate = autoUpdate }
+        if let interval = interval { subscription.updateInterval = interval }
+
+        subscriptions[id] = subscription
+        Task {
+            await saveSubscriptions()
+        }
+    }
+
+    /// Records a successful update
+    public func recordUpdateSuccess(id: UUID) {
+        guard var subscription = subscriptions[id] else { return }
+        subscription.lastUpdated = Date()
+        subscription.lastError = nil
+        subscriptions[id] = subscription
+        Task {
+            await saveSubscriptions()
+        }
+    }
+
+    /// Records an update failure
+    public func recordUpdateFailure(id: UUID, error: String) {
+        guard var subscription = subscriptions[id] else { return }
+        subscription.lastError = error
+        subscriptions[id] = subscription
+        Task {
+            await saveSubscriptions()
+        }
+    }
+
+    // MARK: - Update Scheduling
+
+    /// Returns subscriptions that need updating
+    public func subscriptionsNeedingUpdate(referenceDate: Date = Date()) -> [Subscription] {
+        allSubscriptions().filter { $0.needsUpdate(referenceDate: referenceDate) }
+    }
+
+    /// Calculates next update time for a subscription
+    public func nextUpdateTime(for id: UUID) -> Date? {
+        subscription(id: id)?.nextUpdateTime
+    }
+
+    // MARK: - Fetch Operations
+
+    /// Fetches and parses a subscription from a URL
     public func fetchSubscription(url: URL) async throws -> SubscriptionUpdate {
         guard let scheme = url.scheme, scheme == "https" || scheme == "http" else {
             throw SubscriptionError.invalidURL
@@ -56,18 +224,35 @@ public actor SubscriptionManager {
 
         guard !nodes.isEmpty else { throw SubscriptionError.noNodes }
 
-        let update = SubscriptionUpdate(nodes: nodes, source: url)
-        subscriptions[url] = update
-        return update
+        return SubscriptionUpdate(nodes: nodes, source: url)
     }
 
-    public func getSubscription(_ url: URL) -> SubscriptionUpdate? {
-        subscriptions[url]
+    /// Updates a subscription by fetching fresh data
+    public func updateSubscription(id: UUID) async -> SubscriptionUpdateResult {
+        guard let subscription = subscriptions[id] else {
+            return .failure(error: "Subscription not found")
+        }
+
+        guard let url = URL(string: subscription.url) else {
+            return .failure(error: "Invalid URL")
+        }
+
+        do {
+            let update = try await fetchSubscription(url: url)
+            await recordUpdateSuccess(id: id)
+            return .success(proxies: update.nodes)
+        } catch let error as SubscriptionError {
+            let errorMessage = String(describing: error)
+            await recordUpdateFailure(id: id, error: errorMessage)
+            return .failure(error: errorMessage)
+        } catch {
+            let errorMessage = String(describing: error)
+            await recordUpdateFailure(id: id, error: errorMessage)
+            return .failure(error: errorMessage)
+        }
     }
 
-    public func allSubscriptions() -> [URL: SubscriptionUpdate] {
-        subscriptions
-    }
+    // MARK: - Private Methods
 
     private func parseBase64URIList(_ text: String) throws -> [ProxyNode] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,11 +271,11 @@ public actor SubscriptionManager {
             let uri = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard uri.hasPrefix("ss://") || uri.hasPrefix("vmess://") ||
                   uri.hasPrefix("vless://") || uri.hasPrefix("trojan://") else { continue }
-            if let node = ProxyURIParser.parse(uri) {
+            if let parsed = parseProxyURI(uri) {
                 nodes.append(ProxyNode(
-                    name: node.name.isEmpty ? "node-\(index)" : node.name,
-                    kind: node.kind, server: node.server, port: node.port,
-                    cipher: node.cipher, password: node.password
+                    name: parsed.name.isEmpty ? "node-\(index)" : parsed.name,
+                    kind: parsed.kind, server: parsed.server, port: parsed.port,
+                    cipher: parsed.cipher, password: parsed.password
                 ))
                 index += 1
             }
@@ -106,37 +291,26 @@ public actor SubscriptionManager {
             throw SubscriptionError.parseFailed(String(describing: error))
         }
     }
-}
 
-public enum ProxyURIParser {
-    public struct ParsedProxy {
-        let name: String
-        let kind: ProxyKind
-        let server: String
-        let port: Int
-        let cipher: String?
-        let password: String?
-    }
-
-    public static func parse(_ uri: String) -> ParsedProxy? {
+    private func parseProxyURI(_ uri: String) -> ParsedProxy? {
         guard let (rest, fragment) = extractFragment(uri) else { return nil }
 
-        if rest.hasPrefix("ss://") { return parseSS(rest.dropFirst(5), fragment: fragment) }
-        if rest.hasPrefix("vmess://") { return parseVMess(rest.dropFirst(8), fragment: fragment) }
-        if rest.hasPrefix("vless://") { return parseVLESS(rest.dropFirst(8), fragment: fragment) }
-        if rest.hasPrefix("trojan://") { return parseTrojan(rest.dropFirst(9), fragment: fragment) }
+        if rest.hasPrefix("ss://") { return parseSS(String(rest.dropFirst(5)), fragment: fragment) }
+        if rest.hasPrefix("vmess://") { return parseVMess(String(rest.dropFirst(8)), fragment: fragment) }
+        if rest.hasPrefix("vless://") { return parseVLESS(String(rest.dropFirst(8)), fragment: fragment) }
+        if rest.hasPrefix("trojan://") { return parseTrojan(String(rest.dropFirst(9)), fragment: fragment) }
         return nil
     }
 
-    private static func extractFragment(_ uri: String) -> (String, String)? {
+    private func extractFragment(_ uri: String) -> (String, String)? {
         guard let hashIdx = uri.firstIndex(of: "#") else { return (uri, "") }
         let rest = String(uri[..<hashIdx])
         let fragment = String(uri[uri.index(after: hashIdx)...])
         return (rest, fragment)
     }
 
-    private static func parseSS(_ body: Substring, fragment: String) -> ParsedProxy? {
-        let str = String(body)
+    private func parseSS(_ body: String, fragment: String) -> ParsedProxy? {
+        let str = body
         let serverAndParams: String
         var method = ""
         var password = ""
@@ -165,7 +339,7 @@ public enum ProxyURIParser {
             }
         }
 
-        guard let colonIdx = serverAndParams.firstIndex(of: ":") else { return nil }
+        guard let colonIdx = serverAndParams.lastIndex(of: ":") else { return nil }
         let host = String(serverAndParams[..<colonIdx])
         let portStr = String(serverAndParams[serverAndParams.index(after: colonIdx)...])
         let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
@@ -173,8 +347,9 @@ public enum ProxyURIParser {
         return ParsedProxy(name: fragment, kind: .shadowsocks, server: host, port: port, cipher: method, password: password)
     }
 
-    private static func parseVMess(_ body: Substring, fragment: String) -> ParsedProxy? {
-        guard let base64Data = Data(base64Encoded: String(body).padding(toLength: ((String(body).count + 3) / 4) * 4, withPad: "=", startingAt: 0)),
+    private func parseVMess(_ body: String, fragment: String) -> ParsedProxy? {
+        let padded = body.padding(toLength: ((body.count + 3) / 4) * 4, withPad: "=", startingAt: 0)
+        guard let base64Data = Data(base64Encoded: padded),
               let decoded = String(data: base64Data, encoding: .utf8) else { return nil }
 
         guard let data = decoded.data(using: .utf8),
@@ -191,11 +366,10 @@ public enum ProxyURIParser {
         )
     }
 
-    private static func parseVLESS(_ body: Substring, fragment: String) -> ParsedProxy? {
-        let str = String(body)
-        guard let atIdx = str.firstIndex(of: "@") else { return nil }
-        let uuid = String(str[..<atIdx])
-        let serverAndPort = String(str[str.index(after: atIdx)...])
+    private func parseVLESS(_ body: String, fragment: String) -> ParsedProxy? {
+        guard let atIdx = body.firstIndex(of: "@") else { return nil }
+        let uuid = String(body[..<atIdx])
+        let serverAndPort = String(body[body.index(after: atIdx)...])
 
         guard let colonIdx = serverAndPort.lastIndex(of: ":") else { return nil }
         let host = String(serverAndPort[..<colonIdx])
@@ -205,11 +379,10 @@ public enum ProxyURIParser {
         return ParsedProxy(name: fragment, kind: .vless, server: host, port: port, cipher: nil, password: uuid)
     }
 
-    private static func parseTrojan(_ body: Substring, fragment: String) -> ParsedProxy? {
-        let str = String(body)
-        guard let atIdx = str.firstIndex(of: "@") else { return nil }
-        let password = String(str[..<atIdx])
-        let serverAndPort = String(str[str.index(after: atIdx)...])
+    private func parseTrojan(_ body: String, fragment: String) -> ParsedProxy? {
+        guard let atIdx = body.firstIndex(of: "@") else { return nil }
+        let password = String(body[..<atIdx])
+        let serverAndPort = String(body[body.index(after: atIdx)...])
 
         guard let colonIdx = serverAndPort.lastIndex(of: ":") else { return nil }
         let host = String(serverAndPort[..<colonIdx])
@@ -217,5 +390,70 @@ public enum ProxyURIParser {
         let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
 
         return ParsedProxy(name: fragment, kind: .trojan, server: host, port: port, cipher: nil, password: password)
+    }
+
+    private struct ParsedProxy {
+        let name: String
+        let kind: ProxyKind
+        let server: String
+        let port: Int
+        let cipher: String?
+        let password: String?
+    }
+
+    // MARK: - Persistence
+
+    private func loadSubscriptions() async {
+        do {
+            let saved = try await storage.load()
+            for sub in saved {
+                subscriptions[sub.id] = sub
+            }
+        } catch {
+            // Log but don't fail on load error
+            print("[SubscriptionManager] Failed to load subscriptions: \(error)")
+        }
+    }
+
+    private func saveSubscriptions() async {
+        do {
+            try await storage.save(Array(subscriptions.values))
+        } catch {
+            print("[SubscriptionManager] Failed to save subscriptions: \(error)")
+        }
+    }
+}
+
+// MARK: - Storage Protocol
+
+/// Protocol for subscription persistence
+public protocol SubscriptionStorage: Sendable {
+    func load() async throws -> [Subscription]
+    func save(_ subscriptions: [Subscription]) async throws
+}
+
+// MARK: - UserDefaults Storage
+
+/// UserDefaults-based storage for subscriptions
+public actor UserDefaultsSubscriptionStorage: SubscriptionStorage {
+    private let key = "riptide.subscriptions"
+    private let defaults = UserDefaults.standard
+
+    public init() {}
+
+    public func load() async throws -> [Subscription] {
+        guard let data = defaults.data(forKey: key) else {
+            return []
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([Subscription].self, from: data)
+    }
+
+    public func save(_ subscriptions: [Subscription]) async throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(subscriptions)
+        defaults.set(data, forKey: key)
     }
 }
