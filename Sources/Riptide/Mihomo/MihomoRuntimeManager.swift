@@ -52,6 +52,14 @@ public protocol MihomoRuntimeManaging: Actor {
 
     /// Gets current traffic statistics.
     func getTraffic() async throws -> (up: Int, down: Int)
+
+    /// Tests the delay/latency of a proxy.
+    /// - Parameters:
+    ///   - name: The name of the proxy to test
+    ///   - url: Optional test URL (defaults to https://www.google.com)
+    ///   - timeout: Timeout in milliseconds (defaults to 5000)
+    /// - Returns: The measured delay in milliseconds
+    func testProxyDelay(name: String, url: String?, timeout: Int) async throws -> Int
 }
 
 // MARK: - Sendable Wrapper for API Client
@@ -347,6 +355,29 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         do {
             return try await wrapper.client.getTraffic()
+        } catch is MihomoAPIError {
+            throw RuntimeError.apiNotAvailable
+        } catch {
+            throw RuntimeError.apiNotAvailable
+        }
+    }
+
+    /// Tests the delay/latency of a proxy.
+    /// - Parameters:
+    ///   - name: The name of the proxy to test
+    ///   - url: Optional test URL (defaults to https://www.google.com)
+    ///   - timeout: Timeout in milliseconds (defaults to 5000)
+    /// - Returns: The measured delay in milliseconds
+    /// - Throws: RuntimeError if not running or API operation fails.
+    public func testProxyDelay(name: String, url: String? = nil, timeout: Int = 5000) async throws -> Int {
+        guard let wrapper = apiClientWrapper, isRunning else {
+            throw RuntimeError.notRunning
+        }
+
+        let testURL = url ?? "https://www.google.com"
+
+        do {
+            return try await wrapper.client.testProxyDelay(name: name, url: testURL, timeout: timeout)
         } catch is MihomoAPIError {
             throw RuntimeError.apiNotAvailable
         } catch {

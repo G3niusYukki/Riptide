@@ -89,6 +89,21 @@ public actor ModeCoordinator {
         }
     }
 
+    /// Tests the delay of a proxy.
+    /// - Parameters:
+    ///   - proxyName: The name of the proxy to test
+    ///   - url: Optional test URL
+    ///   - timeout: Timeout in milliseconds
+    /// - Returns: The measured delay in milliseconds, or nil if test failed
+    public func testProxyDelay(proxyName: String, url: String? = nil, timeout: Int = 5000) async -> Int? {
+        do {
+            let delay = try await mihomoManager.testProxyDelay(name: proxyName, url: url, timeout: timeout)
+            return delay
+        } catch {
+            return nil
+        }
+    }
+
     private func emit(_ event: RuntimeEvent) {
         eventBuffer.append(event)
         if eventBuffer.count > maxEvents {
