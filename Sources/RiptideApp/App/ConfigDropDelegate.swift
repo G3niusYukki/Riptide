@@ -6,31 +6,24 @@ import UniformTypeIdentifiers
 public final class ConfigDropDelegate: DropDelegate {
     let onDrop: ([URL]) -> Void
 
-    @State private var isHovering = false
-
     public init(onDrop: @escaping ([URL]) -> Void) {
         self.onDrop = onDrop
     }
 
     public func performDrop(info: DropInfo) -> Bool {
-        let urls = info.itemProviders(for: [.fileURL]).compactMap { provider -> URL? in
-            guard let data = try? provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                return nil
+        let providers = info.itemProviders(for: [.fileURL])
+        for provider in providers {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { [weak self] item, error in
+                guard let self, let data = item as? Data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                    return
+                }
+                Task { @MainActor in
+                    self.onDrop([url])
+                }
             }
-            return url
         }
-        guard !urls.isEmpty else { return false }
-        onDrop(urls)
         return true
-    }
-
-    public func dropEntered(info: DropInfo) {
-        isHovering = true
-    }
-
-    public func dropExited(info: DropInfo) {
-        isHovering = false
     }
 
     public func validateDrop(info: DropInfo) -> Bool {

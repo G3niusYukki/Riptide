@@ -40,13 +40,13 @@ public actor CertificateAuthority {
 
     // MARK: - Key Management
 
-    /// Generates a new RSA 2048-bit CA private key and stores it in the keychain.
+    /// Generates a new RSA 2048-bit CA private key.
+    /// Keys are kept in memory only (not stored in keychain) for safety.
     public func generateKey() throws {
         let attributes: [String: Any] = [
             kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
             kSecAttrKeySizeInBits as String: 2048,
-            kSecAttrLabel as String: keyLabel,
-            kSecAttrIsPermanent as String: false, // Keep in memory for safety
+            kSecAttrIsPermanent as String: false, // Memory-only for safety
         ]
 
         var error: Unmanaged<CFError>?
@@ -54,24 +54,6 @@ public actor CertificateAuthority {
             throw MITMError.certificateGenerationFailed
         }
         self.privateKey = key
-    }
-
-    /// Loads an existing CA key from the keychain.
-    public func loadKey() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-            kSecAttrLabel as String: keyLabel,
-            kSecReturnRef as String: true,
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess else {
-            throw MITMError.certificateGenerationFailed
-        }
-        // SecKey toll-free bridged to CFTypeRef
-        self.privateKey = (item as! SecKey)
     }
 
     // MARK: - Certificate Management

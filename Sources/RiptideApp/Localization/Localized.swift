@@ -120,7 +120,7 @@ public enum Localized: String, CaseIterable {
 }
 
 /// Language codes supported by the app.
-public enum AppLanguage: String, CaseIterable {
+public enum AppLanguage: String, CaseIterable, Sendable {
     case zhHans = "zh-Hans"
     case en = "en"
 

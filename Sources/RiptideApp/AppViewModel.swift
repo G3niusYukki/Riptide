@@ -83,11 +83,26 @@ public struct ProxyGroupDisplay: Identifiable, Equatable {
 
 public struct ConnectionInfo: Identifiable {
     public let id: UUID
+    /// Raw backend connection ID — use this for close operations.
+    public let backendId: String
     public let host: String
     public let port: Int
     public let `protocol`: String
     public let proxyName: String
     public let connectionCount: Int
+
+    public init(
+        id: UUID, backendId: String, host: String, port: Int,
+        protocol: String, proxyName: String, connectionCount: Int
+    ) {
+        self.id = id
+        self.backendId = backendId
+        self.host = host
+        self.port = port
+        self.protocol = `protocol`
+        self.proxyName = proxyName
+        self.connectionCount = connectionCount
+    }
 }
 
 public struct RuleMatchLog: Identifiable {
@@ -450,7 +465,11 @@ public final class AppViewModel {
         let subs = await subscriptionManager.allSubscriptions()
         await MainActor.run {
             subscriptions = subs.map { sub in
-                let profileCount = profiles.count { $0.source == .subscription(id: sub.id, name: sub.name) }
+                // Match by subscription ID only (name may change over time)
+                let profileCount = profiles.count {
+                    guard case let .subscription(id, _) = $0.source else { return false }
+                    return id == sub.id
+                }
                 return SubscriptionDisplay(
                     id: sub.id, name: sub.name, url: sub.url,
                     autoUpdate: sub.autoUpdate, lastUpdated: sub.lastUpdated,
@@ -477,6 +496,7 @@ public final class AppViewModel {
             )
             let profile = Profile(name: name, config: config, source: .subscription(id: sub.id, name: sub.name))
             await MainActor.run {
+                lastError = nil  // Clear any previous error
                 profiles.append(profile)
                 if activeProfile == nil { activeProfile = profile }
                 rebuildProxyGroupDisplays()
@@ -484,7 +504,7 @@ public final class AppViewModel {
         case .failure(let error):
             await MainActor.run { lastError = "订阅拉取失败: \(error)" }
         case .noChange:
-            break
+            await MainActor.run { lastError = nil }  // Clear stale error
         }
         await loadSubscriptionsFromBackend()
     }
@@ -520,16 +540,23 @@ public final class AppViewModel {
                     proxyGroups: [],
                     dnsPolicy: DNSPolicy()
                 )
-                let newProfile = Profile(name: sub.name, config: config, source: .subscription(id: sub.id, name: sub.name))
                 await MainActor.run {
                     if let idx = profiles.firstIndex(where: { p in
                         if case .subscription(let sid, _) = p.source { return sid == id }
                         return false
                     }) {
-                        profiles[idx] = newProfile
-                        if activeProfile?.id == profiles[idx].id { activeProfile = newProfile }
+                        // Preserve original profile ID so activeProfile reference stays valid
+                        let existingProfile = profiles[idx]
+                        let wasActiveProfile = activeProfile?.id == existingProfile.id
+                        let refreshedProfile = Profile(
+                            id: existingProfile.id,
+                            name: sub.name, config: config,
+                            source: .subscription(id: sub.id, name: sub.name)
+                        )
+                        profiles[idx] = refreshedProfile
+                        if wasActiveProfile { activeProfile = refreshedProfile }
+                        rebuildProxyGroupDisplays()
                     }
-                    rebuildProxyGroupDisplays()
                 }
             }
         case .failure(let error):
@@ -663,6 +690,7 @@ public final class AppViewModel {
             let mapped = connections.map { conn in
                 ConnectionInfo(
                     id: UUID(uuidString: conn.id) ?? UUID(),
+                    backendId: conn.id,  // Store raw backend ID for close operations
                     host: conn.host,
                     port: 0,
                     protocol: conn.network,

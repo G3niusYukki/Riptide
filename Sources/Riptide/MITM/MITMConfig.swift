@@ -45,9 +45,10 @@ public struct MITMConfig: Sendable, Equatable {
         if pattern == host { return true }
 
         // Wildcard matching: *.example.com matches any.example.com
+        // but NOT badexample.com (must have a dot boundary)
         if pattern.hasPrefix("*.") {
             let suffix = pattern.dropFirst(2)
-            return host.hasSuffix(suffix) || host == String(suffix)
+            return host == String(suffix) || host.hasSuffix("." + String(suffix))
         }
 
         return false

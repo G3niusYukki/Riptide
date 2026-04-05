@@ -356,9 +356,9 @@ struct SubscriptionRow: View {
 
                 Button {
                     withAnimation { isUpdating = true }
-                    onUpdate()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        withAnimation { isUpdating = false }
+                    Task {
+                        defer { Task { @MainActor in withAnimation { isUpdating = false } } }
+                        await onUpdate()
                     }
                 } label: {
                     Label(isUpdating ? "更新中…" : "更新", systemImage: isUpdating ? "arrow.clockwise" : "arrow.clockwise.circle")

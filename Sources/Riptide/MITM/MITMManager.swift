@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Manages MITM (Man-in-the-Middle) HTTPS interception.
 /// Controls which hosts are intercepted and provides hooks for inspection/modification.
@@ -63,10 +64,10 @@ public actor MITMManager {
 
     /// Checks if the CA certificate is trusted in the system keychain.
     public func isCATrusted() -> Bool {
-        // Check if our CA is in the system trust store
+        // Use the same label that CertificateAuthority uses
         let query: [String: Any] = [
             kSecClass as String: kSecClassCertificate,
-            kSecAttrLabel as String: "Riptide CA",
+            kSecAttrLabel as String: "com.riptide.mitm.ca",
             kSecReturnRef as String: true,
         ]
         let status = SecItemCopyMatching(query as CFDictionary, nil)

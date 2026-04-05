@@ -55,7 +55,7 @@ struct ConnectionListView: View {
                     LazyVStack(spacing: 4) {
                         ForEach(filteredConnections) { conn in
                             ConnectionRow(conn: conn) {
-                                Task { await vm.closeConnection(id: conn.id.uuidString) }
+                                Task { await vm.closeConnection(id: conn.backendId) }
                             }
                         }
                     }

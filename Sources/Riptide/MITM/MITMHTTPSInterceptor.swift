@@ -11,10 +11,9 @@ public actor MITMHTTPSInterceptor {
     }
 
     /// Determines whether to intercept a given host:port combination.
-    public func shouldIntercept(host: String, port: Int) -> Bool {
-        // Since mitmManager is actor-isolated, we can call its shouldIntercept directly
-        // This method is already inside the actor, so no async needed
-        return true // Will be checked in handleConnection
+    public func shouldIntercept(host: String, port: Int) async -> Bool {
+        _ = port  // Port is not used in the current matching logic
+        return await mitmManager.shouldIntercept(host)
     }
 
     /// Handles an intercepted HTTPS connection.
@@ -28,7 +27,7 @@ public actor MITMHTTPSInterceptor {
         runtime: LiveTunnelRuntime
     ) async throws {
         let host = target.sniffedDomain ?? target.host
-        let shouldInterceptHost = await mitmManager.shouldIntercept(host)
+        let shouldInterceptHost = await shouldIntercept(host: host, port: target.port)
 
         guard shouldInterceptHost else {
             // Not intercepting — relay raw TLS stream

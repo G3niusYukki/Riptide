@@ -169,8 +169,8 @@ public final class MenuBarViewModel: ObservableObject {
 
     /// Switches to a specific profile.
     public func switchProfile(_ profile: (id: UUID, name: String, isActive: Bool)) async {
-        // Activate profile in AppViewModel
-        // This is a simplified implementation — full version would wire through profile store
+        guard let targetProfile = appViewModel.profiles.first(where: { $0.id == profile.id }) else { return }
+        appViewModel.activateProfile(targetProfile)
         updateProfiles()
     }
 
