@@ -50,6 +50,12 @@ public protocol MihomoRuntimeManaging: Actor {
     /// Gets the list of active connections.
     func getConnections() async throws -> [ConnectionInfo]
 
+    /// Closes a specific connection by ID.
+    func closeConnection(id: String) async throws
+
+    /// Closes all active connections.
+    func closeAllConnections() async throws
+
     /// Gets current traffic statistics.
     func getTraffic() async throws -> (up: Int, down: Int)
 
@@ -60,6 +66,9 @@ public protocol MihomoRuntimeManaging: Actor {
     ///   - timeout: Timeout in milliseconds (defaults to 5000)
     /// - Returns: The measured delay in milliseconds
     func testProxyDelay(name: String, url: String?, timeout: Int) async throws -> Int
+
+    /// Gets recent log entries from the mihomo API.
+    func getLogs(level: String, lines: Int) async throws -> [String]
 }
 
 // MARK: - Sendable Wrapper for API Client
@@ -345,6 +354,34 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         }
     }
 
+    /// Closes a specific connection by ID.
+    public func closeConnection(id: String) async throws {
+        guard let wrapper = apiClientWrapper, isRunning else {
+            throw RuntimeError.notRunning
+        }
+        do {
+            try await wrapper.client.closeConnection(id: id)
+        } catch is MihomoAPIError {
+            throw RuntimeError.apiNotAvailable
+        } catch {
+            throw RuntimeError.apiNotAvailable
+        }
+    }
+
+    /// Closes all active connections.
+    public func closeAllConnections() async throws {
+        guard let wrapper = apiClientWrapper, isRunning else {
+            throw RuntimeError.notRunning
+        }
+        do {
+            try await wrapper.client.closeAllConnections()
+        } catch is MihomoAPIError {
+            throw RuntimeError.apiNotAvailable
+        } catch {
+            throw RuntimeError.apiNotAvailable
+        }
+    }
+
     /// Gets current traffic statistics.
     /// - Returns: Tuple of (upload, download) in bytes.
     /// - Throws: RuntimeError if not running or API operation fails.
@@ -378,6 +415,20 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         do {
             return try await wrapper.client.testProxyDelay(name: name, url: testURL, timeout: timeout)
+        } catch is MihomoAPIError {
+            throw RuntimeError.apiNotAvailable
+        } catch {
+            throw RuntimeError.apiNotAvailable
+        }
+    }
+
+    /// Gets recent log entries from the mihomo API.
+    public func getLogs(level: String = "debug", lines: Int = 200) async throws -> [String] {
+        guard let wrapper = apiClientWrapper, isRunning else {
+            throw RuntimeError.notRunning
+        }
+        do {
+            return try await wrapper.client.getLogs(level: level, lines: lines)
         } catch is MihomoAPIError {
             throw RuntimeError.apiNotAvailable
         } catch {

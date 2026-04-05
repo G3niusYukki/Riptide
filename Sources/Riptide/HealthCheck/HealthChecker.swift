@@ -79,9 +79,11 @@ public actor HealthChecker {
 
 public actor GroupSelector {
     private let healthChecker: HealthChecker
+    private let loadBalancer: LoadBalancer
 
     public init(healthChecker: HealthChecker) {
         self.healthChecker = healthChecker
+        self.loadBalancer = LoadBalancer(strategy: .consistentHash)
     }
 
     public func select(group: ProxyGroup, proxies: [ProxyNode]) async -> ProxyNode? {
@@ -122,7 +124,15 @@ public actor GroupSelector {
             return available.first
 
         case .loadBalance:
-            return available.randomElement()
+            // Update load balancer with currently available proxies
+            await loadBalancer.updateProxies(available.map { $0.name })
+            // For load-balance, use the last target host hint from the group's policy
+            // Since we don't have host context here, pass nil (consistent hash will still work)
+            if let bestName = await loadBalancer.select(forHost: nil),
+               let bestNode = available.first(where: { $0.name == bestName }) {
+                return bestNode
+            }
+            return available.first
         }
     }
 }

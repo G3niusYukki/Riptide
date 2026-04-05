@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct ConfigTabView: View {
     @Bindable var vm: AppViewModel
     @State private var showHelperSetup = false
+    @State private var showAddSubscription = false
+    @State private var editingSubscription: SubscriptionDisplay?
 
     var body: some View {
         ScrollView {
@@ -54,41 +56,8 @@ struct ConfigTabView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
                 }
 
-                // Subscriptions
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("订阅列表")
-                            .font(.headline)
-                            .foregroundStyle(Theme.text)
-                        Spacer()
-                        Button {
-                            // Add subscription — stub
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                    }
-                    if vm.subscriptions.isEmpty {
-                        Text("暂无订阅")
-                            .foregroundStyle(Theme.subtext)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding()
-                    } else {
-                        ForEach(vm.subscriptions) { sub in
-                            HStack {
-                                Text(sub.name)
-                                    .foregroundStyle(Theme.text)
-                                Spacer()
-                                Text(sub.url)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.subtext)
-                            }
-                            Divider()
-                        }
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+                // Subscriptions — wired to backend
+                subscriptionSection
 
                 // Error display
                 if let error = vm.lastError {
@@ -107,6 +76,12 @@ struct ConfigTabView: View {
         .sheet(isPresented: $showHelperSetup) {
             HelperSetupView()
         }
+        .sheet(isPresented: $showAddSubscription) {
+            AddSubscriptionSheet(vm: vm)
+        }
+        .sheet(item: $editingSubscription) { sub in
+            AddSubscriptionSheet(vm: vm, editing: sub)
+        }
         .onChange(of: vm.showHelperSetup) { _, newValue in
             showHelperSetup = newValue
         }
@@ -117,6 +92,57 @@ struct ConfigTabView: View {
                 vm.checkHelperInstallation()
             }
         }
+    }
+
+    // MARK: - Subscription Section
+
+    private var subscriptionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("订阅列表")
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                Button {
+                    showAddSubscription = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+
+            if vm.subscriptions.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "cloud")
+                        .font(.largeTitle)
+                        .foregroundStyle(Theme.subtext)
+                    Text("暂无订阅")
+                        .foregroundStyle(Theme.subtext)
+                    Text("添加远程订阅以自动获取代理节点")
+                        .font(.caption)
+                        .foregroundStyle(Theme.subtext.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding()
+            } else {
+                ForEach(vm.subscriptions) { sub in
+                    SubscriptionRow(
+                        sub: sub,
+                        onUpdate: {
+                            Task { await vm.updateSubscription(id: sub.id) }
+                        },
+                        onEdit: {
+                            editingSubscription = sub
+                        },
+                        onDelete: {
+                            Task { await vm.removeSubscription(id: sub.id) }
+                        }
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 
     // MARK: - Mode Selector Card
@@ -269,5 +295,89 @@ struct ProfileCard: View {
             RoundedRectangle(cornerRadius: Theme.cardRadius)
                 .stroke(isActive ? Theme.success : Color.clear, lineWidth: 2)
         )
+    }
+}
+
+// MARK: - Subscription Row
+
+struct SubscriptionRow: View {
+    let sub: SubscriptionDisplay
+    let onUpdate: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @State private var isUpdating = false
+
+    private var lastUpdatedText: String {
+        guard let date = sub.lastUpdated else { return "从未更新" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: "cloud.fill")
+                    .foregroundStyle(Theme.accent)
+                Text(sub.name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                if sub.autoUpdate {
+                    Label("自动", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                        .foregroundStyle(Theme.success)
+                }
+            }
+
+            Text(sub.url)
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            HStack {
+                Text(lastUpdatedText)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.subtext)
+                if let error = sub.lastError {
+                    Text("错误: \(error)")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.danger)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if sub.profileCount > 0 {
+                    Text("\(sub.profileCount) 个配置")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.subtext)
+                }
+                Spacer()
+
+                Button {
+                    withAnimation { isUpdating = true }
+                    onUpdate()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        withAnimation { isUpdating = false }
+                    }
+                } label: {
+                    Label(isUpdating ? "更新中…" : "更新", systemImage: isUpdating ? "arrow.clockwise" : "arrow.clockwise.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isUpdating)
+
+                Button("编辑") { onEdit() }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.accent)
+
+                Button("删除") { onDelete() }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.danger)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 }

@@ -80,12 +80,49 @@ public actor ModeCoordinator {
     }
 
     /// Gets active connections from the mihomo runtime.
-    public func getConnections() async -> Int {
+    public func getConnections() async -> [(id: String, host: String, network: String, proxy: String, upload: Int, download: Int)] {
         do {
             let connections = try await mihomoManager.getConnections()
-            return connections.count
+            return connections.map { conn in
+                (
+                    id: conn.id,
+                    host: conn.metadata.host ?? conn.metadata.destinationIP ?? "unknown",
+                    network: conn.metadata.network.uppercased(),
+                    proxy: conn.chains.last ?? "Direct",
+                    upload: conn.upload,
+                    download: conn.download
+                )
+            }
         } catch {
-            return 0
+            return []
+        }
+    }
+
+    /// Selects a specific proxy in a proxy group.
+    public func selectProxy(groupID: String, nodeName: String) async {
+        do {
+            try await mihomoManager.switchProxy(to: nodeName)
+        } catch {
+            // Silently fail — the mihomo API may not support named groups
+        }
+    }
+
+    /// Closes a specific connection.
+    public func closeConnection(id: String) async {
+        try? await mihomoManager.closeConnection(id: id)
+    }
+
+    /// Closes all connections.
+    public func closeAllConnections() async {
+        try? await mihomoManager.closeAllConnections()
+    }
+
+    /// Gets recent log entries.
+    public func getLogs(level: String = "debug", lines: Int = 200) async -> [String] {
+        do {
+            return try await mihomoManager.getLogs(level: level, lines: lines)
+        } catch {
+            return []
         }
     }
 
