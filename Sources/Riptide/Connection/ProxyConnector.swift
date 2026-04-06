@@ -48,8 +48,7 @@ public struct ProxyConnector: Sendable {
             case .snell:
                 return try await performSnellConnect(connection: connection, node: node, target: target)
             case .tuic:
-                // TUIC protocol support requires macOS 14+ with Network.framework QUIC
-                throw ProtocolError.malformedResponse("TUIC protocol requires macOS 14+ and is not yet fully implemented")
+                throw ProtocolError.connectionRejected("TUIC protocol requires macOS 14+ and is not yet fully implemented")
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never

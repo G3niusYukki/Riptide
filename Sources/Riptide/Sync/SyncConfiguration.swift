@@ -181,7 +181,7 @@ public struct WebDAVFile: Sendable, Identifiable, Equatable {
 // MARK: - Errors
 
 /// Errors that can occur during WebDAV operations
-public enum WebDAVError: Error, Equatable, Sendable {
+public enum WebDAVError: Error, Equatable, Sendable, LocalizedError {
     case notConfigured
     case invalidURL
     case invalidCredentials
@@ -197,7 +197,7 @@ public enum WebDAVError: Error, Equatable, Sendable {
     case serverError(Int, String)
     case notFound
 
-    public var errorDescription: String {
+    public var errorDescription: String? {
         switch self {
         case .notConfigured:
             return "WebDAV not configured"

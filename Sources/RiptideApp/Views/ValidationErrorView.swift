@@ -52,11 +52,13 @@ struct ValidationErrorView: View {
                 .foregroundStyle(hasErrors ? Theme.danger : (hasWarnings ? Theme.warning : Theme.success))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Configuration Validation")
+                Text(NSLocalizedString(Localized.configMode.rawValue, comment: "Configuration Validation"))
                     .font(.headline)
                     .foregroundStyle(Theme.text)
 
-                Text(hasErrors ? "Errors found" : (hasWarnings ? "Warnings found" : "Validation passed"))
+                Text(hasErrors
+                    ? NSLocalizedString(Localized.commonError.rawValue, comment: "")
+                    : (hasWarnings ? "Warnings found" : NSLocalizedString(Localized.syncSuccess.rawValue, comment: "")))
                     .font(.subheadline)
                     .foregroundStyle(hasErrors ? Theme.danger : (hasWarnings ? Theme.warning : Theme.success))
             }
@@ -64,7 +66,7 @@ struct ValidationErrorView: View {
             Spacer()
 
             if let onDismiss = onDismiss {
-                Button("Close") {
+                Button(NSLocalizedString(Localized.commonClose.rawValue, comment: "")) {
                     onDismiss()
                 }
                 .buttonStyle(.bordered)
@@ -76,7 +78,7 @@ struct ValidationErrorView: View {
         HStack(spacing: 16) {
             SummaryBadge(
                 count: result.errors.count,
-                label: "Errors",
+                label: NSLocalizedString(Localized.commonError.rawValue, comment: ""),
                 color: Theme.danger,
                 icon: "xmark.circle"
             )
@@ -103,7 +105,7 @@ struct ValidationErrorView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.success)
 
-            Text("No issues found")
+            Text(NSLocalizedString(Localized.logsNoLogs.rawValue, comment: ""))
                 .font(.headline)
                 .foregroundStyle(Theme.text)
 
@@ -120,7 +122,7 @@ struct ValidationErrorView: View {
             // Errors section
             if hasErrors {
                 IssueSection(
-                    title: "Errors",
+                    title: NSLocalizedString(Localized.commonError.rawValue, comment: ""),
                     icon: "xmark.circle.fill",
                     color: Theme.danger,
                     issues: result.errors

@@ -75,6 +75,11 @@ public final class LocalizationManager: ObservableObject {
         strings[key.rawValue] ?? key.rawValue
     }
 
+    /// Gets the localized string for a raw string key.
+    public func string(for key: String) -> String {
+        strings[key] ?? NSLocalizedString(key, comment: "")
+    }
+
     /// Gets the localized string for a key with format arguments.
     /// Supports both %@ / %d and {key} placeholder styles.
     public func string(for key: Localized, args: CVarArg...) -> String {
@@ -95,18 +100,22 @@ public final class LocalizationManager: ObservableObject {
     // MARK: - Private
 
     private func loadStrings() {
-        // Try to load from JSON first (backward compatibility)
-        let bundle = Bundle.main
-        guard let url = bundle.url(forResource: currentLanguage.rawValue, withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
-            // Fallback: use String Catalog via NSLocalizedString
+        // Try to load strings from the selected language's .lproj bundle
+        if let path = Bundle.main.path(forResource: currentLanguage.localeIdentifier, ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            for key in Localized.allCases {
+                strings[key.rawValue] = bundle.localizedString(
+                    forKey: key.rawValue,
+                    value: key.rawValue,
+                    table: nil
+                )
+            }
+        } else {
+            // Fallback: use String Catalog via NSLocalizedString with main bundle
             for key in Localized.allCases {
                 strings[key.rawValue] = NSLocalizedString(key.rawValue, comment: "")
             }
-            return
         }
-        strings = decoded
     }
 }
 
@@ -133,10 +142,16 @@ public struct LocalizedText: View {
     }
 }
 
-/// String extension for localized access.
+/// String extension for localized access via LocalizationManager.
 extension String {
-    /// Access a localized string using the key via LocalizationManager.
+    /// Access a localized string using the key, honoring the current language selection.
     public static func localized(_ key: String) -> String {
-        NSLocalizedString(key, comment: "")
+        guard let languageCode = UserDefaults.standard.string(forKey: "riptide.language"),
+              let language = AppLanguage(rawValue: languageCode),
+              let bundlePath = Bundle.main.path(forResource: language.localeIdentifier, ofType: "lproj"),
+              let bundle = Bundle(path: bundlePath) else {
+            return NSLocalizedString(key, comment: "")
+        }
+        return bundle.localizedString(forKey: key, value: key, table: nil)
     }
 }

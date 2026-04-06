@@ -21,13 +21,30 @@ public actor WebDAVClient {
         self.urlSession = URLSession(configuration: config)
     }
 
+    // MARK: - URL Resolution
+
+    /// Build a URL by normalizing the path and resolving it against the server URL.
+    private func resolvedURL(for path: String) -> URL? {
+        let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        if normalizedPath.isEmpty {
+            return serverURL
+        }
+
+        var baseURL = serverURL
+        if !baseURL.absoluteString.hasSuffix("/") {
+            baseURL = baseURL.appendingPathComponent("")
+        }
+
+        return URL(string: normalizedPath, relativeTo: baseURL)?.absoluteURL
+    }
+
     // MARK: - WebDAV Operations
 
     /// List files in a directory using PROPFIND
     public func listFiles(path: String) async throws -> [WebDAVFile] {
-        let url = serverURL.appendingPathComponent(path)
-
-        guard url.scheme?.hasPrefix("http") == true else {
+        guard let url = resolvedURL(for: path),
+              url.scheme?.hasPrefix("http") == true else {
             throw WebDAVError.invalidURL
         }
 
@@ -81,9 +98,8 @@ public actor WebDAVClient {
 
     /// Download a file using GET
     public func download(path: String) async throws -> Data {
-        let url = serverURL.appendingPathComponent(path)
-
-        guard url.scheme?.hasPrefix("http") == true else {
+        guard let url = resolvedURL(for: path),
+              url.scheme?.hasPrefix("http") == true else {
             throw WebDAVError.invalidURL
         }
 
@@ -120,9 +136,8 @@ public actor WebDAVClient {
 
     /// Upload a file using PUT
     public func upload(path: String, data: Data, contentType: String = "application/json") async throws {
-        let url = serverURL.appendingPathComponent(path)
-
-        guard url.scheme?.hasPrefix("http") == true else {
+        guard let url = resolvedURL(for: path),
+              url.scheme?.hasPrefix("http") == true else {
             throw WebDAVError.invalidURL
         }
 
@@ -163,9 +178,8 @@ public actor WebDAVClient {
 
     /// Delete a file using DELETE
     public func delete(path: String) async throws {
-        let url = serverURL.appendingPathComponent(path)
-
-        guard url.scheme?.hasPrefix("http") == true else {
+        guard let url = resolvedURL(for: path),
+              url.scheme?.hasPrefix("http") == true else {
             throw WebDAVError.invalidURL
         }
 
@@ -202,9 +216,8 @@ public actor WebDAVClient {
 
     /// Create a directory using MKCOL
     public func createDirectory(path: String) async throws {
-        let url = serverURL.appendingPathComponent(path)
-
-        guard url.scheme?.hasPrefix("http") == true else {
+        guard let url = resolvedURL(for: path),
+              url.scheme?.hasPrefix("http") == true else {
             throw WebDAVError.invalidURL
         }
 
@@ -285,6 +298,9 @@ private final class PropfindParserDelegate: NSObject, XMLParserDelegate {
     private var currentIsDirectory = false
     private var currentEtag: String?
 
+    // Accumulate raw character data per element (XMLParser may call foundCharacters multiple times)
+    private var elementBuffer = ""
+
     private var inResponse = false
     private var inPropstat = false
     private var inProp = false
@@ -310,6 +326,7 @@ private final class PropfindParserDelegate: NSObject, XMLParserDelegate {
             currentSize = 0
             currentIsDirectory = false
             currentEtag = nil
+            elementBuffer = ""
         } else if elementName == "D:propstat" || elementName == "propstat" {
             inPropstat = true
         } else if elementName == "D:prop" || elementName == "prop" {
@@ -317,25 +334,11 @@ private final class PropfindParserDelegate: NSObject, XMLParserDelegate {
         } else if (elementName == "D:collection" || elementName == "collection") && inProp {
             currentIsDirectory = true
         }
+        elementBuffer = ""
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        if currentElement == "D:href" || currentElement == "href" {
-            currentHref += trimmed
-        } else if currentElement == "D:displayname" || currentElement == "displayname" {
-            currentName += trimmed
-        } else if currentElement == "D:getcontentlength" || currentElement == "getcontentlength" {
-            currentSize = Int(trimmed) ?? 0
-        } else if currentElement == "D:getlastmodified" || currentElement == "getlastmodified" {
-            if let date = parseDAVDate(trimmed) {
-                currentModified = date
-            }
-        } else if currentElement == "D:getetag" || currentElement == "getetag" {
-            currentEtag = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-        }
+        elementBuffer += string
     }
 
     func parser(
@@ -344,6 +347,25 @@ private final class PropfindParserDelegate: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
+        let trimmed = elementBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Process accumulated character data based on the closing element
+        if !trimmed.isEmpty {
+            if elementName == "D:href" || elementName == "href" {
+                currentHref += trimmed
+            } else if elementName == "D:displayname" || elementName == "displayname" {
+                currentName += trimmed
+            } else if elementName == "D:getcontentlength" || elementName == "getcontentlength" {
+                currentSize = Int(trimmed) ?? 0
+            } else if elementName == "D:getlastmodified" || elementName == "getlastmodified" {
+                if let date = parseDAVDate(trimmed) {
+                    currentModified = date
+                }
+            } else if elementName == "D:getetag" || elementName == "getetag" {
+                currentEtag = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+
         if elementName == "D:response" || elementName == "response" {
             inResponse = false
 

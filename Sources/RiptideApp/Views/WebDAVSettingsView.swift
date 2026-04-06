@@ -15,8 +15,10 @@ struct WebDAVSettingsView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var isSaving = false
+    @State private var isSyncing = false
     @State private var lastSyncResult: Riptide.SyncResult?
     @State private var showSyncResult = false
+    @State private var existingConfigID: UUID?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -196,25 +198,6 @@ struct WebDAVSettingsView: View {
         UserDefaults.standard.data(forKey: "webdav_configuration") != nil
     }
 
-    private var isSyncing: Bool {
-        false
-    }
-
-    // MARK: - Helper Methods
-
-    private func displayName(for option: Riptide.WebDAVConfiguration.ConflictResolution) -> String {
-        switch option {
-        case .localWins:
-            return NSLocalizedString(Localized.syncConflictLocalWins.rawValue, comment: "")
-        case .remoteWins:
-            return NSLocalizedString(Localized.syncConflictRemoteWins.rawValue, comment: "")
-        case .askUser:
-            return NSLocalizedString(Localized.syncConflictAsk.rawValue, comment: "")
-        case .merge:
-            return NSLocalizedString(Localized.syncConflictMerge.rawValue, comment: "")
-        }
-    }
-
     // MARK: - Actions
 
     private func loadExistingConfiguration() async {
@@ -224,6 +207,7 @@ struct WebDAVSettingsView: View {
         do {
             let config = try JSONDecoder().decode(Riptide.WebDAVConfiguration.self, from: data)
             await MainActor.run {
+                existingConfigID = config.id
                 serverURL = config.serverURL.absoluteString
                 username = config.username
                 remotePath = config.remotePath
@@ -280,6 +264,7 @@ struct WebDAVSettingsView: View {
             }
 
             let config = Riptide.WebDAVConfiguration(
+                id: existingConfigID ?? UUID(),
                 serverURL: url,
                 username: username,
                 remotePath: remotePath,
@@ -291,6 +276,9 @@ struct WebDAVSettingsView: View {
             // Save configuration to UserDefaults
             let data = try JSONEncoder().encode(config)
             UserDefaults.standard.set(data, forKey: "webdav_configuration")
+
+            // Save password to Keychain so WebDAVManager can load it later
+            try Riptide.WebDAVManager.savePasswordToKeychain(password, for: config.id)
 
             await MainActor.run {
                 isSaving = false

@@ -32,7 +32,6 @@ let package = Package(
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
             ],
-            exclude: ["Backup"]
         ),
         .executableTarget(
             name: "RiptideCLI",

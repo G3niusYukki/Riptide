@@ -163,9 +163,20 @@ public enum Localized: String, CaseIterable {
     case commonError = "common.error"
     case commonUnknown = "common.unknown"
 
-    /// Get the localized string value for this key.
+    /// Get the localized string value for this key, honoring the current language selection.
     public var string: String {
-        NSLocalizedString(rawValue, comment: "")
+        Self.localizedBundle.localizedString(forKey: rawValue, value: rawValue, table: nil)
+    }
+
+    /// Resolve the bundle for the currently selected language.
+    private static var localizedBundle: Bundle {
+        guard let languageCode = UserDefaults.standard.string(forKey: "riptide.language"),
+              let language = AppLanguage(rawValue: languageCode),
+              let path = Bundle.main.path(forResource: language.localeIdentifier, ofType: "lproj"),
+              let bundle = Bundle(path: path) else {
+            return .main
+        }
+        return bundle
     }
 }
 
