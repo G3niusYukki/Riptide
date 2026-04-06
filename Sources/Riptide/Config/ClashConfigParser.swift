@@ -190,6 +190,25 @@ public enum ClashConfigParser {
                     skipCertVerify: proxy.skipCertVerify
                 )
 
+            case .tuic:
+                guard let uuid = proxy.uuid, !uuid.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for TUIC")
+                }
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for TUIC")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .tuic,
+                    server: proxy.server,
+                    port: port,
+                    password: password,
+                    uuid: uuid,
+                    sni: proxy.sni,
+                    alpn: proxy.alpn,
+                    skipCertVerify: proxy.skipCertVerify
+                )
+
             case .relay:
                 guard let chainName = proxy.chain, !chainName.isEmpty else {
                     throw ClashConfigError.invalidProxy(index: index, reason: "chain proxy name is required for relay")
@@ -234,6 +253,8 @@ public enum ClashConfigParser {
             return .trojan
         case "hysteria2":
             return .hysteria2
+        case "tuic":
+            return .tuic
         case "relay":
             return .relay
         case "snell":

@@ -31,7 +31,7 @@ let package = Package(
             name: "Riptide",
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
-            ]
+            ],
         ),
         .executableTarget(
             name: "RiptideCLI",

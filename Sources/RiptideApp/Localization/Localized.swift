@@ -1,7 +1,7 @@
 import Foundation
 
 /// All localizable string keys used in the app.
-/// Each case maps to a key in the language JSON files.
+/// Each case maps to a key in the Localizable.xcstrings file.
 public enum Localized: String, CaseIterable {
     // MARK: - Tab Names
     case tabConfig = "tab.config"
@@ -106,6 +106,51 @@ public enum Localized: String, CaseIterable {
     case menuDisconnected = "menu.disconnected"
     case menuSwitchModeFirst = "menu.switch_mode_first"
 
+    // MARK: - Language
+    case languageSelect = "language.select"
+    case languageAuto = "language.auto"
+
+    // MARK: - WebDAV Sync
+    case syncTitle = "sync.title"
+    case syncServerSection = "sync.server_section"
+    case syncServerUrl = "sync.server_url"
+    case syncUsername = "sync.username"
+    case syncPassword = "sync.password"
+    case syncOptionsSection = "sync.options_section"
+    case syncRemotePath = "sync.remote_path"
+    case syncAutoSync = "sync.auto_sync"
+    case syncConflictResolution = "sync.conflict_resolution"
+    case syncTestConnection = "sync.test_connection"
+    case syncTestSuccess = "sync.test_success"
+    case syncTestFailed = "sync.test_failed"
+    case syncSaveConfig = "sync.save_config"
+    case syncClearConfig = "sync.clear_config"
+    case syncSyncNow = "sync.sync_now"
+    case syncResultSection = "sync.result_section"
+    case syncUploadedCount = "sync.uploaded_count"
+    case syncDownloadedCount = "sync.downloaded_count"
+    case syncConflictsCount = "sync.conflicts_count"
+    case syncErrorsCount = "sync.errors_count"
+    case syncSuccess = "sync.success"
+    case syncConflictLocalWins = "sync.conflict_local_wins"
+    case syncConflictRemoteWins = "sync.conflict_remote_wins"
+    case syncConflictAsk = "sync.conflict_ask"
+    case syncConflictMerge = "sync.conflict_merge"
+    case syncErrorNotConfigured = "sync.error_not_configured"
+    case syncErrorInvalidUrl = "sync.error_invalid_url"
+    case syncErrorInvalidCredentials = "sync.error_invalid_credentials"
+    case syncErrorListFailed = "sync.error_list_failed"
+    case syncErrorDownloadFailed = "sync.error_download_failed"
+    case syncErrorUploadFailed = "sync.error_upload_failed"
+    case syncErrorDeleteFailed = "sync.error_delete_failed"
+    case syncErrorNetwork = "sync.error_network"
+    case syncErrorParsing = "sync.error_parsing"
+    case syncErrorKeychain = "sync.error_keychain"
+    case syncErrorInProgress = "sync.error_in_progress"
+    case syncErrorConflictResolution = "sync.error_conflict_resolution"
+    case syncErrorServer = "sync.error_server"
+    case syncErrorNotFound = "sync.error_not_found"
+
     // MARK: - Common
     case commonCancel = "common.cancel"
     case commonConfirm = "common.confirm"
@@ -117,18 +162,51 @@ public enum Localized: String, CaseIterable {
     case commonLoading = "common.loading"
     case commonError = "common.error"
     case commonUnknown = "common.unknown"
+
+    /// Get the localized string value for this key, honoring the current language selection.
+    public var string: String {
+        Self.localizedBundle.localizedString(forKey: rawValue, value: rawValue, table: nil)
+    }
+
+    /// Resolve the bundle for the currently selected language.
+    private static var localizedBundle: Bundle {
+        guard let languageCode = UserDefaults.standard.string(forKey: "riptide.language"),
+              let language = AppLanguage(rawValue: languageCode),
+              let path = Bundle.main.path(forResource: language.localeIdentifier, ofType: "lproj"),
+              let bundle = Bundle(path: path) else {
+            return .main
+        }
+        return bundle
+    }
 }
 
-/// Language codes supported by the app.
-public enum AppLanguage: String, CaseIterable, Sendable {
-    case zhHans = "zh-Hans"
-    case en = "en"
+/// Extended language codes supported by the app (7 languages total).
+public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
+    case chineseSimplified = "zh-Hans"
+    case english = "en"
+    case spanish = "es"
+    case russian = "ru"
+    case japanese = "ja"
+    case korean = "ko"
+    case persian = "fa"
+
+    public var id: String { rawValue }
 
     /// Display name in the language itself.
     public var displayName: String {
         switch self {
-        case .zhHans: return "简体中文"
-        case .en: return "English"
+        case .chineseSimplified: return "简体中文"
+        case .english: return "English"
+        case .spanish: return "Español"
+        case .russian: return "Русский"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .persian: return "فارسی"
         }
+    }
+
+    /// Locale identifier for this language.
+    public var localeIdentifier: String {
+        rawValue
     }
 }
