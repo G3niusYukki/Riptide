@@ -202,8 +202,8 @@ public enum ClashConfigParser {
                     kind: .tuic,
                     server: proxy.server,
                     port: port,
-                    uuid: uuid,
                     password: password,
+                    uuid: uuid,
                     sni: proxy.sni,
                     alpn: proxy.alpn,
                     skipCertVerify: proxy.skipCertVerify
