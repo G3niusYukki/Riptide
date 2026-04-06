@@ -301,6 +301,7 @@ public actor WebSocketExternalController {
         case .trojan: return "Trojan"
         case .hysteria2: return "Hysteria2"
         case .snell: return "Snell"
+        case .tuic: return "TUIC"
         case .relay: return "Relay"
         }
     }

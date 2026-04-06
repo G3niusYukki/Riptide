@@ -150,6 +150,8 @@ public enum MihomoConfigGenerator {
             return "socks5"
         case .relay:
             return "relay"
+        case .tuic:
+            return "tuic"
         }
     }
 
@@ -244,6 +246,26 @@ public enum MihomoConfigGenerator {
             }
             if let version = proxy.snellVersion {
                 lines.append("    version: \(version)")
+            }
+
+        case .tuic:
+            if let uuid = proxy.uuid {
+                lines.append("    uuid: \(yamlEscape(uuid))")
+            }
+            if let password = proxy.password {
+                lines.append("    password: \(yamlEscape(password))")
+            }
+            if let sni = proxy.sni {
+                lines.append("    sni: \(yamlEscape(sni))")
+            }
+            if let skipCertVerify = proxy.skipCertVerify {
+                lines.append("    skip-cert-verify: \(skipCertVerify)")
+            }
+            if let alpn = proxy.alpn {
+                lines.append("    alpn:")
+                for proto in alpn {
+                    lines.append("      - \(yamlEscape(proto))")
+                }
             }
 
         case .relay:
