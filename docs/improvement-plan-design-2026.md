@@ -142,18 +142,18 @@ public struct MultiplexConfig: Sendable {
 
 ### 3.8 sing-box 基础集成
 
-新增 `Sources/Riptide/Singbox/` 模块：
+新增 `Sources/Riptide/SingBox/` 模块：
 
 | 文件 | 职责 |
 |------|------|
-| `SingboxConfigGenerator.swift` | sing-box JSON 配置生成 |
-| `SingboxRuntimeManager.swift` | sing-box 进程生命周期管理 |
-| `SingboxAPIClient.swift` | sing-box REST API 客户端 |
-| `SingboxPaths.swift` | 文件系统布局 |
+| `SingBoxConfigGenerator.swift` | sing-box JSON 配置生成 |
+| `SingBoxRuntimeManager.swift` | sing-box 进程生命周期管理 |
+| `SingBoxAPIClient.swift` | sing-box REST API 客户端 |
+| `SingBoxPaths.swift` | 文件系统布局 |
 
 **下载脚本：** `Scripts/download-singbox.sh`
 
-sing-box 二进制通过 XPC Helper 安装到 `/Library/Application Support/Riptide/singbox/sing-box`。
+sing-box 二进制通过 XPC Helper 安装到 `/Library/Application Support/Riptide/singbox/Binaries/sing-box`。
 
 ### 3.9 节点编辑器 UI 改动
 
@@ -168,15 +168,15 @@ sing-box 二进制通过 XPC Helper 安装到 `/Library/Application Support/Ript
 **新增文件：**
 
 ```
-Sources/Riptide/Singbox/
-  SingboxConfigGenerator.swift
-  SingboxRuntimeManager.swift
-  SingboxAPIClient.swift
-  SingboxPaths.swift
+Sources/Riptide/SingBox/
+  SingBoxConfigGenerator.swift
+  SingBoxRuntimeManager.swift
+  SingBoxAPIClient.swift
+  SingBoxPaths.swift
 Sources/Riptide/Engines/
   ProxyEngine.swift              (protocol)
   MihomoEngine.swift             (wraps existing)
-  SingboxEngineImpl.swift        (wraps SingboxConfigGenerator)
+  SingBoxEngineImpl.swift        (wraps SingboxConfigGenerator)
   EngineRouter.swift             (routes by ProxyKind)
 Sources/RiptideApp/Views/
   RealityNodeSheet.swift
