@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// Manages app localization and language switching.
+/// Manages app localization and language switching for 7 languages.
 @MainActor
 public final class LocalizationManager: ObservableObject {
     @Published public var currentLanguage: AppLanguage
@@ -16,9 +16,9 @@ public final class LocalizationManager: ObservableObject {
         } else {
             let preferred = Locale.preferredLanguages.first ?? ""
             if preferred.hasPrefix("zh") {
-                self.currentLanguage = .zhHans
+                self.currentLanguage = .chineseSimplified
             } else {
-                self.currentLanguage = .en
+                self.currentLanguage = .english
             }
         }
         loadStrings()
@@ -29,6 +29,45 @@ public final class LocalizationManager: ObservableObject {
         currentLanguage = language
         UserDefaults.standard.set(language.rawValue, forKey: defaultsKey)
         loadStrings()
+
+        // Post notification for UI updates
+        NotificationCenter.default.post(
+            name: .languageChanged,
+            object: nil,
+            userInfo: ["language": language.rawValue]
+        )
+    }
+
+    /// Get current language (for async contexts).
+    public func getCurrentLanguage() -> AppLanguage {
+        currentLanguage
+    }
+
+    /// Detect and set system language.
+    public func setSystemLanguage() {
+        let preferred = Locale.preferredLanguages.first ?? ""
+        let language: AppLanguage
+        if preferred.hasPrefix("zh") {
+            language = .chineseSimplified
+        } else if preferred.hasPrefix("es") {
+            language = .spanish
+        } else if preferred.hasPrefix("ru") {
+            language = .russian
+        } else if preferred.hasPrefix("ja") || preferred.hasPrefix("jp") {
+            language = .japanese
+        } else if preferred.hasPrefix("ko") {
+            language = .korean
+        } else if preferred.hasPrefix("fa") {
+            language = .persian
+        } else {
+            language = .english
+        }
+        setLanguage(language)
+    }
+
+    /// All supported languages.
+    public func supportedLanguages() -> [AppLanguage] {
+        AppLanguage.allCases
     }
 
     /// Gets the localized string for a key.
@@ -50,36 +89,34 @@ public final class LocalizationManager: ObservableObject {
             let placeholder = "{\(index)}"
             result = result.replacingOccurrences(of: placeholder, with: String(describing: arg))
         }
-        // Also support named placeholders like {count}
-        for arg in args {
-            let value = String(describing: arg)
-            let pattern = "\\{\\w+\\}"
-            if let regex = try? NSRegularExpression(pattern: pattern) {
-                let range = NSRange(result.startIndex..., in: result)
-                result = regex.stringByReplacingMatches(
-                    in: result, range: range, withTemplate: value
-                )
-            }
-            break // Only replace first match per arg
-        }
         return result
     }
 
     // MARK: - Private
 
     private func loadStrings() {
+        // Try to load from JSON first (backward compatibility)
         let bundle = Bundle.main
         guard let url = bundle.url(forResource: currentLanguage.rawValue, withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
-            // Fallback: use keys as values
+            // Fallback: use String Catalog via NSLocalizedString
             for key in Localized.allCases {
-                strings[key.rawValue] = key.rawValue
+                strings[key.rawValue] = NSLocalizedString(key.rawValue, comment: "")
             }
             return
         }
         strings = decoded
     }
+}
+
+extension Notification.Name {
+    public static let languageChanged = Notification.Name("languageChanged")
+}
+
+/// Shared instance for non-SwiftUI code.
+public extension LocalizationManager {
+    static let shared = LocalizationManager()
 }
 
 /// Convenience view modifier for localized text.
@@ -96,7 +133,10 @@ public struct LocalizedText: View {
     }
 }
 
-/// Shared instance for non-SwiftUI code.
-public extension LocalizationManager {
-    static let shared = LocalizationManager()
+/// String extension for localized access.
+extension String {
+    /// Access a localized string using the key via LocalizationManager.
+    public static func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
 }

@@ -1,0 +1,270 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "app.name": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Riptide" } },
+        "zh-Hans": { "stringUnit": { "value": "Riptide" } },
+        "es": { "stringUnit": { "value": "Riptide" } },
+        "ru": { "stringUnit": { "value": "Riptide" } },
+        "ja": { "stringUnit": { "value": "Riptide" } },
+        "ko": { "stringUnit": { "value": "Riptide" } },
+        "fa": { "stringUnit": { "value": "Riptide" } }
+      }
+    },
+    "tab.config": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Config" } },
+        "zh-Hans": { "stringUnit": { "value": "配置" } },
+        "es": { "stringUnit": { "value": "Configuración" } },
+        "ru": { "stringUnit": { "value": "Конфигурация" } },
+        "ja": { "stringUnit": { "value": "設定" } },
+        "ko": { "stringUnit": { "value": "설정" } },
+        "fa": { "stringUnit": { "value": "پیکربندی" } }
+      }
+    },
+    "tab.proxy": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Proxies" } },
+        "zh-Hans": { "stringUnit": { "value": "代理" } },
+        "es": { "stringUnit": { "value": "Proxies" } },
+        "ru": { "stringUnit": { "value": "Прокси" } },
+        "ja": { "stringUnit": { "value": "プロキシ" } },
+        "ko": { "stringUnit": { "value": "프록시" } },
+        "fa": { "stringUnit": { "value": "پروکسی" } }
+      }
+    },
+    "tab.traffic": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Traffic" } },
+        "zh-Hans": { "stringUnit": { "value": "流量" } },
+        "es": { "stringUnit": { "value": "Tráfico" } },
+        "ru": { "stringUnit": { "value": "Трафик" } },
+        "ja": { "stringUnit": { "value": "トラフィック" } },
+        "ko": { "stringUnit": { "value": "트래픽" } },
+        "fa": { "stringUnit": { "value": "ترافیک" } }
+      }
+    },
+    "tab.rules": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Rules" } },
+        "zh-Hans": { "stringUnit": { "value": "规则" } },
+        "es": { "stringUnit": { "value": "Reglas" } },
+        "ru": { "stringUnit": { "value": "Правила" } },
+        "ja": { "stringUnit": { "value": "ルール" } },
+        "ko": { "stringUnit": { "value": "규칙" } },
+        "fa": { "stringUnit": { "value": "قوانین" } }
+      }
+    },
+    "tab.logs": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Logs" } },
+        "zh-Hans": { "stringUnit": { "value": "日志" } },
+        "es": { "stringUnit": { "value": "Registros" } },
+        "ru": { "stringUnit": { "value": "Логи" } },
+        "ja": { "stringUnit": { "value": "ログ" } },
+        "ko": { "stringUnit": { "value": "로그" } },
+        "fa": { "stringUnit": { "value": "گزارش‌ها" } }
+      }
+    },
+    "config.mode": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Mode" } },
+        "zh-Hans": { "stringUnit": { "value": "运行模式" } },
+        "es": { "stringUnit": { "value": "Modo" } },
+        "ru": { "stringUnit": { "value": "Режим" } },
+        "ja": { "stringUnit": { "value": "モード" } },
+        "ko": { "stringUnit": { "value": "모드" } },
+        "fa": { "stringUnit": { "value": "حالت" } }
+      }
+    },
+    "config.system_proxy": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "System Proxy" } },
+        "zh-Hans": { "stringUnit": { "value": "系统代理" } },
+        "es": { "stringUnit": { "value": "Proxy del Sistema" } },
+        "ru": { "stringUnit": { "value": "Системный прокси" } },
+        "ja": { "stringUnit": { "value": "システムプロキシ" } },
+        "ko": { "stringUnit": { "value": "시스템 프록시" } },
+        "fa": { "stringUnit": { "value": "پروکسی سیستم" } }
+      }
+    },
+    "config.tun_mode": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "TUN Mode" } },
+        "zh-Hans": { "stringUnit": { "value": "TUN 模式" } },
+        "es": { "stringUnit": { "value": "Modo TUN" } },
+        "ru": { "stringUnit": { "value": "Режим TUN" } },
+        "ja": { "stringUnit": { "value": "TUNモード" } },
+        "ko": { "stringUnit": { "value": "TUN 모드" } },
+        "fa": { "stringUnit": { "value": "حالت TUN" } }
+      }
+    },
+    "config.import": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Import Config" } },
+        "zh-Hans": { "stringUnit": { "value": "导入配置文件" } },
+        "es": { "stringUnit": { "value": "Importar Configuración" } },
+        "ru": { "stringUnit": { "value": "Импорт конфигурации" } },
+        "ja": { "stringUnit": { "value": "設定をインポート" } },
+        "ko": { "stringUnit": { "value": "구성 가져오기" } },
+        "fa": { "stringUnit": { "value": "وارد کردن پیکربندی" } }
+      }
+    },
+    "config.subscriptions": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Subscriptions" } },
+        "zh-Hans": { "stringUnit": { "value": "订阅列表" } },
+        "es": { "stringUnit": { "value": "Suscripciones" } },
+        "ru": { "stringUnit": { "value": "Подписки" } },
+        "ja": { "stringUnit": { "value": "サブスクリプション" } },
+        "ko": { "stringUnit": { "value": "구독" } },
+        "fa": { "stringUnit": { "value": "اشتراک‌ها" } }
+      }
+    },
+    "proxy.delay_test": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Delay Test" } },
+        "zh-Hans": { "stringUnit": { "value": "延迟测试" } },
+        "es": { "stringUnit": { "value": "Prueba de Latencia" } },
+        "ru": { "stringUnit": { "value": "Тест задержки" } },
+        "ja": { "stringUnit": { "value": "遅延テスト" } },
+        "ko": { "stringUnit": { "value": "지연 테스트" } },
+        "fa": { "stringUnit": { "value": "تست تأخیر" } }
+      }
+    },
+    "traffic.upload": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Upload" } },
+        "zh-Hans": { "stringUnit": { "value": "上传" } },
+        "es": { "stringUnit": { "value": "Subida" } },
+        "ru": { "stringUnit": { "value": "Отправка" } },
+        "ja": { "stringUnit": { "value": "アップロード" } },
+        "ko": { "stringUnit": { "value": "업로드" } },
+        "fa": { "stringUnit": { "value": "آپلود" } }
+      }
+    },
+    "traffic.download": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Download" } },
+        "zh-Hans": { "stringUnit": { "value": "下载" } },
+        "es": { "stringUnit": { "value": "Descarga" } },
+        "ru": { "stringUnit": { "value": "Загрузка" } },
+        "ja": { "stringUnit": { "value": "ダウンロード" } },
+        "ko": { "stringUnit": { "value": "다운로드" } },
+        "fa": { "stringUnit": { "value": "دانلود" } }
+      }
+    },
+    "common.cancel": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Cancel" } },
+        "zh-Hans": { "stringUnit": { "value": "取消" } },
+        "es": { "stringUnit": { "value": "Cancelar" } },
+        "ru": { "stringUnit": { "value": "Отмена" } },
+        "ja": { "stringUnit": { "value": "キャンセル" } },
+        "ko": { "stringUnit": { "value": "취소" } },
+        "fa": { "stringUnit": { "value": "لغو" } }
+      }
+    },
+    "common.save": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Save" } },
+        "zh-Hans": { "stringUnit": { "value": "保存" } },
+        "es": { "stringUnit": { "value": "Guardar" } },
+        "ru": { "stringUnit": { "value": "Сохранить" } },
+        "ja": { "stringUnit": { "value": "保存" } },
+        "ko": { "stringUnit": { "value": "저장" } },
+        "fa": { "stringUnit": { "value": "ذخیره" } }
+      }
+    },
+    "common.delete": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Delete" } },
+        "zh-Hans": { "stringUnit": { "value": "删除" } },
+        "es": { "stringUnit": { "value": "Eliminar" } },
+        "ru": { "stringUnit": { "value": "Удалить" } },
+        "ja": { "stringUnit": { "value": "削除" } },
+        "ko": { "stringUnit": { "value": "삭제" } },
+        "fa": { "stringUnit": { "value": "حذف" } }
+      }
+    },
+    "common.add": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Add" } },
+        "zh-Hans": { "stringUnit": { "value": "添加" } },
+        "es": { "stringUnit": { "value": "Añadir" } },
+        "ru": { "stringUnit": { "value": "Добавить" } },
+        "ja": { "stringUnit": { "value": "追加" } },
+        "ko": { "stringUnit": { "value": "추가" } },
+        "fa": { "stringUnit": { "value": "افزودن" } }
+      }
+    },
+    "common.edit": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Edit" } },
+        "zh-Hans": { "stringUnit": { "value": "编辑" } },
+        "es": { "stringUnit": { "value": "Editar" } },
+        "ru": { "stringUnit": { "value": "Изменить" } },
+        "ja": { "stringUnit": { "value": "編集" } },
+        "ko": { "stringUnit": { "value": "편집" } },
+        "fa": { "stringUnit": { "value": "ویرایش" } }
+      }
+    },
+    "common.close": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Close" } },
+        "zh-Hans": { "stringUnit": { "value": "关闭" } },
+        "es": { "stringUnit": { "value": "Cerrar" } },
+        "ru": { "stringUnit": { "value": "Закрыть" } },
+        "ja": { "stringUnit": { "value": "閉じる" } },
+        "ko": { "stringUnit": { "value": "닫기" } },
+        "fa": { "stringUnit": { "value": "بستن" } }
+      }
+    },
+    "menu.start": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Start" } },
+        "zh-Hans": { "stringUnit": { "value": "启动" } },
+        "es": { "stringUnit": { "value": "Iniciar" } },
+        "ru": { "stringUnit": { "value": "Запустить" } },
+        "ja": { "stringUnit": { "value": "開始" } },
+        "ko": { "stringUnit": { "value": "시작" } },
+        "fa": { "stringUnit": { "value": "شروع" } }
+      }
+    },
+    "menu.stop": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Stop" } },
+        "zh-Hans": { "stringUnit": { "value": "停止" } },
+        "es": { "stringUnit": { "value": "Detener" } },
+        "ru": { "stringUnit": { "value": "Остановить" } },
+        "ja": { "stringUnit": { "value": "停止" } },
+        "ko": { "stringUnit": { "value": "중지" } },
+        "fa": { "stringUnit": { "value": "توقف" } }
+      }
+    },
+    "language.select": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Select Language" } },
+        "zh-Hans": { "stringUnit": { "value": "选择语言" } },
+        "es": { "stringUnit": { "value": "Seleccionar Idioma" } },
+        "ru": { "stringUnit": { "value": "Выбрать Язык" } },
+        "ja": { "stringUnit": { "value": "言語を選択" } },
+        "ko": { "stringUnit": { "value": "언어 선택" } },
+        "fa": { "stringUnit": { "value": "انتخاب زبان" } }
+      }
+    },
+    "language.auto": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "Auto" } },
+        "zh-Hans": { "stringUnit": { "value": "自动" } },
+        "es": { "stringUnit": { "value": "Automático" } },
+        "ru": { "stringUnit": { "value": "Авто" } },
+        "ja": { "stringUnit": { "value": "自動" } },
+        "ko": { "stringUnit": { "value": "자동" } },
+        "fa": { "stringUnit": { "value": "خودکار" } }
+      }
+    }
+  }
+}

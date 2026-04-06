@@ -1,7 +1,7 @@
 import Foundation
 
 /// All localizable string keys used in the app.
-/// Each case maps to a key in the language JSON files.
+/// Each case maps to a key in the Localizable.xcstrings file.
 public enum Localized: String, CaseIterable {
     // MARK: - Tab Names
     case tabConfig = "tab.config"
@@ -106,6 +106,10 @@ public enum Localized: String, CaseIterable {
     case menuDisconnected = "menu.disconnected"
     case menuSwitchModeFirst = "menu.switch_mode_first"
 
+    // MARK: - Language
+    case languageSelect = "language.select"
+    case languageAuto = "language.auto"
+
     // MARK: - Common
     case commonCancel = "common.cancel"
     case commonConfirm = "common.confirm"
@@ -117,18 +121,40 @@ public enum Localized: String, CaseIterable {
     case commonLoading = "common.loading"
     case commonError = "common.error"
     case commonUnknown = "common.unknown"
+
+    /// Get the localized string value for this key.
+    public var string: String {
+        NSLocalizedString(rawValue, comment: "")
+    }
 }
 
-/// Language codes supported by the app.
-public enum AppLanguage: String, CaseIterable, Sendable {
-    case zhHans = "zh-Hans"
-    case en = "en"
+/// Extended language codes supported by the app (7 languages total).
+public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
+    case chineseSimplified = "zh-Hans"
+    case english = "en"
+    case spanish = "es"
+    case russian = "ru"
+    case japanese = "ja"
+    case korean = "ko"
+    case persian = "fa"
+
+    public var id: String { rawValue }
 
     /// Display name in the language itself.
     public var displayName: String {
         switch self {
-        case .zhHans: return "简体中文"
-        case .en: return "English"
+        case .chineseSimplified: return "简体中文"
+        case .english: return "English"
+        case .spanish: return "Español"
+        case .russian: return "Русский"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .persian: return "فارسی"
         }
+    }
+
+    /// Locale identifier for this language.
+    public var localeIdentifier: String {
+        rawValue
     }
 }
