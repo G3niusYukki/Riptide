@@ -100,7 +100,7 @@ struct RuleProviderTests {
 
         // Calling stop should cancel the update task without error.
         let rules = await provider.getRules()
-        #expect(rules != nil)
+        #expect(rules.count == 0)
     }
 
     @Test("RuleProvider parses domain rules from file")
@@ -341,8 +341,7 @@ struct RuleProviderManagerTests {
             updateInterval: 3600
         )
 
-        let provider = await manager.addProvider(config)
-        let providerID = provider.id
+        let providerID = await manager.addProvider(config)
         let retrieved = await manager.getProvider(id: providerID)
 
         #expect(retrieved != nil)
@@ -359,8 +358,7 @@ struct RuleProviderManagerTests {
             updateInterval: 3600
         )
 
-        let provider = await manager.addProvider(config)
-        let providerID = provider.id
+        let providerID = await manager.addProvider(config)
         await manager.removeProvider(id: providerID)
         let retrieved = await manager.getProvider(id: providerID)
 
@@ -371,7 +369,6 @@ struct RuleProviderManagerTests {
     func getAllProviders() async throws {
         let manager = RuleProviderManager()
         let url1 = URL(string: "https://example.com/rules1.yaml")!
-        let url2 = URL(string: "https://example.com/rules2.yaml")!
 
         let config1 = RuleProviderConfig(name: "provider1", type: .http, url: url1, updateInterval: 3600)
         let config2 = RuleProviderConfig(name: "provider2", type: .file, path: "/tmp/rules.yaml", updateInterval: nil)
@@ -442,11 +439,12 @@ struct RuleProviderManagerTests {
         }
 
         let config = RuleProviderConfig(name: "update-test", type: .file, path: testFile.path, updateInterval: nil)
-        let provider = await manager.addProvider(config)
+        let providerID = await manager.addProvider(config)
 
-        try await manager.updateProvider(id: provider.id)
+        try await manager.updateProvider(id: providerID)
 
-        let rules = await provider.getRules()
-        #expect(rules.count == 1)
+        let provider = await manager.getProvider(id: providerID)
+        let rules = await provider?.getRules()
+        #expect(rules?.count == 1)
     }
 }

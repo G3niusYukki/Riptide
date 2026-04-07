@@ -7,13 +7,29 @@ public actor RuleProviderManager {
 
     public init() {}
 
-    /// Add a new rule provider from configuration.
-    public func addProvider(_ config: RuleProviderConfig) async -> RuleProvider {
+    /// Add a new rule provider from configuration and returns its ID.
+    public func addProvider(_ config: RuleProviderConfig) -> UUID {
         let provider = RuleProvider(config: config)
         providers[provider.id] = provider
 
         if let interval = config.updateInterval, interval > 0 {
-            await scheduler?.schedule(providerID: provider.id, interval: TimeInterval(interval))
+            Task { [providerID = provider.id] in
+                await scheduler?.schedule(providerID: providerID, interval: TimeInterval(interval))
+            }
+        }
+
+        return provider.id
+    }
+
+    /// Add a new rule provider from configuration.
+    public func addProviderAndReturnProvider(_ config: RuleProviderConfig) -> RuleProvider {
+        let provider = RuleProvider(config: config)
+        providers[provider.id] = provider
+
+        if let interval = config.updateInterval, interval > 0 {
+            Task { [providerID = provider.id] in
+                await scheduler?.schedule(providerID: providerID, interval: TimeInterval(interval))
+            }
         }
 
         return provider
