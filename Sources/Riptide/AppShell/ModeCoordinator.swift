@@ -7,6 +7,8 @@ public actor ModeCoordinator {
     private let mihomoManager: any MihomoRuntimeManaging
     private var activeMode: RuntimeMode
     private var eventBuffer: [RuntimeEvent]
+    private var providerScheduler: ProviderUpdateScheduler?
+    private var registeredProviders: [UUID: ProxyProviderConfig] = [:]
 
     private let maxEvents = 100
 
@@ -31,6 +33,14 @@ public actor ModeCoordinator {
             activeMode = mode
             emit(.modeChanged(mode))
             emit(.stateChanged(.running))
+
+            // Initialize Provider scheduler
+            providerScheduler = ProviderUpdateScheduler { [weak self] providerID in
+                await self?.updateProvider(id: providerID)
+            }
+
+            // Register and schedule proxy providers from profile config
+            await registerProviders(from: profile)
         } catch {
             emit(.degraded(mode, "\(mode) start failed: \(String(describing: error))"))
             emit(.error(RuntimeErrorSnapshot(
@@ -42,6 +52,11 @@ public actor ModeCoordinator {
     }
 
     public func stop() async throws {
+        // Stop Provider scheduler
+        await providerScheduler?.stopAll()
+        providerScheduler = nil
+        registeredProviders.removeAll()
+
         do {
             try await mihomoManager.stop()
             emit(.stateChanged(.stopped))
@@ -139,6 +154,33 @@ public actor ModeCoordinator {
         } catch {
             return nil
         }
+    }
+
+    // MARK: - Provider Management
+
+    /// Registers proxy providers from the tunnel profile and schedules updates.
+    private func registerProviders(from profile: TunnelProfile) async {
+        guard let scheduler = providerScheduler else { return }
+
+        for (name, config) in profile.config.proxyProviders {
+            let id = UUID(uuidString: name.hashValue.description) ?? UUID()
+            registeredProviders[id] = config
+
+            // Schedule updates if interval is specified
+            if let interval = config.interval, interval > 0 {
+                await scheduler.schedule(providerID: id, interval: TimeInterval(interval))
+            }
+        }
+    }
+
+    /// Updates a specific provider by ID.
+    private func updateProvider(id: UUID) async {
+        guard let scheduler = providerScheduler,
+              let config = registeredProviders[id] else { return }
+
+        // Create a temporary provider to refresh
+        let provider = ProxyProvider(config: config)
+        try? await provider.refresh()
     }
 
     private func emit(_ event: RuntimeEvent) {

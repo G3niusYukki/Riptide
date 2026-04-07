@@ -1,5 +1,8 @@
 import Foundation
 import Security
+import X509
+import SwiftASN1
+import Crypto
 
 public enum MITMError: Error, Equatable, Sendable {
     case certificateGenerationFailed
@@ -26,7 +29,7 @@ public enum MITMError: Error, Equatable, Sendable {
 public actor CertificateAuthority {
     private let commonName: String
     private let organization: String
-    private var privateKey: SecKey?
+    private var privateKey: Certificate.PrivateKey?
     private var certificateData: Data?
 
     /// Keychain label for storing the CA private key.
@@ -40,58 +43,121 @@ public actor CertificateAuthority {
 
     // MARK: - Key Management
 
-    /// Generates a new RSA 2048-bit CA private key.
+    /// Generates a new P-384 CA private key.
     /// Keys are kept in memory only (not stored in keychain) for safety.
     public func generateKey() throws {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-            kSecAttrKeySizeInBits as String: 2048,
-            kSecAttrIsPermanent as String: false, // Memory-only for safety
-        ]
+        let privateKey = Certificate.PrivateKey(P384.Signing.PrivateKey())
+        self.privateKey = privateKey
+    }
 
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw MITMError.certificateGenerationFailed
-        }
-        self.privateKey = key
+    /// DER representation of a Certificate.PublicKey using ASN.1 serialization
+    private func derBytes(for publicKey: Certificate.PublicKey) throws -> [UInt8] {
+        var serializer = DER.Serializer()
+        try publicKey.serialize(into: &serializer)
+        return serializer.serializedBytes
     }
 
     // MARK: - Certificate Management
 
-    /// Generates a self-signed CA certificate.
-    /// Note: Full X.509 certificate generation requires ASN.1 DER encoding.
-    /// This method scaffolds the CA infrastructure. Production use should integrate
-    /// a certificate generation library (e.g., SwiftASN1).
+    /// Generates a self-signed CA certificate using swift-certificates.
     public func generateCertificate() throws {
-        try generateKey()
+        // 1. Generate P384 key pair
+        let privateKey = Certificate.PrivateKey(P384.Signing.PrivateKey())
+        self.privateKey = privateKey
 
-        // Placeholder: In production, generate a real X.509 v3 certificate with:
-        // - Subject: CN=Riptide MITM CA, O=Riptide
-        // - Basic Constraints: CA:TRUE
-        // - Key Usage: keyCertSign, cRLSign
-        // - Validity: 10 years from now
-        // Then encode as DER and store via SecCertificateCreateWithData
+        // 2. Build DN
+        let name = try DistinguishedName {
+            CountryName("US")
+            OrganizationName(self.organization)
+            CommonName(self.commonName)
+        }
 
-        // For now, mark that key generation succeeded
-        self.certificateData = nil
+        // 3. Compute SKI from public key bytes
+        let publicKeyBytes = try derBytes(for: privateKey.publicKey)
+        let ski = ArraySlice(Insecure.SHA1.hash(data: Data(publicKeyBytes)))
+
+        // 4. Build extensions
+        let extensions = try Certificate.Extensions {
+            Critical(
+                BasicConstraints.isCertificateAuthority(maxPathLength: nil)
+            )
+            KeyUsage(digitalSignature: true, keyCertSign: true, cRLSign: true)
+            SubjectKeyIdentifier(keyIdentifier: ski)
+        }
+
+        // 5. Generate self-signed certificate
+        let certificate = try Certificate(
+            version: .v3,
+            serialNumber: .init(bytes: ArraySlice<UInt8>(Array(repeating: 0, count: 16).map { _ in UInt8.random(in: 0...255) })),
+            publicKey: privateKey.publicKey,
+            notValidBefore: Date(),
+            notValidAfter: Date() + 3650 * 24 * 3600, // 10 years
+            issuer: name,
+            subject: name,
+            extensions: extensions,
+            issuerPrivateKey: privateKey
+        )
+
+        // 6. DER encode and store
+        var serializer = DER.Serializer()
+        try certificate.serialize(into: &serializer)
+        self.certificateData = Data(serializer.serializedBytes)
     }
 
     /// Generates a domain certificate signed by the CA.
     /// - Parameter domain: The domain name (e.g., "example.com")
     /// - Returns: DER-encoded certificate data
     public func generateCertificate(for domain: String) throws -> Data {
-        guard let privateKey else {
+        guard let caPrivateKey = privateKey else {
             throw MITMError.certificateGenerationFailed
         }
 
-        // Placeholder: In production, generate a real X.509 v3 certificate:
-        // - Subject: CN=<domain>
-        // - SAN: DNS:<domain>
-        // - Issuer: CN=Riptide MITM CA
-        // - Validity: 1 year from now
-        // - Signed with CA private key
+        // Build CA name for issuer
+        let caName = try DistinguishedName {
+            CountryName("US")
+            OrganizationName(self.organization)
+            CommonName(self.commonName)
+        }
 
-        throw MITMError.certificateGenerationFailed
+        // Build domain name
+        let domainName = try DistinguishedName {
+            CommonName(domain)
+        }
+
+        // Generate domain key pair
+        let domainPrivateKey = Certificate.PrivateKey(P384.Signing.PrivateKey())
+        let domainPublicKey = domainPrivateKey.publicKey
+
+        // Compute public key bytes for SKI
+        let domainPublicKeyBytes = try derBytes(for: domainPublicKey)
+        let ski = ArraySlice(Insecure.SHA1.hash(data: Data(domainPublicKeyBytes)))
+
+        // Build extensions for domain certificate
+        let extensions = try Certificate.Extensions {
+            Critical(
+                BasicConstraints.isCertificateAuthority(maxPathLength: nil)
+            )
+            KeyUsage(digitalSignature: true)
+            SubjectKeyIdentifier(keyIdentifier: ski)
+        }
+
+        // Generate domain certificate signed by CA
+        let domainCertificate = try Certificate(
+            version: .v3,
+            serialNumber: .init(bytes: ArraySlice<UInt8>(Array(repeating: 0, count: 16).map { _ in UInt8.random(in: 0...255) })),
+            publicKey: domainPublicKey,
+            notValidBefore: Date(),
+            notValidAfter: Date() + 365 * 24 * 3600, // 1 year
+            issuer: caName,
+            subject: domainName,
+            extensions: extensions,
+            issuerPrivateKey: caPrivateKey
+        )
+
+        // DER encode
+        var serializer = DER.Serializer()
+        try domainCertificate.serialize(into: &serializer)
+        return Data(serializer.serializedBytes)
     }
 
     // MARK: - Installation

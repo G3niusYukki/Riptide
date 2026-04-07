@@ -11,11 +11,13 @@ public enum ProxyProviderError: Error, Sendable {
 
 /// Actor that downloads and auto-updates a remote proxy provider.
 public actor ProxyProvider {
-    private let config: ProxyProviderConfig
+    public let id: UUID
+    public let config: ProxyProviderConfig
     private var currentNodes: [ProxyNode] = []
     private var updateTask: Task<Void, Never>?
 
     public init(config: ProxyProviderConfig) {
+        self.id = UUID()
         self.config = config
     }
 
