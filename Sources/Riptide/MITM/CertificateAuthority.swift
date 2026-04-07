@@ -50,7 +50,7 @@ public actor CertificateAuthority {
         self.privateKey = privateKey
     }
 
-    /// DER representation of a Certificate.PublicKey using ASN.1 unwrapping
+    /// DER representation of a Certificate.PublicKey using ASN.1 serialization
     private func derBytes(for publicKey: Certificate.PublicKey) throws -> [UInt8] {
         var serializer = DER.Serializer()
         try publicKey.serialize(into: &serializer)
@@ -72,12 +72,12 @@ public actor CertificateAuthority {
             CommonName(self.commonName)
         }
 
-        // 3. Compute SKI from public key bytes (before builder)
+        // 3. Compute SKI from public key bytes
         let publicKeyBytes = try derBytes(for: privateKey.publicKey)
         let ski = ArraySlice(Insecure.SHA1.hash(data: Data(publicKeyBytes)))
 
         // 4. Build extensions
-        let extensions = Certificate.Extensions {
+        let extensions = try Certificate.Extensions {
             Critical(
                 BasicConstraints.isCertificateAuthority(maxPathLength: nil)
             )
@@ -128,12 +128,12 @@ public actor CertificateAuthority {
         let domainPrivateKey = Certificate.PrivateKey(P384.Signing.PrivateKey())
         let domainPublicKey = domainPrivateKey.publicKey
 
-        // Compute public key bytes for SKI (before builder)
+        // Compute public key bytes for SKI
         let domainPublicKeyBytes = try derBytes(for: domainPublicKey)
         let ski = ArraySlice(Insecure.SHA1.hash(data: Data(domainPublicKeyBytes)))
 
         // Build extensions for domain certificate
-        let extensions = Certificate.Extensions {
+        let extensions = try Certificate.Extensions {
             Critical(
                 BasicConstraints.isCertificateAuthority(maxPathLength: nil)
             )

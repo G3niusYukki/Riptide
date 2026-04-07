@@ -168,7 +168,7 @@ public actor ModeCoordinator {
 
             // Schedule updates if interval is specified
             if let interval = config.interval, interval > 0 {
-                scheduler.schedule(providerID: id, interval: TimeInterval(interval))
+                await scheduler.schedule(providerID: id, interval: TimeInterval(interval))
             }
         }
     }
