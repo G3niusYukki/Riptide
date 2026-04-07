@@ -25,12 +25,14 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.1"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
     ],
     targets: [
         .target(
             name: "Riptide",
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
+                .product(name: "X509", package: "swift-certificates"),
             ],
         ),
         .executableTarget(
