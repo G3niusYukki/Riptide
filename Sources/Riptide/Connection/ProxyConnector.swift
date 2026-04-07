@@ -21,7 +21,8 @@ public struct ConnectedProxyContext: Sendable {
 }
 
 public struct ProxyConnector: Sendable {
-    private let pool: TransportConnectionPool
+    /// The transport connection pool used by this connector.
+    public let pool: TransportConnectionPool
 
     public init(pool: TransportConnectionPool) {
         self.pool = pool

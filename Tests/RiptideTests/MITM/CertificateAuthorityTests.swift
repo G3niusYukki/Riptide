@@ -13,19 +13,23 @@ struct CertificateAuthorityTests {
     @Test("generateCertificate creates valid CA")
     func testGenerateCertificateCreatesValidCA() async throws {
         try await ca.generateCertificate()
-        
+
         let certData = await ca.caCertificateData()
         #expect(certData != nil)
-        
+
         // Verify DER is parseable
         let cert = try Certificate(derEncoded: Array(certData!))
         #expect(cert.issuer.description.contains("Riptide MITM CA"))
         #expect(cert.issuer.description.contains("Riptide"))
         #expect(cert.issuer.description.contains("US"))
-        
+
         // Verify is CA certificate
-        let basicConstraints = cert.extensions.basicConstraints
-        #expect(basicConstraints?.isCertificateAuthority ?? false)
+        let basicConstraints = try cert.extensions.basicConstraints
+        if case .isCertificateAuthority = basicConstraints {
+            #expect(true)
+        } else {
+            Issue.record("Certificate should be a CA")
+        }
     }
     
     @Test("generateCertificate for domain")

@@ -13,15 +13,48 @@ import Network
 /// - GET /connections — return active connections
 /// - DELETE /connections/{id} — close a connection
 /// - GET /traffic — return traffic stats (WebSocket streaming)
+/// - GET /proxies/{name}/delay — test proxy latency
 public actor WebSocketExternalController {
     private let runtime: LiveTunnelRuntime
     private let config: RiptideConfig
+    private let healthChecker: HealthChecker?
     private var listener: NWListener?
     private var activeConnections: [UUID: WebSocketConnection] = [:]
+    /// Current group selections, keyed by group name.
+    private var groupSelections: [String: String] = [:]
+    /// Cached delay results, keyed by proxy name.
+    private var delayCache: [String: DelayHistory] = [:]
 
-    public init(runtime: LiveTunnelRuntime, config: RiptideConfig) {
+    public struct DelayHistory: Sendable {
+        public var history: [DelayEntry]
+        public var delay: Int?
+
+        public init(history: [DelayEntry] = [], delay: Int? = nil) {
+            self.history = history
+            self.delay = delay
+        }
+    }
+
+    public struct DelayEntry: Sendable, Encodable {
+        public let time: String
+        public let delay: Int
+
+        public init(time: String = ISO8601DateFormatter().string(from: Date()), delay: Int) {
+            self.time = time
+            self.delay = delay
+        }
+    }
+
+    public init(runtime: LiveTunnelRuntime, config: RiptideConfig, healthChecker: HealthChecker? = nil) {
         self.runtime = runtime
         self.config = config
+        self.healthChecker = healthChecker
+        // Initialize group selections from config
+        for group in config.proxyGroups {
+            if let first = group.proxies.first {
+                groupSelections[group.id] = first
+            }
+        }
     }
 
     /// Start the WebSocket controller on the specified host and port.
@@ -149,6 +182,8 @@ public actor WebSocketExternalController {
             return await handlePutConfigs(request)
         case ("GET", "/proxies"):
             return await handleGetProxies(request)
+        case ("GET", _) where request.path.hasPrefix("/proxies/") && request.path.hasSuffix("/delay"):
+            return await handleGetProxyDelay(request)
         case ("GET", _) where request.path.hasPrefix("/proxies/"):
             return await handleGetProxy(request)
         case ("PUT", _) where request.path.hasPrefix("/proxies/"):
@@ -203,10 +238,11 @@ public actor WebSocketExternalController {
 
         // Add proxy groups
         for group in config.proxyGroups {
+            let currentSelection = groupSelections[group.id] ?? group.proxies.first ?? "DIRECT"
             proxies[group.id] = [
                 "name": group.id,
                 "type": groupTypeString(group.kind),
-                "now": group.proxies.first ?? "DIRECT",
+                "now": currentSelection,
                 "all": group.proxies,
                 "history": []
             ]
@@ -217,13 +253,162 @@ public actor WebSocketExternalController {
 
     private func handleGetProxy(_ request: WebSocketRequest) async -> WebSocketResponse {
         let name = String(request.path.dropFirst("/proxies/".count))
-        // Return proxy details (simplified)
-        return WebSocketResponse(id: request.id, status: "ok", data: ["name": name], error: nil)
+
+        // Check if it's a group
+        if let group = config.proxyGroups.first(where: { $0.id == name }) {
+            let currentSelection = groupSelections[name] ?? group.proxies.first ?? "DIRECT"
+            let history = group.proxies.compactMap { proxyName in
+                delayCache[proxyName]?.history.last.map { entry -> [String: Any] in
+                    ["time": entry.time, "delay": entry.delay]
+                }
+            }
+
+            var proxyDetails: [String: [String: Any]] = [:]
+            for proxyName in group.proxies {
+                if let node = config.proxies.first(where: { $0.name == proxyName }) {
+                    let delayInfo = delayCache[proxyName]
+                    proxyDetails[proxyName] = [
+                        "name": proxyName,
+                        "type": proxyTypeString(node.kind),
+                        "server": node.server,
+                        "port": node.port,
+                        "history": delayInfo?.history.map { ["time": $0.time, "delay": $0.delay] } ?? []
+                    ]
+                } else if proxyName == "DIRECT" {
+                    proxyDetails[proxyName] = ["name": "DIRECT", "type": "Direct", "history": []]
+                } else if proxyName == "REJECT" {
+                    proxyDetails[proxyName] = ["name": "REJECT", "type": "Reject", "history": []]
+                }
+            }
+
+            return WebSocketResponse(
+                id: request.id,
+                status: "ok",
+                data: [
+                    "name": name,
+                    "type": groupTypeString(group.kind),
+                    "now": currentSelection,
+                    "all": group.proxies,
+                    "history": history,
+                    "proxies": proxyDetails
+                ],
+                error: nil
+            )
+        }
+
+        // It's a direct proxy node
+        if let node = config.proxies.first(where: { $0.name == name }) {
+            let delayInfo = delayCache[name]
+            return WebSocketResponse(
+                id: request.id,
+                status: "ok",
+                data: [
+                    "name": name,
+                    "type": proxyTypeString(node.kind),
+                    "server": node.server,
+                    "port": node.port,
+                    "history": delayInfo?.history.map { ["time": $0.time, "delay": $0.delay] } ?? []
+                ],
+                error: nil
+            )
+        }
+
+        // DIRECT / REJECT
+        if name == "DIRECT" {
+            return WebSocketResponse(id: request.id, status: "ok", data: ["name": "DIRECT", "type": "Direct", "history": []], error: nil)
+        }
+        if name == "REJECT" {
+            return WebSocketResponse(id: request.id, status: "ok", data: ["name": "REJECT", "type": "Reject", "history": []], error: nil)
+        }
+
+        return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Proxy not found: \(name)")
     }
 
     private func handlePutProxy(_ request: WebSocketRequest) async -> WebSocketResponse {
-        // Proxy selection for groups (simplified)
-        return WebSocketResponse(id: request.id, status: "ok", data: nil, error: nil)
+        // Parse request body for proxy selection
+        // Expected format: { "name": "<group-name>" } in the URL path is the group,
+        // and the body contains { "name": "<proxy-name>" } for the selection
+        let groupName = String(request.path.dropFirst("/proxies/".count))
+
+        guard let group = config.proxyGroups.first(where: { $0.id == groupName }) else {
+            return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Group not found: \(groupName)")
+        }
+
+        guard group.kind == .select else {
+            return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Only 'select' groups support proxy switching")
+        }
+
+        // Extract proxy name from request body
+        let proxyName: String
+        if let body = request.body,
+           let nameValue = body["name"],
+           let str = nameValue.value as? String {
+            proxyName = str
+        } else {
+            // Fall back to the URL path after the group name (e.g., /proxies/GLOBAL?name=Proxy1)
+            proxyName = ""
+        }
+
+        guard !proxyName.isEmpty, group.proxies.contains(proxyName) else {
+            return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Proxy '\(proxyName)' not found in group '\(groupName)'")
+        }
+
+        // Update the group selection
+        groupSelections[groupName] = proxyName
+
+        return WebSocketResponse(
+            id: request.id,
+            status: "ok",
+            data: [
+                "name": groupName,
+                "now": proxyName
+            ],
+            error: nil
+        )
+    }
+
+    private func handleGetProxyDelay(_ request: WebSocketRequest) async -> WebSocketResponse {
+        // Extract proxy name from path: /proxies/{name}/delay
+        let basePath = String(request.path.dropFirst("/proxies/".count)) // "{name}/delay"
+        let proxyName = String(basePath.dropLast("/delay".count)) // "{name}"
+
+        // Parse query parameters from a full URL
+        let testURLString = "http://localhost" + request.path
+        let components = URLComponents(string: testURLString)
+        let urlString = components?.queryItems?.first(where: { $0.name == "url" })?.value ?? "http://www.gstatic.com/generate_204"
+        let timeout = Int(components?.queryItems?.first(where: { $0.name == "timeout" })?.value ?? "5000") ?? 5000
+
+        guard let testURL = URL(string: urlString) else {
+            return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Invalid test URL")
+        }
+
+        guard let node = config.proxies.first(where: { $0.name == proxyName }) else {
+            return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Proxy not found: \(proxyName)")
+        }
+
+        // Perform delay test
+        let delayMs: Int
+        if let healthChecker {
+            let result = await healthChecker.check(node: node, testURL: testURL, timeout: .milliseconds(timeout))
+            delayMs = result.latency ?? -1
+
+            // Update delay cache
+            let entry = DelayEntry(delay: result.alive ? (result.latency ?? -1) : -1)
+            var history = delayCache[proxyName] ?? DelayHistory()
+            history.history.append(entry)
+            if history.history.count > 10 { history.history.removeFirst(history.history.count - 10) }
+            history.delay = result.alive ? result.latency : nil
+            delayCache[proxyName] = history
+        } else {
+            delayMs = -1
+        }
+
+        return WebSocketResponse(
+            id: request.id,
+            status: "ok",
+            data: ["delay": delayMs],
+            error: nil
+        )
     }
 
     private func handleGetRules(_ request: WebSocketRequest) async -> WebSocketResponse {
