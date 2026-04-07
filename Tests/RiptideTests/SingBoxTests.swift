@@ -2,10 +2,73 @@ import Foundation
 import Testing
 @testable import Riptide
 
+// MARK: - SingBox Mock URL Protocol (isolated from Mihomo tests)
+
+final class SingBoxMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
+    nonisolated(unsafe) static var errorHandler: (@Sendable (URLRequest) -> Error?)?
+    
+    static func reset() {
+        requestHandler = nil
+        errorHandler = nil
+    }
+    
+    static func setRequestHandler(_ handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?) {
+        requestHandler = handler
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        return true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        return request
+    }
+
+    override func startLoading() {
+        let currentRequest = self.request
+        let client = self.client
+
+        if let error = Self.errorHandler?(currentRequest) {
+            client?.urlProtocol(self, didFailWithError: error)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+
+        do {
+            let (response, data) = try handler(currentRequest)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
+extension URLSession {
+    static func makeSingBoxMockSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SingBoxMockURLProtocol.self]
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return URLSession(configuration: configuration)
+    }
+}
+
 @Suite("SingBox API Client", .serialized)
 struct SingBoxAPIClientTests {
     private func setupMock() {
-        MockURLProtocol.reset()
+        SingBoxMockURLProtocol.reset()
     }
 
     @Test("getVersion requests /version and decodes response")
@@ -13,9 +76,9 @@ struct SingBoxAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = URLSession.makeSingBoxMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        SingBoxMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/version")
             #expect(request.httpMethod == "GET")
 
@@ -39,9 +102,9 @@ struct SingBoxAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = URLSession.makeSingBoxMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        SingBoxMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/proxies")
 
             let response = HTTPURLResponse(
@@ -73,9 +136,9 @@ struct SingBoxAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = URLSession.makeSingBoxMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        SingBoxMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/connections")
 
             let response = HTTPURLResponse(
@@ -111,9 +174,9 @@ struct SingBoxAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = URLSession.makeSingBoxMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        SingBoxMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/traffic")
 
             let response = HTTPURLResponse(
@@ -137,9 +200,9 @@ struct SingBoxAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = URLSession.makeSingBoxMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        SingBoxMockURLProtocol.setRequestHandler { request in
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 503,
