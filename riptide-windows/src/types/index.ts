@@ -25,6 +25,56 @@ export interface ProxyGroup {
   interval?: number;
 }
 
+// Mihomo API Types
+export interface ProxyInfo {
+  name: string;
+  type: string;
+  alive?: boolean;
+  delay?: number;
+  history?: DelayHistory[];
+}
+
+export interface DelayHistory {
+  time: string;
+  delay: number;
+}
+
+export interface ProxyGroupDetail {
+  name: string;
+  group_type: string;
+  proxies: string[];
+  now?: string;
+  url?: string;
+  interval?: number;
+  tolerance?: number;
+  delay?: number;
+}
+
+export interface ConnectionMetadata {
+  network: string;
+  type: string;
+  sourceIP: string;
+  destinationIP?: string;
+  host?: string;
+  sourcePort: string;
+  destinationPort: string;
+}
+
+export interface ConnectionInfo {
+  id: string;
+  metadata: ConnectionMetadata;
+  upload: number;
+  download: number;
+  start: string;
+  chains: string[];
+  rule?: string;
+}
+
+export interface TrafficData {
+  up: number;
+  down: number;
+}
+
 export interface Rule {
   type: string;
   value: string;

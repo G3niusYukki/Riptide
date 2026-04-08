@@ -1,13 +1,16 @@
 //! mihomo sidecar process management
 
 use std::process::{Child, Command};
-use std::sync::Mutex;
 use tauri::AppHandle;
-use tauri_plugin_shell::ShellExt;
+use tokio::sync::Mutex;
+
+use crate::core::mihomo_api::MihomoApiClient;
 
 pub struct MihomoManager {
     app_handle: AppHandle,
     process: Mutex<Option<Child>>,
+    api_port: Mutex<u16>,
+    api_secret: Mutex<Option<String>>,
 }
 
 impl MihomoManager {
@@ -15,12 +18,14 @@ impl MihomoManager {
         Self {
             app_handle,
             process: Mutex::new(None),
+            api_port: Mutex::new(9090), // Default mihomo API port
+            api_secret: Mutex::new(None),
         }
     }
 
     /// Start mihomo process
     pub async fn start(&self) -> anyhow::Result<()> {
-        let mut process = self.process.lock().unwrap();
+        let mut process = self.process.lock().await;
         
         if process.is_some() {
             return Err(anyhow::anyhow!("mihomo is already running"));
@@ -39,14 +44,17 @@ impl MihomoManager {
             .spawn()?;
 
         *process = Some(child);
-        log::info!("mihomo started with PID: {:?}", process.as_ref().map(|p| p.id()));
+        log::info!("mihomo started");
+        
+        // Wait a moment for mihomo to start its API
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         
         Ok(())
     }
 
     /// Stop mihomo process
     pub async fn stop(&self) -> anyhow::Result<()> {
-        let mut process = self.process.lock().unwrap();
+        let mut process = self.process.lock().await;
         
         if let Some(mut child) = process.take() {
             child.kill()?;
@@ -65,7 +73,7 @@ impl MihomoManager {
 
     /// Check if mihomo is running
     pub async fn is_running(&self) -> bool {
-        let mut process = self.process.lock().unwrap();
+        let mut process = self.process.lock().await;
         if let Some(ref mut child) = *process {
             // Try to check if process is still alive
             // On Windows, we can check by trying to get exit code
@@ -73,6 +81,21 @@ impl MihomoManager {
         } else {
             false
         }
+    }
+
+    /// Get the API client for making requests to mihomo
+    pub async fn get_api_client(&self) -> anyhow::Result<MihomoApiClient> {
+        let port = *self.api_port.lock().await;
+        let secret = self.api_secret.lock().await.clone();
+        let base_url = format!("http://127.0.0.1:{}", port);
+        
+        Ok(MihomoApiClient::new(base_url, secret))
+    }
+
+    /// Update API configuration (port and secret)
+    pub async fn set_api_config(&self, port: u16, secret: Option<String>) {
+        *self.api_port.lock().await = port;
+        *self.api_secret.lock().await = secret;
     }
 
     /// Generate mihomo config from profile

@@ -32,6 +32,9 @@ windows-service = "0.7"
 reqwest = { version = "0.12", features = ["json"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+urlencoding = "2"
+tokio-tungstenite = "0.26"
+futures = "0.3"
 
 tauri-plugin-fs = "2"
 

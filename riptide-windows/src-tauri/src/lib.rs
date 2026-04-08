@@ -47,6 +47,15 @@ pub fn run() {
             cmds::proxy::restart_proxy,
             cmds::proxy::get_proxy_status,
             cmds::proxy::test_proxy_delay,
+            cmds::proxy::get_proxy_groups,
+            cmds::proxy::get_all_proxies,
+            cmds::proxy::switch_proxy,
+            cmds::proxy::test_group_delay,
+            // Connection commands
+            cmds::proxy::get_connections,
+            cmds::proxy::close_connection,
+            cmds::proxy::close_all_connections,
+            cmds::proxy::get_traffic,
             // Config commands
             cmds::config::get_profiles,
             cmds::config::add_profile,
