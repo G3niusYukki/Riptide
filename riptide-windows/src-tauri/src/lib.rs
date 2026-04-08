@@ -5,7 +5,6 @@ pub mod config;
 pub mod core;
 pub mod utils;
 
-use tauri::AppHandle;
 use tauri::Manager;
 use std::sync::Mutex;
 
