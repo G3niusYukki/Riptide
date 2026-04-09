@@ -17,11 +17,11 @@ pub fn add_profile(
     state: State<'_, Mutex<Vec<Profile>>>,
     name: String,
     content: String,
-) -> Result<(), String> {
+) -> Result<Profile, String> {
     let mut profiles = state.lock().unwrap();
     let profile = Profile::new(name, content);
-    profiles.push(profile);
-    Ok(())
+    profiles.push(profile.clone());
+    Ok(profile)
 }
 
 /// Remove a profile
@@ -125,7 +125,8 @@ pub fn get_active_profile() -> Option<String> {
 
 /// Set active profile
 #[tauri::command]
-pub fn set_active_profile(_id: String) -> Result<(), String> {
+pub fn set_active_profile(id: String) -> Result<(), String> {
     // TODO: Save to config storage
+    let _ = id;
     Ok(())
 }

@@ -38,13 +38,13 @@ export const getTraffic = () =>
 // Config commands
 export const getProfiles = () => invoke<Profile[]>('get_profiles');
 export const addProfile = (name: string, content: string) => 
-  invoke<void>('add_profile', { name, content });
+  invoke<Profile>('add_profile', { name, content });
 export const removeProfile = (id: string) => 
   invoke<void>('remove_profile', { id });
 export const updateProfile = (id: string, content: string) => 
   invoke<void>('update_profile', { id, content });
 export const importProfileFromUrl = (url: string) => 
-  invoke<string>('import_profile_from_url', { url });
+  invoke<Profile>('import_profile_from_url', { url });
 export const getActiveProfile = () => invoke<string | null>('get_active_profile');
 export const setActiveProfile = (id: string) => 
   invoke<void>('set_active_profile', { id });

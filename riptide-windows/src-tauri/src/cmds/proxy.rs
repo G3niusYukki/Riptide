@@ -2,7 +2,7 @@
 
 use crate::core::mihomo::MihomoManager;
 use crate::core::mihomo_api::{ProxyInfo, ProxyGroupDetail};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tauri::State;
 
 /// Start the proxy service
@@ -61,29 +61,22 @@ pub async fn get_proxy_groups(
         .get_proxies()
         .await
         .map_err(|e| format!("Failed to get proxies: {}", e))?;
-    
-    // Filter to only groups (types: select, url-test, fallback, load-balance, relay)
+
     let group_types = ["select", "url-test", "fallback", "load-balance", "relay"];
-    let groups: Vec<ProxyGroupDetail> = proxies
-        .into_iter()
-        .filter_map(|(name, proxy)| {
-            if group_types.contains(&proxy.proxy_type.as_str()) {
-                Some(ProxyGroupDetail {
-                    name,
-                    group_type: proxy.proxy_type,
-                    proxies: vec![],
-                    now: None,
-                    url: None,
-                    interval: None,
-                    tolerance: None,
-                    delay: proxy.delay,
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
-    
+    let mut groups = Vec::new();
+
+    for (name, proxy) in proxies {
+        if !group_types.contains(&proxy.proxy_type.as_str()) {
+            continue;
+        }
+
+        let group = api_client
+            .get_proxy_group(&name)
+            .await
+            .map_err(|e| format!("Failed to get proxy group {name}: {e}"))?;
+        groups.push(group);
+    }
+
     Ok(groups)
 }
 
@@ -138,18 +131,29 @@ pub async fn test_group_delay(
     let api_client = state.get_api_client().await
         .map_err(|e| format!("Failed to get API client: {}", e))?;
     
+    let group_detail = api_client
+        .get_proxy_group(&group)
+        .await
+        .map_err(|e| format!("Failed to get proxy group: {}", e))?;
+
     let mut results = HashMap::new();
-    
-    // Test the group's own delay (represents selected proxy)
-    match api_client.test_proxy_delay(&group, None, Some(5000)).await {
-        Ok(delay) => {
-            results.insert(group, delay);
+    let mut seen = HashSet::new();
+
+    for proxy_name in group_detail.proxies {
+        if !seen.insert(proxy_name.clone()) {
+            continue;
         }
-        Err(e) => {
-            log::warn!("Failed to test group {}: {}", group, e);
+
+        match api_client.test_proxy_delay(&proxy_name, None, Some(5000)).await {
+            Ok(delay) => {
+                results.insert(proxy_name, delay);
+            }
+            Err(e) => {
+                log::warn!("Failed to test proxy {} in group {}: {}", proxy_name, group, e);
+            }
         }
     }
-    
+
     Ok(results)
 }
 

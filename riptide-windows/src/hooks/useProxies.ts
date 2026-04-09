@@ -134,7 +134,7 @@ export function useProxyData() {
       groupsQuery.refetch();
       proxiesQuery.refetch();
     }
-  }, [isRunning]);
+  }, [isRunning, groupsQuery.refetch, proxiesQuery.refetch]);
 
   return {
     groups: groupsQuery.data ?? [],

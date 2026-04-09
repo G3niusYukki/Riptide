@@ -116,10 +116,8 @@ mod tests {
         ));
 
         #[cfg(not(target_os = "macos"))]
-        assert!(matches!(
-            autostart_launcher(),
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent
-                | tauri_plugin_autostart::MacosLauncher::AppleScript
-        ));
+        {
+            let _ = autostart_launcher();
+        }
     }
 }

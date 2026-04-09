@@ -42,13 +42,7 @@ jobs:
         run: npm ci
 
       - name: Lint Frontend
-        run: |
-          if npm run lint 2>/dev/null || [ $? -eq 0 ]; then
-            echo "Lint passed or not configured"
-          else
-            echo "No lint script configured, skipping"
-          fi
-        shell: bash
+        run: npm run lint --if-present
 
       - name: Type Check
         run: npx tsc --noEmit
