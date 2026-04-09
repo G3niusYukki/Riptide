@@ -160,7 +160,7 @@ impl MihomoApiClient {
 
     /// Check if mihomo API is healthy
     pub async fn health_check(&self) -> Result<bool, MihomoError> {
-        match self.client.get(format!("{}/version", self.base_url)).send().await {
+        match self.build_request(reqwest::Method::GET, "/version").send().await {
             Ok(response) => Ok(response.status().is_success()),
             Err(_) => Ok(false),
         }
@@ -217,6 +217,25 @@ impl MihomoApiClient {
         if response.status().is_success() {
             let proxy = response.json().await?;
             Ok(proxy)
+        } else if response.status() == StatusCode::NOT_FOUND {
+            Err(MihomoError::ProxyNotFound { name: name.to_string() })
+        } else {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            Err(MihomoError::ApiError { status, message: text })
+        }
+    }
+
+    /// Get detailed proxy group information
+    pub async fn get_proxy_group(&self, name: &str) -> Result<ProxyGroupDetail, MihomoError> {
+        let path = format!("/proxies/{}", urlencoding::encode(name));
+        let response = self.build_request(reqwest::Method::GET, &path)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            let group = response.json().await?;
+            Ok(group)
         } else if response.status() == StatusCode::NOT_FOUND {
             Err(MihomoError::ProxyNotFound { name: name.to_string() })
         } else {

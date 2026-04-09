@@ -41,7 +41,7 @@ export interface DelayHistory {
 
 export interface ProxyGroupDetail {
   name: string;
-  group_type: string;
+  type: string;
   proxies: string[];
   now?: string;
   url?: string;

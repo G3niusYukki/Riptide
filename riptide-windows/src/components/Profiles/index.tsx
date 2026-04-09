@@ -11,31 +11,30 @@ export function Profiles() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
-  const handleAddProfile = () => {
+  const handleAddProfile = async () => {
     if (!newProfileName.trim()) return;
-    
-    const profile = {
-      id: crypto.randomUUID(),
-      name: newProfileName,
-      content: newProfileContent || '# Profile configuration\n',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    addProfile(profile);
-    tauri.addProfile(profile.name, profile.content);
-    
-    setNewProfileName('');
-    setNewProfileContent('');
-    setShowAddModal(false);
+
+    try {
+      const profile = await tauri.addProfile(
+        newProfileName,
+        newProfileContent || '# Profile configuration\n',
+      );
+
+      addProfile(profile);
+      setNewProfileName('');
+      setNewProfileContent('');
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('Failed to add profile:', error);
+    }
   };
 
   const handleImportFromUrl = async () => {
     if (!importUrl.trim()) return;
     
     try {
-      const result = await tauri.importProfileFromUrl(importUrl);
-      console.log(result);
+      const profile = await tauri.importProfileFromUrl(importUrl);
+      addProfile(profile);
       setImportUrl('');
       setShowImportModal(false);
     } catch (error) {
@@ -43,14 +42,22 @@ export function Profiles() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    removeProfile(id);
-    tauri.removeProfile(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await tauri.removeProfile(id);
+      removeProfile(id);
+    } catch (error) {
+      console.error('Failed to remove profile:', error);
+    }
   };
 
-  const handleActivate = (id: string) => {
-    setActiveProfile(id);
-    tauri.setActiveProfile(id);
+  const handleActivate = async (id: string) => {
+    try {
+      await tauri.setActiveProfile(id);
+      setActiveProfile(id);
+    } catch (error) {
+      console.error('Failed to activate profile:', error);
+    }
   };
 
   return (

@@ -1,4 +1,3 @@
-import { useRiptideStore } from '../../stores/riptide';
 import { Shield, Globe, FileText } from 'lucide-react';
 
 const ruleIcons: Record<string, typeof Globe> = {
@@ -13,7 +12,8 @@ const ruleIcons: Record<string, typeof Globe> = {
 };
 
 export function Rules() {
-  const { proxies } = useRiptideStore();
+  // TODO: Load rules from active profile and use proxies
+  // const { proxies } = useRiptideStore();
   
   // TODO: Load rules from active profile
   const rules: Array<{ type: string; value: string; policy: string }> = [

@@ -10,6 +10,7 @@ on:
     branches: [ master, main ]
     paths:
       - 'riptide-windows/**'
+      - '.github/workflows/windows-ci.yml'
   workflow_dispatch:
 
 env:
@@ -41,7 +42,7 @@ jobs:
         run: npm ci
 
       - name: Lint Frontend
-        run: npm run lint || echo "No lint script configured"
+        run: npm run lint --if-present
 
       - name: Type Check
         run: npx tsc --noEmit
@@ -67,9 +68,13 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
+          override: true
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
 
       - name: Cache Rust Build
         uses: Swatinem/rust-cache@v2
@@ -89,6 +94,7 @@ jobs:
           path: |
             riptide-windows/src-tauri/target/release/bundle/msi/*.msi
             riptide-windows/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
           retention-days: 30
 
   test:
@@ -111,7 +117,10 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
       - name: Run Rust Tests
         working-directory: ./riptide-windows/src-tauri
@@ -139,7 +148,10 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
       - name: Build Release
         run: npm run tauri build

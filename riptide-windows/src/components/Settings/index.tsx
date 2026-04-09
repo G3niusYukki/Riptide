@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useRiptideStore } from '../../stores/riptide';
-import { Settings, Globe, Shield, RotateCcw } from 'lucide-react';
+import { Settings, Globe, Shield } from 'lucide-react';
 import * as tauri from '../../services/tauri';
 
 export function SettingsPage() {
-  const { systemProxyEnabled, tunModeEnabled, setSystemProxyEnabled, setTunModeEnabled } = useRiptideStore();
+  const { systemProxyEnabled, setSystemProxyEnabled } = useRiptideStore();
   const [httpPort, setHttpPort] = useState(7890);
   const [socksPort, setSocksPort] = useState(7891);
 
