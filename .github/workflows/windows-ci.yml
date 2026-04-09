@@ -74,9 +74,10 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@v1
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
       - name: Cache Rust Build
         uses: Swatinem/rust-cache@v2
@@ -119,7 +120,10 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@v1
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
       - name: Run Rust Tests
         working-directory: ./riptide-windows/src-tauri
@@ -147,7 +151,10 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@v1
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
       - name: Build Release
         run: npm run tauri build
