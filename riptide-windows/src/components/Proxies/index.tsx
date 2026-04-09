@@ -6,21 +6,29 @@ import { Globe, Zap, Check, Loader2 } from 'lucide-react';
 export function Proxies() {
   const { isRunning } = useRiptideStore();
   const { groups, proxies, isLoading, isError } = useProxyData();
-  const { mutate: testDelay, isPending: isTesting } = useTestDelay();
-  const { mutate: switchProxy, isPending: isSwitching } = useSwitchProxy();
+  const { mutateAsync: testDelayAsync, isPending: isTesting } = useTestDelay();
+  const { mutateAsync: switchProxyAsync, isPending: isSwitching } = useSwitchProxy();
   const [testingProxy, setTestingProxy] = useState<string | null>(null);
 
   const handleTestDelay = async (proxyName: string) => {
     setTestingProxy(proxyName);
     try {
-      await testDelay({ name: proxyName });
+      await testDelayAsync({ name: proxyName });
     } finally {
       setTestingProxy(null);
     }
   };
 
+  const handleTestAllDelay = async () => {
+    const proxyNames = [...new Set(groups.flatMap(group => group.proxies))];
+
+    for (const proxyName of proxyNames) {
+      await handleTestDelay(proxyName);
+    }
+  };
+
   const handleSwitchProxy = async (group: string, proxyName: string) => {
-    await switchProxy({ group, proxyName });
+    await switchProxyAsync({ group, proxyName });
   };
 
   const getDelayColor = (delay?: number) => {
@@ -71,8 +79,8 @@ export function Proxies() {
         <h2 className="text-2xl font-bold text-slate-100">代理节点</h2>
         <button 
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-          onClick={() => groups.forEach(g => handleTestDelay(g.name))}
-          disabled={isTesting}
+          onClick={handleTestAllDelay}
+          disabled={isTesting || isSwitching}
         >
           {isTesting ? '测试中...' : '测试全部延迟'}
         </button>
@@ -92,7 +100,7 @@ export function Proxies() {
                   <Globe size={20} className="text-blue-400" />
                   <h3 className="font-semibold text-slate-100">{group.name}</h3>
                   <span className="text-xs px-2 py-1 bg-slate-800 rounded text-slate-400">
-                    {group.group_type}
+                    {group.type}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -119,8 +127,9 @@ export function Proxies() {
                           px-6 py-3 flex items-center justify-between cursor-pointer
                           transition-colors hover:bg-slate-800/50
                           ${isSelected ? 'bg-blue-600/10' : ''}
+                          ${isSwitching ? 'opacity-60 cursor-not-allowed' : ''}
                         `}
-                        onClick={() => handleSwitchProxy(group.name, proxyName)}
+                        onClick={() => !isSwitching && handleSwitchProxy(group.name, proxyName)}
                       >
                         <div className="flex items-center gap-3">
                           {isSelected && <Check size={16} className="text-emerald-400" />}
@@ -135,7 +144,7 @@ export function Proxies() {
                               e.stopPropagation();
                               handleTestDelay(proxyName);
                             }}
-                            disabled={isCurrentTesting}
+                            disabled={isCurrentTesting || isSwitching}
                             className="text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 transition-colors disabled:opacity-50"
                           >
                             {isCurrentTesting ? (
@@ -176,9 +185,9 @@ export function Proxies() {
                   <span className="text-xs text-slate-500">{proxy.type}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button
+                    <button
                     onClick={() => handleTestDelay(proxy.name)}
-                    disabled={testingProxy === proxy.name}
+                    disabled={testingProxy === proxy.name || isSwitching}
                     className="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 transition-colors disabled:opacity-50"
                   >
                     {testingProxy === proxy.name ? (

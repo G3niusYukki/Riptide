@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useRiptideStore } from '../stores/riptide';
 import * as tauri from '../services/tauri';
-import type { ProxyInfo, ProxyGroupDetail } from '../types';
+import type { ProxyInfo } from '../types';
 
 // Query keys
 const PROXY_KEYS = {
@@ -26,7 +26,7 @@ export function useProxyGroups() {
       // Transform to store format
       const storeGroups = groups.map(g => ({
         name: g.name,
-        type: g.group_type as 'select' | 'url-test' | 'fallback' | 'load-balance',
+        type: g.type as 'select' | 'url-test' | 'fallback' | 'load-balance',
         proxies: g.proxies,
         now: g.now,
         url: g.url,

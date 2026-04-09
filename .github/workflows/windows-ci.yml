@@ -10,6 +10,7 @@ on:
     branches: [ master, main ]
     paths:
       - 'riptide-windows/**'
+      - '.github/workflows/windows-ci.yml'
   workflow_dispatch:
 
 env:
@@ -89,6 +90,7 @@ jobs:
           path: |
             riptide-windows/src-tauri/target/release/bundle/msi/*.msi
             riptide-windows/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
           retention-days: 30
 
   test:

@@ -12,6 +12,28 @@ use crate::core::mihomo::MihomoManager;
 use crate::core::sysproxy::SystemProxyController;
 use crate::config::profiles::Profile;
 
+fn autostart_args() -> Option<Vec<&'static str>> {
+    Some(vec!["--minimized"])
+}
+
+fn autostart_launcher() -> tauri_plugin_autostart::MacosLauncher {
+    #[cfg(target_os = "macos")]
+    {
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        tauri_plugin_autostart::MacosLauncher::default()
+    }
+}
+
+fn autostart_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    // The launcher choice is only used on macOS. Windows uses the plugin's
+    // native autostart backend, so we avoid hard-coding a macOS launcher there.
+    tauri_plugin_autostart::init(autostart_launcher(), autostart_args())
+}
+
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,7 +44,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"]) ))
+        .plugin(autostart_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .manage(Mutex::new(Vec::<Profile>::new()))
@@ -74,4 +96,30 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{autostart_args, autostart_launcher};
+
+    #[test]
+    fn autostart_passes_minimized_flag() {
+        assert_eq!(autostart_args(), Some(vec!["--minimized"]));
+    }
+
+    #[test]
+    fn autostart_uses_platform_appropriate_launcher_configuration() {
+        #[cfg(target_os = "macos")]
+        assert!(matches!(
+            autostart_launcher(),
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent
+        ));
+
+        #[cfg(not(target_os = "macos"))]
+        assert!(matches!(
+            autostart_launcher(),
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent
+                | tauri_plugin_autostart::MacosLauncher::AppleScript
+        ));
+    }
 }
