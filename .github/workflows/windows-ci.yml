@@ -79,6 +79,9 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           override: true
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
       - name: Cache Rust Build
         uses: Swatinem/rust-cache@v2
         with:
