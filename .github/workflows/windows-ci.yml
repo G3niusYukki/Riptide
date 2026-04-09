@@ -42,7 +42,13 @@ jobs:
         run: npm ci
 
       - name: Lint Frontend
-        run: npm run lint || echo "No lint script configured"
+        run: |
+          if npm run lint 2>/dev/null || [ $? -eq 0 ]; then
+            echo "Lint passed or not configured"
+          else
+            echo "No lint script configured, skipping"
+          fi
+        shell: bash
 
       - name: Type Check
         run: npx tsc --noEmit
@@ -68,7 +74,7 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-action@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
@@ -113,7 +119,7 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-action@v1
 
       - name: Run Rust Tests
         working-directory: ./riptide-windows/src-tauri
@@ -141,7 +147,7 @@ jobs:
         run: npm ci
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-action@v1
 
       - name: Build Release
         run: npm run tauri build

@@ -1,10 +1,8 @@
 // React hooks for connections with real mihomo API data
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { useRiptideStore } from '../stores/riptide';
 import * as tauri from '../services/tauri';
-import type { ConnectionInfo } from '../types';
 
 // Query keys
 const CONNECTION_KEYS = {
