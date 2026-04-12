@@ -1,0 +1,121 @@
+# .github/workflows/homebrew.yml
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to'
+        required: true
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: G3niusYukki/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      
+      - name: Download release artifacts
+        run: |
+          VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
+          VERSION="${VERSION#v}"
+          
+          mkdir -p downloads
+          
+          # Download ARM64 build
+          curl -L -o downloads/arm64.zip \
+            "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-arm64.zip" \
+            || echo "ARM64 build not found"
+          
+          # Download x86_64 build
+          curl -L -o downloads/x86_64.zip \
+            "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-x86_64.zip" \
+            || echo "x86_64 build not found"
+          
+          # If universal binary exists, use that instead
+          curl -L -o downloads/universal.zip \
+            "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-universal.zip" \
+            || true
+      
+      - name: Calculate checksums
+        id: checksums
+        run: |
+          if [ -f downloads/universal.zip ]; then
+            echo "sha256_universal=$(sha256sum downloads/universal.zip | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+            echo "has_universal=true" >> $GITHUB_OUTPUT
+          else
+            echo "sha256_arm64=$(sha256sum downloads/arm64.zip | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+            echo "sha256_x86_64=$(sha256sum downloads/x86_64.zip | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+            echo "has_universal=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update formula
+        run: |
+          VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
+          VERSION="${VERSION#v}"
+          
+          cd tap
+          
+          if [ "${{ steps.checksums.outputs.has_universal }}" = "true" ]; then
+            # Single universal binary
+            cat > Formula/riptide.rb << EOF
+class Riptide < Formula
+  desc "Native macOS proxy client built in Swift"
+  homepage "https://github.com/G3niusYukki/Riptide"
+  version "${VERSION}"
+  license "MIT"
+  
+  url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-universal.zip"
+  sha256 "${{ steps.checksums.outputs.sha256_universal }}"
+  
+  depends_on macos: :sonoma
+  
+  def install
+    bin.install "Riptide"
+  end
+end
+EOF
+          else
+            # Separate ARM64 and x86_64 builds
+            cat > Formula/riptide.rb << EOF
+class Riptide < Formula
+  desc "Native macOS proxy client built in Swift"
+  homepage "https://github.com/G3niusYukki/Riptide"
+  version "${VERSION}"
+  license "MIT"
+  
+  if Hardware::CPU.arm?
+    url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-arm64.zip"
+    sha256 "${{ steps.checksums.outputs.sha256_arm64 }}"
+  else
+    url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-x86_64.zip"
+    sha256 "${{ steps.checksums.outputs.sha256_x86_64 }}"
+  end
+  
+  depends_on macos: :sonoma
+  
+  def install
+    bin.install "Riptide"
+  end
+end
+EOF
+          fi
+      
+      - name: Commit and push
+        run: |
+          VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
+          VERSION="${VERSION#v}"
+          
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add Formula/riptide.rb
+          git commit -m "riptide: update to ${VERSION}"
+          git push
