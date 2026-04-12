@@ -188,7 +188,6 @@ public struct ConfigMerger: Sendable {
 
     // MARK: - Rule Parsing (existing)
 
->>>>>>> origin/main
     private static func parseRule(parts: [String]) -> ProxyRule? {
         guard parts.count >= 3 else { return nil }
         let ruleType = parts[0].uppercased()
