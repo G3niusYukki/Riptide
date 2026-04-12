@@ -1,10 +1,10 @@
 # Riptide
 
-A native macOS proxy client built entirely in Swift 6. Riptide combines a **Swift-native proxy engine** with optional [mihomo](https://github.com/MetaCubeX/mihomo) sidecar integration, delivering a Clash-compatible configuration system, TUN mode, and a polished SwiftUI user interface.
+A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-native proxy engine** with optional [mihomo](https://github.com/MetaCubeX/mihomo) sidecar integration, delivering a Clash-compatible configuration system, TUN mode, and a polished native user interface.
 
-> **Architecture**: Library-first design. The `Riptide` library implements protocol framing, transport orchestration, DNS resolution, rule matching, and connection lifecycle management — all in pure Swift. The `RiptideApp` SwiftUI client and the `mihomo` sidecar are two interchangeable consumers of this library.
+> **Architecture**: Library-first design. The `Riptide` library implements protocol framing, transport orchestration, DNS resolution, rule matching, and connection lifecycle management — all in pure Swift. The `RiptideApp` SwiftUI client (macOS) / WebView2 client (Windows) and the `mihomo` sidecar are interchangeable consumers of this library.
 
-**Status**: Beta — Full mihomo integration, SwiftUI app, subscription management, connection monitoring, MITM framework, i18n, and TUN mode via privileged XPC helper.
+**Status**: Beta — Full mihomo integration, native app, subscription management, connection monitoring, MITM framework, i18n, TUN mode, and WebDAV config sync.
 
 ---
 
@@ -23,6 +23,20 @@ A native macOS proxy client built entirely in Swift 6. Riptide combines a **Swif
 ---
 
 ## Features
+
+### 跨平台支持
+
+| 平台 | 状态 | 说明 |
+|------|------|------|
+| macOS 14+ | ✅ 完整支持 | SwiftUI 原生界面，完整 TUN 支持 |
+| Windows 10/11 | ✅ v1.0+ 支持 | WebView2 界面，MSI 安装包 |
+| Linux | ❌ 计划中 | - |
+
+### 配置同步
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| WebDAV 同步 | ✅ v1.1+ | 跨设备配置同步 |
 
 ### Proxy Protocols
 
@@ -224,11 +238,20 @@ A native macOS proxy client built entirely in Swift 6. Riptide combines a **Swif
 
 ### Requirements
 
-- **macOS 14+** (Sonoma or later)
-- **Swift 6.2+** / **Xcode 16+**
-- Apple Developer account (for signing the privileged helper — required for TUN mode)
+- **macOS 14+** (Sonoma or later) OR **Windows 10/11**
+- **Swift 6.2+** / **Xcode 16+** (仅用于从源码构建 macOS 版本)
+- Apple Developer account (用于 macOS 签名特权助手 — TUN 模式必需)
 
-### 1. Clone & Build
+### 安装方式
+
+#### macOS (Homebrew - 推荐)
+
+```bash
+brew tap G3niusYukki/riptide
+brew install riptide
+```
+
+#### macOS (从源码构建)
 
 ```bash
 git clone https://github.com/G3niusYukki/Riptide.git
@@ -236,7 +259,11 @@ cd Riptide
 swift build
 ```
 
-### 2. Download mihomo Binary
+#### Windows (MSI 安装包)
+
+从 [GitHub Releases](https://github.com/G3niusYukki/Riptide/releases) 下载 `.msi` 安装包并运行。
+
+### 2. 下载 mihomo Binary
 
 ```bash
 ./Scripts/download-mihomo.sh
@@ -500,6 +527,28 @@ swift run riptide --help
 # Run app
 swift run RiptideApp
 ```
+
+---
+
+## 对比其他客户端
+
+| 功能 | Riptide | Clash Verge Rev | Clash for Windows |
+|------|---------|-----------------|-------------------|
+| 原生引擎 | ✅ Swift 自研 | ❌ Tauri 封装 | ❌ Electron |
+| macOS 集成 | ✅ 深度集成 | ⚠️ 一般 | ❌ 不支持 |
+| Windows 支持 | ✅ WebView2 | ✅ Tauri | ✅ Electron |
+| Linux 支持 | ❌ 暂无 | ✅ 支持 | ✅ 支持 |
+| Clash 兼容 | ✅ 完全兼容 | ✅ 完全兼容 | ✅ 完全兼容 |
+| TUN 模式 | ✅ 支持 | ✅ 支持 | ⚠️ 有限支持 |
+| WebDAV 同步 | ✅ v1.1+ | ✅ 支持 | ❌ 不支持 |
+| 自动更新 | ✅ 支持 | ✅ 支持 | ❌ 不支持 |
+| 安装包大小 | ~15MB | ~40MB | ~80MB |
+| 内存占用 | ~50MB | ~150MB | ~200MB |
+
+## 安装指南
+
+- [完整安装指南](docs/INSTALL.md) - 包含 macOS 和 Windows 的详细安装步骤
+- [从 Clash Verge Rev 迁移](docs/MIGRATION.md) - 平滑迁移指南
 
 ---
 
