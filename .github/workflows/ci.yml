@@ -2,119 +2,58 @@ name: CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [main, develop]
   pull_request:
-    branches: [ master, main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
-  SWIFT_VERSION: 6.2
-  MACOS_VERSION: '14'
+  SWIFT_VERSION: "6.2"
 
 jobs:
-  lint:
-    name: Swift Lint
+  macos-test:
     runs-on: macos-14
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
         with:
-          xcode-version: '16.2'
+          swift-version: ${{ env.SWIFT_VERSION }}
 
-      - name: Swift Format Check
-        run: |
-          echo "Checking swift formatting..."
-          # Add swiftformat or swiftlint here if configured
-          echo "No linter configured yet, skipping"
-
-  test:
-    name: Test & Build
-    runs-on: macos-14
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '16.2'
-
-      - name: Swift Version
-        run: swift --version
-
-      - name: Cache Swift Build
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-
+      - name: Download mihomo binary
+        run: ./Scripts/download-mihomo.sh
 
       - name: Build
-        run: swift build --verbose
+        run: swift build
 
-      - name: Run Tests
-        run: swift test --verbose
+      - name: Test
+        run: swift test
 
-      - name: Build Release
-        run: swift build -c release --arch arm64 --arch x86_64
-
-      - name: Verify Binary
-        run: |
-          echo "Checking binary architecture..."
-          lipo -info .build/apple/Products/Release/RiptideApp
-          echo "Checking framework links..."
-          otool -L .build/apple/Products/Release/RiptideApp | head -20
-
-  release-dmg:
-    name: Build Release DMG
-    runs-on: macos-14
-    needs: test
-    if: startsWith(github.ref, 'refs/tags/')
-    timeout-minutes: 30
-
+  windows-test:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          xcode-version: '16.2'
+          node-version: 20
 
-      - name: Cache Swift Build
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
 
-      - name: Build Release DMG
-        run: |
-          chmod +x Scripts/build-release.sh
-          ./Scripts/build-release.sh
+      - name: Install dependencies
+        working-directory: ./riptide-windows
+        run: npm ci
 
-      - name: Upload DMG Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Riptide-${{ github.ref_name }}.dmg
-          path: .build/release-dmg/Riptide.dmg
-          retention-days: 90
+      - name: Build Windows
+        working-directory: ./riptide-windows/src-tauri
+        run: cargo build
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: .build/release-dmg/Riptide.dmg
-          draft: true
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test Windows
+        working-directory: ./riptide-windows/src-tauri
+        run: cargo test
