@@ -51,7 +51,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows
-        working-directory: ./riptide-windows
+        working-directory: ./riptide-windows/src-tauri
         run: cargo build
 
       - name: Test Windows
