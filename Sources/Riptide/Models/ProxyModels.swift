@@ -16,7 +16,6 @@ public enum ProxyKind: Equatable, Sendable {
     case hysteria2
     case relay
     case snell
-    case tuic
 }
 
 public struct ProxyNode: Equatable, Sendable {

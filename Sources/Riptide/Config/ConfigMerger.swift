@@ -135,7 +135,6 @@ public struct ConfigMerger: Sendable {
     }
 
     // MARK: - Raw Parsing Helpers
-
     private static func parseRawProxy(_ raw: [String: Any]) throws -> ProxyNode {
         guard let name = raw["name"] as? String,
               let type = raw["type"] as? String,
@@ -189,6 +188,7 @@ public struct ConfigMerger: Sendable {
 
     // MARK: - Rule Parsing (existing)
 
+>>>>>>> origin/main
     private static func parseRule(parts: [String]) -> ProxyRule? {
         guard parts.count >= 3 else { return nil }
         let ruleType = parts[0].uppercased()
