@@ -53,7 +53,7 @@ jobs:
           ./Scripts/setup-signing.sh
 
       - name: Build Universal Binary
-        run: swift build --product RiptideApp -c release --arch x86_64 --arch arm64
+        run: xcrun swift build --product RiptideApp -c release --arch x86_64 --arch arm64
 
       - name: Package and Sign
         env:
@@ -140,6 +140,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --locked
 
       - name: Install dependencies
         run: |
