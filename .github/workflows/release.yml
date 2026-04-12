@@ -1,0 +1,242 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 1.0.0)'
+        required: true
+
+env:
+  SWIFT_VERSION: '6.0'
+  MACOS_VERSION: '14'
+
+jobs:
+  build-macos:
+    name: Build macOS Universal Binary
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Swift Version
+        run: swift --version
+
+      - name: Cache Swift Build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-
+
+      - name: Setup signing
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+        run: |
+          chmod +x Scripts/setup-signing.sh
+          ./Scripts/setup-signing.sh
+
+      - name: Build Universal Binary
+        run: swift build --product RiptideApp -c release --arch x86_64 --arch arm64
+
+      - name: Package and Sign
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+        run: |
+          mkdir -p Riptide.app/Contents/MacOS
+          cp .build/apple/Products/Release/RiptideApp Riptide.app/Contents/MacOS/Riptide
+          
+          # Create Info.plist if not exists
+          if [ ! -f "Riptide.app/Contents/Info.plist" ]; then
+            cat > Riptide.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>Riptide</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.riptide.app</string>
+              <key>CFBundleName</key>
+              <string>Riptide</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>$(cat .version 2>/dev/null || echo '0.1.0')</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>14.0</string>
+              <key>NSPrincipalClass</key>
+              <string>NSApplication</string>
+          </dict>
+          </plist>
+          EOF
+          fi
+          
+          # Code sign if certificate is available
+          if [ -n "$MACOS_CERTIFICATE" ]; then
+            codesign --sign "Developer ID Application" --deep --force --options runtime Riptide.app
+          fi
+          
+          zip -r Riptide-macos-universal.zip Riptide.app
+
+      - name: Notarize
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit Riptide-macos-universal.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+
+      - name: Create DMG
+        run: |
+          chmod +x Scripts/build-release.sh
+          ./Scripts/build-release.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            Riptide-macos-universal.zip
+            .build/release-dmg/Riptide.dmg
+
+  build-windows:
+    name: Build Windows MSI
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install dependencies
+        working-directory: riptide-windows
+        run: npm install
+
+      - name: Build
+        working-directory: riptide-windows
+        run: cargo tauri build
+
+      - name: Sign Windows installer
+        if: env.WINDOWS_CERTIFICATE != ''
+        working-directory: riptide-windows
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PWD: ${{ secrets.WINDOWS_CERTIFICATE_PWD }}
+        run: |
+          echo "$WINDOWS_CERTIFICATE" | base64 -d > certificate.pfx
+          signtool sign /f certificate.pfx /p "$WINDOWS_CERTIFICATE_PWD" \
+            /tr http://timestamp.digicert.com /td sha256 \
+            /fd sha256 \
+            src-tauri/target/release/bundle/msi/*.msi
+          rm certificate.pfx
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: riptide-windows/src-tauri/target/release/bundle/msi/*.msi
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          chmod +x Scripts/generate-release-notes.sh
+          ./Scripts/generate-release-notes.sh ${{ github.ref_name }}
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: ./artifacts/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./artifacts/windows
+
+      - name: Compute checksums
+        run: |
+          echo "## 🔐 Checksums" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "| File | SHA256 |" >> RELEASE_NOTES.md
+          echo "|------|--------|" >> RELEASE_NOTES.md
+          
+          for file in ./artifacts/macos/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              sha256=$(sha256sum "$file" | cut -d' ' -f1)
+              echo "| $filename | \`$sha256\` |" >> RELEASE_NOTES.md
+            fi
+          done
+          
+          for file in ./artifacts/windows/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              sha256=$(sha256sum "$file" | cut -d' ' -f1)
+              echo "| $filename | \`$sha256\` |" >> RELEASE_NOTES.md
+            fi
+          done
+          
+          echo "" >> RELEASE_NOTES.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/macos/*.zip
+            ./artifacts/macos/*.dmg
+            ./artifacts/windows/*.msi
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

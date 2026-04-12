@@ -107,6 +107,21 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
         }
         return mockDelays[name] ?? 999
     }
+
+    func closeConnection(id: String) async throws {
+        guard isRunning else { throw RuntimeError.notRunning }
+        mockConnections.removeAll { $0.id == id }
+    }
+
+    func closeAllConnections() async throws {
+        guard isRunning else { throw RuntimeError.notRunning }
+        mockConnections = []
+    }
+
+    func getLogs(level: String, lines: Int) async throws -> [String] {
+        guard isRunning else { throw RuntimeError.notRunning }
+        return ["[INFO] Mock log entry"]
+    }
 }
 
 // MARK: - Tests
@@ -300,8 +315,8 @@ struct ModeCoordinatorMihomoTests {
         let metadata1 = ConnectionMetadata(network: "tcp", type: "HTTP", sourceIP: "127.0.0.1", destinationIP: "1.2.3.4", host: "example.com")
         let metadata2 = ConnectionMetadata(network: "tcp", type: "HTTP", sourceIP: "127.0.0.1", destinationIP: "5.6.7.8", host: "test.com")
         let connections = [
-            ConnectionInfo(id: UUID().uuidString, metadata: metadata1, upload: 100, download: 200),
-            ConnectionInfo(id: UUID().uuidString, metadata: metadata2, upload: 50, download: 100)
+            ConnectionInfo(id: UUID().uuidString, metadata: metadata1, upload: 100, download: 200, chains: ["Proxy-1"]),
+            ConnectionInfo(id: UUID().uuidString, metadata: metadata2, upload: 50, download: 100, chains: ["Proxy-2"])
         ]
         await manager.configureMockConnections(connections)
         let coordinator = ModeCoordinator(mihomoManager: manager)
@@ -309,8 +324,10 @@ struct ModeCoordinatorMihomoTests {
         let profile = TunnelProfile(name: "test", config: config)
 
         try await coordinator.start(mode: .systemProxy, profile: profile)
-        let connectionCount = await coordinator.getConnections()
-        #expect(connectionCount == 2)
+        let connectionList = await coordinator.getConnections()
+        #expect(connectionList.count == 2)
+        #expect(connectionList[0].host == "example.com")
+        #expect(connectionList[1].host == "test.com")
     }
 
     @Test("mode coordinator returns zero connections when not running")
@@ -319,7 +336,7 @@ struct ModeCoordinatorMihomoTests {
         let coordinator = ModeCoordinator(mihomoManager: manager)
 
         let connections = await coordinator.getConnections()
-        #expect(connections == 0)
+        #expect(connections.isEmpty)
     }
 
     @Test("mode coordinator checks helper installation status")

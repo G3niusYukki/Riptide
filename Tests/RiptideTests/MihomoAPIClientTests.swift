@@ -361,7 +361,8 @@ struct MihomoAPIClientTests {
                         "host": "example.com"
                     },
                     "upload": 1024,
-                    "download": 2048
+                    "download": 2048,
+                    "chains": ["Proxy-1", "Proxy-2"]
                 }
             ]
         }
@@ -389,6 +390,7 @@ struct MihomoAPIClientTests {
         #expect(connections[0].metadata.host == "example.com")
         #expect(connections[0].upload == 1024)
         #expect(connections[0].download == 2048)
+        #expect(connections[0].chains == ["Proxy-1", "Proxy-2"])
     }
 
     @Test("closeConnection sends DELETE request")

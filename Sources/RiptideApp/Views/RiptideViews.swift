@@ -124,24 +124,144 @@ struct ConfigView: View {
 }
 
 struct SettingsView: View {
-    @Binding var controllerPort: String
+    @Bindable var viewModel: AppViewModel
+    @State private var showingVersionPicker = false
+    @State private var localVersions: [String] = []
 
     var body: some View {
         Form {
+            Section("内核管理 (Core Management)") {
+                Picker("通道 (Channel)", selection: $viewModel.mihomoChannel) {
+                    Text("Stable").tag(MihomoDownloader.Channel.stable)
+                    Text("Alpha").tag(MihomoDownloader.Channel.alpha)
+                }
+                .pickerStyle(.segmented)
+
+                HStack {
+                    Text("当前版本 (Current Version)")
+                    Spacer()
+                    if viewModel.mihomoVersion.isEmpty {
+                        Text("未安装 (Not Installed)")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(viewModel.mihomoVersion)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // Show available update
+                if let update = viewModel.availableUpdate {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("更新到 \(update.version) (Update)") {
+                            Task { await viewModel.downloadLatestMihomo() }
+                        }
+                        .disabled(viewModel.isDownloadingMihomo)
+
+                        if let notes = update.releaseNotes {
+                            Text(notes)
+                                .font(.caption)
+                                .lineLimit(3)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Text("发布于: \(update.publishedAt, style: .date)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                } else if !viewModel.mihomoVersion.isEmpty {
+                    Button("检查更新 (Check for Updates)") {
+                        Task { await viewModel.checkMihomoOnLaunch() }
+                    }
+                    .disabled(viewModel.isDownloadingMihomo)
+                }
+
+                // Download progress
+                if viewModel.isDownloadingMihomo {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("下载中... (Downloading)")
+                                .font(.caption)
+                            Spacer()
+                            Text("\(Int(viewModel.mihomoDownloadProgress * 100))%")
+                                .font(.caption)
+                        }
+                        ProgressView(value: viewModel.mihomoDownloadProgress)
+                            .progressViewStyle(.linear)
+                    }
+                }
+
+                // Error display
+                if let error = viewModel.mihomoDownloadError {
+                    Text("错误: \(error)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                // Version switcher
+                if !localVersions.isEmpty {
+                    Button("切换到其他版本 (Switch Version)") {
+                        localVersions = viewModel.listLocalMihomoVersions()
+                        showingVersionPicker = true
+                    }
+                    .disabled(viewModel.isDownloadingMihomo)
+                }
+            }
+
             Section("External Controller") {
                 HStack {
                     Text("API Port")
-                    TextField("9090", text: $controllerPort)
+                    TextField("9090", text: .constant("9090"))
                         .frame(width: 80)
+                        .disabled(true)
                 }
             }
+
             Section("About") {
                 Text("Riptide v1.0.0")
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400)
+        .frame(width: 450, height: 400)
+        .sheet(isPresented: $showingVersionPicker) {
+            VersionPickerSheet(
+                versions: localVersions,
+                onSelect: { version in
+                    Task {
+                        await viewModel.switchMihomoVersion(to: version)
+                    }
+                },
+                onCancel: { showingVersionPicker = false }
+            )
+        }
+    }
+}
+
+// MARK: - Version Picker Sheet
+
+struct VersionPickerSheet: View {
+    let versions: [String]
+    let onSelect: (String) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("选择版本 (Select Version)")
+                .font(.headline)
+
+            List(versions, id: \.self) { version in
+                Button(version) {
+                    onSelect(version)
+                    onCancel()
+                }
+            }
+            .frame(height: 200)
+
+            Button("取消 (Cancel)", action: onCancel)
+                .keyboardShortcut(.escape)
+        }
+        .padding()
+        .frame(width: 300)
     }
 }
 

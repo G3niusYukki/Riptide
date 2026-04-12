@@ -21,7 +21,8 @@ public struct ConnectedProxyContext: Sendable {
 }
 
 public struct ProxyConnector: Sendable {
-    private let pool: TransportConnectionPool
+    /// The transport connection pool used by this connector.
+    public let pool: TransportConnectionPool
 
     public init(pool: TransportConnectionPool) {
         self.pool = pool
@@ -47,6 +48,8 @@ public struct ProxyConnector: Sendable {
                 return try await performHysteria2Connect(connection: connection, node: node, target: target)
             case .snell:
                 return try await performSnellConnect(connection: connection, node: node, target: target)
+            case .tuic:
+                throw ProtocolError.connectionRejected("TUIC protocol requires macOS 14+ and is not yet fully implemented")
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never

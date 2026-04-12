@@ -68,34 +68,8 @@ struct TrafficTabView: View {
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
 
-                // Connections
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("活跃连接 (\(vm.activeConnections.count))")
-                        .font(.headline)
-                        .foregroundStyle(Theme.text)
-                    if vm.activeConnections.isEmpty {
-                        Text("暂无连接")
-                            .foregroundStyle(Theme.subtext)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding()
-                    } else {
-                        ForEach(vm.activeConnections.prefix(20)) { conn in
-                            HStack {
-                                Text(conn.host)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(Theme.text)
-                                Spacer()
-                                Text(conn.proxyName)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.subtext)
-                            }
-                            Divider()
-                        }
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+                // Active connections — real-time list
+                ConnectionListView(vm: vm)
             }
             .padding()
         }

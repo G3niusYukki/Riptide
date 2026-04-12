@@ -59,12 +59,14 @@ public struct ConnectionInfo: Codable, Sendable {
     public let metadata: ConnectionMetadata
     public let upload: Int
     public let download: Int
+    public let chains: [String]
 
-    public init(id: String, metadata: ConnectionMetadata, upload: Int, download: Int) {
+    public init(id: String, metadata: ConnectionMetadata, upload: Int, download: Int, chains: [String] = []) {
         self.id = id
         self.metadata = metadata
         self.upload = upload
         self.download = download
+        self.chains = chains
     }
 }
 

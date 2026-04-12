@@ -43,11 +43,11 @@ struct LogTabView: View {
                 Spacer()
 
                 Button("清空") {
-                    // Clear logs — stub: add clear method to AppViewModel if needed
+                    vm.clearLogs()
                 }
 
                 Button("导出") {
-                    // Export logs — stub
+                    vm.exportLogs()
                 }
             }
             .padding()

@@ -1,0 +1,166 @@
+/* Riptide Русская Локализация */
+
+/* MARK: - Имена вкладок */
+"tab.config" = "Настройки";
+"tab.proxy" = "Прокси";
+"tab.traffic" = "Трафик";
+"tab.rules" = "Правила";
+"tab.logs" = "Логи";
+
+/* MARK: - Вкладка настроек */
+"config.mode" = "Режим";
+"config.system_proxy" = "Системный прокси";
+"config.tun_mode" = "Режим TUN";
+"config.import" = "Импорт конфигурации";
+"config.profiles" = "Профили";
+"config.subscriptions" = "Подписки";
+"config.no_subscriptions" = "Нет подписок";
+"config.add_subscription_hint" = "Добавьте удаленную подписку для автоматического получения прокси-узлов";
+"config.helper_installed" = "Helper установлен";
+"config.helper_not_installed" = "Helper не установлен";
+"config.install_helper" = "Установить Helper";
+"config.install_helper_hint" = "Режим TUN требует установки инструмента Helper для настройки сетевых интерфейсов";
+"config.mode_locked" = "Режим заблокирован";
+"config.all_configs" = "Все конфигурации";
+
+/* MARK: - Профиль */
+"profile.active" = "Активный";
+"profile.activate" = "Активировать";
+"profile.delete" = "Удалить";
+"profile.edit" = "Редактировать";
+"profile.nodes" = "Узлы";
+"profile.rules" = "Правила";
+
+/* MARK: - Подписка */
+"subscription.add" = "Добавить подписку";
+"subscription.edit" = "Редактировать";
+"subscription.update" = "Обновить";
+"subscription.updating" = "Обновление...";
+"subscription.never_updated" = "Никогда не обновлялось";
+"subscription.error" = "Ошибка";
+"subscription.configs" = "Конфигурации";
+"subscription.name" = "Название";
+"subscription.url" = "URL";
+"subscription.auto_update" = "Автообновление";
+"subscription.update_interval" = "Интервал обновления";
+"subscription.interval_15m" = "15 минут";
+"subscription.interval_30m" = "30 минут";
+"subscription.interval_1h" = "1 час";
+"subscription.interval_6h" = "6 часов";
+"subscription.interval_24h" = "24 часа";
+
+/* MARK: - Вкладка прокси */
+"proxy.delay_test" = "Тест задержки";
+"proxy.direct" = "Прямое соединение";
+"proxy.timeout" = "Таймаут";
+
+/* MARK: - Вкладка трафика */
+"traffic.upload" = "Отправка";
+"traffic.download" = "Загрузка";
+"traffic.active_connections" = "Активные подключения";
+"traffic.no_connections" = "Нет подключений";
+
+/* MARK: - Список подключений */
+"connection.search" = "Поиск";
+"connection.close_all" = "Закрыть все";
+"connection.closing" = "Закрытие...";
+"connection.no_connections" = "Нет подключений";
+
+/* MARK: - Вкладка логов */
+"logs.clear" = "Очистить";
+"logs.export" = "Экспорт";
+"logs.no_logs" = "Нет логов";
+"logs.search" = "Поиск";
+"logs.level" = "Уровень";
+"logs.all" = "Все";
+
+/* MARK: - Вкладка правил */
+"rules.list" = "Правила";
+"rules.total" = "Всего";
+"rules.direct" = "Прямое соединение";
+"rules.proxy" = "Прокси";
+"rules.reject" = "Отклонить";
+
+/* MARK: - Настройки MITM */
+"mitm.title" = "MITM";
+"mitm.enable" = "Включить MITM";
+"mitm.hosts" = "Хосты";
+"mitm.exclude_hosts" = "Исключить хосты";
+"mitm.install_cert" = "Установить сертификат";
+"mitm.cert_installed" = "Сертификат установлен";
+"mitm.cert_not_installed" = "Сертификат не установлен";
+"mitm.log" = "Лог";
+"mitm.all" = "Все";
+
+/* MARK: - Меню */
+"menu.start" = "Запустить";
+"menu.stop" = "Остановить";
+"menu.open_panel" = "Открыть панель";
+"menu.quit" = "Выйти";
+"menu.mode" = "Режим";
+"menu.configs" = "Конфигурации";
+"menu.connected" = "Подключено";
+"menu.disconnected" = "Отключено";
+"menu.switch_mode_first" = "Сначала переключите режим";
+
+/* MARK: - Язык */
+"language.select" = "Выбрать язык";
+"language.auto" = "Авто";
+"language.system" = "Системный (Авто)";
+
+/* MARK: - Синхронизация WebDAV */
+"sync.title" = "Синхронизация WebDAV";
+"sync.server_section" = "Сервер";
+"sync.server_url" = "URL сервера";
+"sync.username" = "Имя пользователя";
+"sync.password" = "Пароль";
+"sync.options_section" = "Опции";
+"sync.remote_path" = "Удаленный путь";
+"sync.auto_sync" = "Автосинхронизация";
+"sync.conflict_resolution" = "Разрешение конфликтов";
+"sync.test_connection" = "Проверить подключение";
+"sync.test_success" = "Подключение успешно";
+"sync.test_failed" = "Подключение не удалось";
+"sync.save_config" = "Сохранить конфигурацию";
+"sync.clear_config" = "Очистить конфигурацию";
+"sync.sync_now" = "Синхронизировать сейчас";
+"sync.result_section" = "Результаты синхронизации";
+"sync.uploaded_count" = "Загружено";
+"sync.downloaded_count" = "Скачано";
+"sync.conflicts_count" = "Конфликты";
+"sync.errors_count" = "Ошибки";
+"sync.success" = "Успех";
+"sync.conflict_local_wins" = "Локальный приоритет";
+"sync.conflict_remote_wins" = "Удаленный приоритет";
+"sync.conflict_ask" = "Спросить";
+"sync.conflict_merge" = "Объединить";
+"sync.error_not_configured" = "Не настроено";
+"sync.error_invalid_url" = "Неверный URL";
+"sync.error_invalid_credentials" = "Неверные учетные данные";
+"sync.error_list_failed" = "Ошибка получения списка";
+"sync.error_download_failed" = "Ошибка скачивания";
+"sync.error_upload_failed" = "Ошибка загрузки";
+"sync.error_delete_failed" = "Ошибка удаления";
+"sync.error_network" = "Ошибка сети";
+"sync.error_parsing" = "Ошибка разбора";
+"sync.error_keychain" = "Ошибка связки ключей";
+"sync.error_in_progress" = "Синхронизация в процессе";
+"sync.error_conflict_resolution" = "Ошибка разрешения конфликта";
+"sync.error_server" = "Ошибка сервера";
+"sync.error_not_found" = "Не найдено";
+
+/* MARK: - Общие */
+"common.cancel" = "Отмена";
+"common.confirm" = "Подтвердить";
+"common.add" = "Добавить";
+"common.save" = "Сохранить";
+"common.delete" = "Удалить";
+"common.edit" = "Редактировать";
+"common.close" = "Закрыть";
+"common.loading" = "Загрузка";
+"common.error" = "Ошибка";
+"common.unknown" = "Неизвестно";
+
+/* MARK: - Приложение */
+"app.name" = "Riptide";
+"app.tagline" = "Быстрый и безопасный прокси-клиент";

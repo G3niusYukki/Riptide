@@ -1,0 +1,238 @@
+import Foundation
+
+/// All localizable string keys used in the app.
+/// Each case maps to a key in the Localizable.xcstrings file.
+public enum Localized: String, CaseIterable {
+    // MARK: - Tab Names
+    case tabConfig = "tab.config"
+    case tabProxy = "tab.proxy"
+    case tabTraffic = "tab.traffic"
+    case tabRules = "tab.rules"
+    case tabLogs = "tab.logs"
+
+    // MARK: - Config Tab
+    case configMode = "config.mode"
+    case configSystemProxy = "config.system_proxy"
+    case configTunMode = "config.tun_mode"
+    case configImport = "config.import"
+    case configProfiles = "config.profiles"
+    case configSubscriptions = "config.subscriptions"
+    case configNoSubscriptions = "config.no_subscriptions"
+    case configAddSubscriptionHint = "config.add_subscription_hint"
+    case configHelperInstalled = "config.helper_installed"
+    case configHelperNotInstalled = "config.helper_not_installed"
+    case configInstallHelper = "config.install_helper"
+    case configInstallHelperHint = "config.install_helper_hint"
+    case configModeLocked = "config.mode_locked"
+
+    // MARK: - Profile
+    case profileActive = "profile.active"
+    case profileActivate = "profile.activate"
+    case profileDelete = "profile.delete"
+    case profileEdit = "profile.edit"
+    case profileNodes = "profile.nodes"
+    case profileRules = "profile.rules"
+    case configAllConfigs = "config.all_configs"
+
+    // MARK: - Subscription
+    case subAdd = "subscription.add"
+    case subEdit = "subscription.edit"
+    case subUpdate = "subscription.update"
+    case subUpdating = "subscription.updating"
+    case subNeverUpdated = "subscription.never_updated"
+    case subError = "subscription.error"
+    case subConfigs = "subscription.configs"
+    case subName = "subscription.name"
+    case subUrl = "subscription.url"
+    case subAutoUpdate = "subscription.auto_update"
+    case subUpdateInterval = "subscription.update_interval"
+    case subInterval15m = "subscription.interval_15m"
+    case subInterval30m = "subscription.interval_30m"
+    case subInterval1h = "subscription.interval_1h"
+    case subInterval6h = "subscription.interval_6h"
+    case subInterval24h = "subscription.interval_24h"
+
+    // MARK: - Proxy Tab
+    case proxyDelayTest = "proxy.delay_test"
+    case proxyDirect = "proxy.direct"
+    case proxyTimeout = "proxy.timeout"
+
+    // MARK: - Traffic Tab
+    case trafficUpload = "traffic.upload"
+    case trafficDownload = "traffic.download"
+    case trafficActiveConnections = "traffic.active_connections"
+    case trafficNoConnections = "traffic.no_connections"
+
+    // MARK: - Connection List
+    case connSearch = "connection.search"
+    case connCloseAll = "connection.close_all"
+    case connClosing = "connection.closing"
+    case connNoConnections = "connection.no_connections"
+
+    // MARK: - Logs Tab
+    case logsClear = "logs.clear"
+    case logsExport = "logs.export"
+    case logsNoLogs = "logs.no_logs"
+    case logsSearch = "logs.search"
+    case logsLevel = "logs.level"
+    case logsAll = "logs.all"
+
+    // MARK: - Rules Tab
+    case rulesList = "rules.list"
+    case rulesTotal = "rules.total"
+    case rulesDirect = "rules.direct"
+    case rulesProxy = "rules.proxy"
+    case rulesReject = "rules.reject"
+
+    // MARK: - MITM Settings
+    case mitmTitle = "mitm.title"
+    case mitmEnable = "mitm.enable"
+    case mitmHosts = "mitm.hosts"
+    case mitmExcludeHosts = "mitm.exclude_hosts"
+    case mitmInstallCert = "mitm.install_cert"
+    case mitmCertInstalled = "mitm.cert_installed"
+    case mitmCertNotInstalled = "mitm.cert_not_installed"
+    case mitmLog = "mitm.log"
+    case mitmAll = "mitm.all"
+
+    // MARK: - Menu Bar
+    case menuStart = "menu.start"
+    case menuStop = "menu.stop"
+    case menuOpenPanel = "menu.open_panel"
+    case menuQuit = "menu.quit"
+    case menuMode = "menu.mode"
+    case menuConfigs = "menu.configs"
+    case menuConnected = "menu.connected"
+    case menuDisconnected = "menu.disconnected"
+    case menuSwitchModeFirst = "menu.switch_mode_first"
+
+    // MARK: - Language
+    case languageSelect = "language.select"
+    case languageAuto = "language.auto"
+
+    // MARK: - WebDAV Sync
+    case syncTitle = "sync.title"
+    case syncServerSection = "sync.server_section"
+    case syncServerUrl = "sync.server_url"
+    case syncUsername = "sync.username"
+    case syncPassword = "sync.password"
+    case syncOptionsSection = "sync.options_section"
+    case syncRemotePath = "sync.remote_path"
+    case syncAutoSync = "sync.auto_sync"
+    case syncConflictResolution = "sync.conflict_resolution"
+    case syncTestConnection = "sync.test_connection"
+    case syncTestSuccess = "sync.test_success"
+    case syncTestFailed = "sync.test_failed"
+    case syncSaveConfig = "sync.save_config"
+    case syncClearConfig = "sync.clear_config"
+    case syncSyncNow = "sync.sync_now"
+    case syncResultSection = "sync.result_section"
+    case syncUploadedCount = "sync.uploaded_count"
+    case syncDownloadedCount = "sync.downloaded_count"
+    case syncConflictsCount = "sync.conflicts_count"
+    case syncErrorsCount = "sync.errors_count"
+    case syncSuccess = "sync.success"
+    case syncConflictLocalWins = "sync.conflict_local_wins"
+    case syncConflictRemoteWins = "sync.conflict_remote_wins"
+    case syncConflictAsk = "sync.conflict_ask"
+    case syncConflictMerge = "sync.conflict_merge"
+    case syncErrorNotConfigured = "sync.error_not_configured"
+    case syncErrorInvalidUrl = "sync.error_invalid_url"
+    case syncErrorInvalidCredentials = "sync.error_invalid_credentials"
+    case syncErrorListFailed = "sync.error_list_failed"
+    case syncErrorDownloadFailed = "sync.error_download_failed"
+    case syncErrorUploadFailed = "sync.error_upload_failed"
+    case syncErrorDeleteFailed = "sync.error_delete_failed"
+    case syncErrorNetwork = "sync.error_network"
+    case syncErrorParsing = "sync.error_parsing"
+    case syncErrorKeychain = "sync.error_keychain"
+    case syncErrorInProgress = "sync.error_in_progress"
+    case syncErrorConflictResolution = "sync.error_conflict_resolution"
+    case syncErrorServer = "sync.error_server"
+    case syncErrorNotFound = "sync.error_not_found"
+
+    // MARK: - Common
+    case commonCancel = "common.cancel"
+    case commonConfirm = "common.confirm"
+    case commonAdd = "common.add"
+    case commonSave = "common.save"
+    case commonDelete = "common.delete"
+    case commonEdit = "common.edit"
+    case commonClose = "common.close"
+    case commonLoading = "common.loading"
+    case commonError = "common.error"
+    case commonUnknown = "common.unknown"
+
+    /// Get the localized string value for this key, honoring the current language selection.
+    public var string: String {
+        Self.localizedBundle.localizedString(forKey: rawValue, value: rawValue, table: nil)
+    }
+
+    /// Resolve the bundle for the currently selected language.
+    private static var localizedBundle: Bundle {
+        guard let languageCode = UserDefaults.standard.string(forKey: "riptide.language"),
+              let language = AppLanguage(rawValue: languageCode),
+              let path = Bundle.main.path(forResource: language.localeIdentifier, ofType: "lproj"),
+              let bundle = Bundle(path: path) else {
+            return .main
+        }
+        return bundle
+    }
+}
+
+/// Extended language codes supported by the app (8 options including system auto-detect).
+public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
+    case system = "system"
+    case chineseSimplified = "zh-Hans"
+    case english = "en"
+    case spanish = "es"
+    case russian = "ru"
+    case japanese = "ja"
+    case korean = "ko"
+    case persian = "fa"
+
+    public var id: String { rawValue }
+
+    /// Display name in the language itself.
+    public var displayName: String {
+        switch self {
+        case .system: return String.localized("language.system")
+        case .chineseSimplified: return "简体中文"
+        case .english: return "English"
+        case .spanish: return "Español"
+        case .russian: return "Русский"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .persian: return "فارسی"
+        }
+    }
+
+    /// Locale identifier for this language.
+    public var localeIdentifier: String {
+        rawValue
+    }
+
+    /// Returns the actual language to use (resolves system to detected language).
+    public func resolvedLanguage() -> AppLanguage {
+        if self != .system {
+            return self
+        }
+
+        let preferred = Locale.preferredLanguages.first ?? ""
+        if preferred.hasPrefix("zh-Hans") || preferred.hasPrefix("zh-CN") {
+            return .chineseSimplified
+        } else if preferred.hasPrefix("es") {
+            return .spanish
+        } else if preferred.hasPrefix("ru") {
+            return .russian
+        } else if preferred.hasPrefix("ja") || preferred.hasPrefix("jp") {
+            return .japanese
+        } else if preferred.hasPrefix("ko") {
+            return .korean
+        } else if preferred.hasPrefix("fa") {
+            return .persian
+        } else {
+            return .english
+        }
+    }
+}

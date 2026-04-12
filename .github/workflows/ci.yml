@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SWIFT_VERSION: "6.0"
+
+jobs:
+  macos-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Download mihomo binary
+        run: ./Scripts/download-mihomo.sh
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  windows-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+
+      - name: Install dependencies
+        working-directory: ./riptide-windows
+        run: npm ci
+
+      - name: Build Windows
+        working-directory: ./riptide-windows
+        run: cargo build
+
+      - name: Test Windows
+        working-directory: ./riptide-windows/src-tauri
+        run: cargo test
