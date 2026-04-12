@@ -11,13 +11,13 @@ on:
         required: true
 
 env:
-  SWIFT_VERSION: 6.2
+  SWIFT_VERSION: '6.0'
   MACOS_VERSION: '14'
 
 jobs:
   build-macos:
     name: Build macOS Universal Binary
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
@@ -141,27 +141,29 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
       - name: Install dependencies
-        run: |
-          cd riptide-windows
-          npm install
+        working-directory: riptide-windows
+        run: npm install
 
       - name: Build
-        run: |
-          cd riptide-windows
-          cargo tauri build
+        working-directory: riptide-windows
+        run: cargo tauri build
 
       - name: Sign Windows installer
         if: env.WINDOWS_CERTIFICATE != ''
+        working-directory: riptide-windows
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PWD: ${{ secrets.WINDOWS_CERTIFICATE_PWD }}
         run: |
           echo "$WINDOWS_CERTIFICATE" | base64 -d > certificate.pfx
-          signtool sign /f certificate.pfx /p "$WINDOWS_CERTIFICATE_PWD" `
-            /tr http://timestamp.digicert.com /td sha256 `
-            /fd sha256 `
-            riptide-windows/src-tauri/target/release/bundle/msi/*.msi
+          signtool sign /f certificate.pfx /p "$WINDOWS_CERTIFICATE_PWD" \
+            /tr http://timestamp.digicert.com /td sha256 \
+            /fd sha256 \
+            src-tauri/target/release/bundle/msi/*.msi
           rm certificate.pfx
 
       - name: Upload artifact
