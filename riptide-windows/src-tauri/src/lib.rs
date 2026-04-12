@@ -53,6 +53,20 @@ pub fn run() {
             let app_handle = app.handle().clone();
             app.manage(MihomoManager::new(app_handle.clone()));
             app.manage(SystemProxyController::new());
+            
+            // Initialize Windows-specific state
+            #[cfg(target_os = "windows")]
+            {
+                match crate::cmds::windows::init_windows_proxy_state(&app_handle) {
+                    Ok(state) => {
+                        app.manage(state);
+                        log::info!("Windows proxy state initialized");
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to initialize Windows proxy state: {}", e);
+                    }
+                }
+            }
 
             // Check if mihomo binary exists
             if !core::mihomo::check_mihomo_binary(&app_handle) {
@@ -93,6 +107,27 @@ pub fn run() {
             cmds::system::uninstall_tun_service,
             cmds::system::start_tun_service,
             cmds::system::stop_tun_service,
+            // Windows-specific commands
+            #[cfg(target_os = "windows")]
+            cmds::windows::start_windows_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::stop_windows_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::restart_windows_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::get_windows_proxy_status,
+            #[cfg(target_os = "windows")]
+            cmds::windows::get_windows_proxy_pid,
+            #[cfg(target_os = "windows")]
+            cmds::windows::enable_windows_system_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::enable_windows_socks_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::enable_windows_both_proxies,
+            #[cfg(target_os = "windows")]
+            cmds::windows::disable_windows_system_proxy,
+            #[cfg(target_os = "windows")]
+            cmds::windows::get_windows_system_proxy_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
