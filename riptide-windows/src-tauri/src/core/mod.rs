@@ -10,3 +10,5 @@ pub mod service;
 pub mod windows_proxy;
 #[cfg(target_os = "windows")]
 pub mod windows_sysproxy;
+#[cfg(target_os = "windows")]
+pub mod windows_tun;

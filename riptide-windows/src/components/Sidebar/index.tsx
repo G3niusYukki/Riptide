@@ -21,14 +21,14 @@ export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-4">
-      <div className="mb-8">
-        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+    <aside className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-4 select-none">
+      <div className="mb-6">
+        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
           <span className="text-white font-bold text-lg">R</span>
         </div>
       </div>
       
-      <nav className="flex-1 flex flex-col gap-2">
+      <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -38,15 +38,15 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={`
-                w-12 h-12 rounded-lg flex items-center justify-center transition-all
+                w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-150
                 ${isActive 
-                  ? 'bg-blue-600/20 text-blue-400' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-blue-600/20 text-blue-400 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
                 }
               `}
               title={item.label}
             >
-              <Icon size={20} />
+              <Icon size={22} strokeWidth={isActive ? 2 : 1.5} />
             </Link>
           );
         })}

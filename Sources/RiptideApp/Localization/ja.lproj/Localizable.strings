@@ -1,0 +1,166 @@
+/* Riptide 日本語ローカライゼーション */
+
+/* MARK: - タブ名 */
+"tab.config" = "設定";
+"tab.proxy" = "プロキシ";
+"tab.traffic" = "トラフィック";
+"tab.rules" = "ルール";
+"tab.logs" = "ログ";
+
+/* MARK: - 設定タブ */
+"config.mode" = "モード";
+"config.system_proxy" = "システムプロキシ";
+"config.tun_mode" = "TUNモード";
+"config.import" = "設定をインポート";
+"config.profiles" = "プロファイル";
+"config.subscriptions" = "サブスクリプション";
+"config.no_subscriptions" = "サブスクリプションがありません";
+"config.add_subscription_hint" = "リモートサブスクリプションを追加して、プロキシノードを自動的に取得します";
+"config.helper_installed" = "Helperがインストールされています";
+"config.helper_not_installed" = "Helperがインストールされていません";
+"config.install_helper" = "Helperをインストール";
+"config.install_helper_hint" = "TUNモードでは、ネットワークインターフェースを設定するためにHelperツールが必要です";
+"config.mode_locked" = "モードがロックされています";
+"config.all_configs" = "すべての設定";
+
+/* MARK: - プロファイル */
+"profile.active" = "アクティブ";
+"profile.activate" = "アクティブ化";
+"profile.delete" = "削除";
+"profile.edit" = "編集";
+"profile.nodes" = "ノード";
+"profile.rules" = "ルール";
+
+/* MARK: - サブスクリプション */
+"subscription.add" = "サブスクリプションを追加";
+"subscription.edit" = "編集";
+"subscription.update" = "更新";
+"subscription.updating" = "更新中...";
+"subscription.never_updated" = "更新なし";
+"subscription.error" = "エラー";
+"subscription.configs" = "設定";
+"subscription.name" = "名前";
+"subscription.url" = "URL";
+"subscription.auto_update" = "自動更新";
+"subscription.update_interval" = "更新間隔";
+"subscription.interval_15m" = "15分";
+"subscription.interval_30m" = "30分";
+"subscription.interval_1h" = "1時間";
+"subscription.interval_6h" = "6時間";
+"subscription.interval_24h" = "24時間";
+
+/* MARK: - プロキシタブ */
+"proxy.delay_test" = "遅延テスト";
+"proxy.direct" = "ダイレクト";
+"proxy.timeout" = "タイムアウト";
+
+/* MARK: - トラフィックタブ */
+"traffic.upload" = "アップロード";
+"traffic.download" = "ダウンロード";
+"traffic.active_connections" = "アクティブ接続";
+"traffic.no_connections" = "接続がありません";
+
+/* MARK: - 接続リスト */
+"connection.search" = "検索";
+"connection.close_all" = "すべて閉じる";
+"connection.closing" = "閉じています...";
+"connection.no_connections" = "接続がありません";
+
+/* MARK: - ログタブ */
+"logs.clear" = "クリア";
+"logs.export" = "エクスポート";
+"logs.no_logs" = "ログがありません";
+"logs.search" = "検索";
+"logs.level" = "レベル";
+"logs.all" = "すべて";
+
+/* MARK: - ルールタブ */
+"rules.list" = "ルール";
+"rules.total" = "合計";
+"rules.direct" = "ダイレクト";
+"rules.proxy" = "プロキシ";
+"rules.reject" = "拒否";
+
+/* MARK: - MITM設定 */
+"mitm.title" = "MITM";
+"mitm.enable" = "MITMを有効化";
+"mitm.hosts" = "ホスト";
+"mitm.exclude_hosts" = "除外ホスト";
+"mitm.install_cert" = "証明書をインストール";
+"mitm.cert_installed" = "証明書がインストールされています";
+"mitm.cert_not_installed" = "証明書がインストールされていません";
+"mitm.log" = "ログ";
+"mitm.all" = "すべて";
+
+/* MARK: - メニューバー */
+"menu.start" = "開始";
+"menu.stop" = "停止";
+"menu.open_panel" = "パネルを開く";
+"menu.quit" = "終了";
+"menu.mode" = "モード";
+"menu.configs" = "設定";
+"menu.connected" = "接続済み";
+"menu.disconnected" = "未接続";
+"menu.switch_mode_first" = "先にモードを切り替えてください";
+
+/* MARK: - 言語 */
+"language.select" = "言語を選択";
+"language.auto" = "自動";
+"language.system" = "システム (自動)";
+
+/* MARK: - WebDAV同期 */
+"sync.title" = "WebDAV同期";
+"sync.server_section" = "サーバー";
+"sync.server_url" = "サーバーURL";
+"sync.username" = "ユーザー名";
+"sync.password" = "パスワード";
+"sync.options_section" = "オプション";
+"sync.remote_path" = "リモートパス";
+"sync.auto_sync" = "自動同期";
+"sync.conflict_resolution" = "競合解決";
+"sync.test_connection" = "接続をテスト";
+"sync.test_success" = "接続成功";
+"sync.test_failed" = "接続失敗";
+"sync.save_config" = "設定を保存";
+"sync.clear_config" = "設定をクリア";
+"sync.sync_now" = "今すぐ同期";
+"sync.result_section" = "同期結果";
+"sync.uploaded_count" = "アップロード済み";
+"sync.downloaded_count" = "ダウンロード済み";
+"sync.conflicts_count" = "競合";
+"sync.errors_count" = "エラー";
+"sync.success" = "成功";
+"sync.conflict_local_wins" = "ローカルを優先";
+"sync.conflict_remote_wins" = "リモートを優先";
+"sync.conflict_ask" = "確認";
+"sync.conflict_merge" = "マージ";
+"sync.error_not_configured" = "設定されていません";
+"sync.error_invalid_url" = "無効なURL";
+"sync.error_invalid_credentials" = "無効な認証情報";
+"sync.error_list_failed" = "リスト取得に失敗";
+"sync.error_download_failed" = "ダウンロードに失敗";
+"sync.error_upload_failed" = "アップロードに失敗";
+"sync.error_delete_failed" = "削除に失敗";
+"sync.error_network" = "ネットワークエラー";
+"sync.error_parsing" = "解析エラー";
+"sync.error_keychain" = "キーチェーンエラー";
+"sync.error_in_progress" = "同期進行中";
+"sync.error_conflict_resolution" = "競合解決に失敗";
+"sync.error_server" = "サーバーエラー";
+"sync.error_not_found" = "見つかりません";
+
+/* MARK: - 共通 */
+"common.cancel" = "キャンセル";
+"common.confirm" = "確認";
+"common.add" = "追加";
+"common.save" = "保存";
+"common.delete" = "削除";
+"common.edit" = "編集";
+"common.close" = "閉じる";
+"common.loading" = "読み込み中";
+"common.error" = "エラー";
+"common.unknown" = "不明";
+
+/* MARK: - アプリ */
+"app.name" = "Riptide";
+"app.tagline" = "高速で安全なプロキシクライアント";

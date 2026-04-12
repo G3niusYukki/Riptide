@@ -5,11 +5,15 @@
 
 use crate::core::windows_proxy::{WindowsProxyManager, ProxyError};
 use crate::core::windows_sysproxy::{WindowsSysProxyController, WindowsProxyConfig};
+use crate::core::windows_tun::{WindowsTUNManager, TUNError, TUNStatusDto};
 use tauri::{AppHandle, State};
 use std::sync::Mutex;
 
 /// State wrapper for WindowsProxyManager
 pub struct WindowsProxyState(pub Mutex<WindowsProxyManager>);
+
+/// State wrapper for WindowsTUNManager
+pub struct WindowsTUNState(pub Mutex<WindowsTUNManager>);
 
 /// Start the mihomo proxy using Windows-optimized process management
 #[tauri::command]
@@ -122,6 +126,67 @@ impl From<WindowsProxyConfig> for WindowsProxyConfigDto {
 pub fn init_windows_proxy_state(app_handle: &AppHandle) -> anyhow::Result<WindowsProxyState> {
     let manager = WindowsProxyManager::from_app_handle(app_handle)?;
     Ok(WindowsProxyState(Mutex::new(manager)))
+}
+
+/// Initialize Windows TUN state for the application
+pub fn init_windows_tun_state(app_handle: &AppHandle) -> anyhow::Result<WindowsTUNState> {
+    // Get the app data directory where wintun.dll should be bundled
+    let app_dir = crate::utils::dirs::get_app_data_dir(app_handle)?;
+    let wintun_path = app_dir.join("wintun.dll");
+    
+    // Check if wintun.dll exists in the app directory
+    // In production, wintun.dll should be bundled via tauri.conf.json resources
+    let wintun_dll_path = if wintun_path.exists() {
+        wintun_path
+    } else {
+        // Fallback to current directory (for development)
+        std::env::current_dir()?.join("wintun.dll")
+    };
+    
+    log::info!("Wintun DLL path: {:?}", wintun_dll_path);
+    
+    let manager = WindowsTUNManager::new(wintun_dll_path);
+    Ok(WindowsTUNState(Mutex::new(manager)))
+}
+
+// ==================== TUN Mode Commands ====================
+
+/// Start TUN mode
+#[tauri::command]
+pub async fn start_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
+    let mut manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+    
+    // Create adapter if not already created
+    if manager.get_status().await == crate::core::windows_tun::TUNStatus::Stopped {
+        manager.create_adapter().map_err(|e| e.to_string())?;
+    }
+    
+    // Start TUN session
+    manager.start().await.map_err(|e| e.to_string())
+}
+
+/// Stop TUN mode
+#[tauri::command]
+pub async fn stop_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
+    let mut manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+    manager.stop().await.map_err(|e| e.to_string())
+}
+
+/// Get TUN mode status
+#[tauri::command]
+pub fn get_tun_status(state: State<'_, WindowsTUNState>) -> Result<TUNStatusDto, String> {
+    let manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let config = manager.get_config();
+    
+    // For sync command, we'll return the config info without checking real-time status
+    // The status will be determined by the config and last known state
+    Ok(TUNStatusDto {
+        status: "unknown".to_string(),
+        running: false, // Frontend can call the async start/stop commands to change this
+        adapter_name: Some(config.adapter_name.clone()),
+        interface_ip: Some(config.interface_ip.clone()),
+        gateway: Some(config.gateway.clone()),
+    })
 }
 
 #[cfg(test)]

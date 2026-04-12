@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "Riptide",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14),
     ],

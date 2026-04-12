@@ -58,3 +58,6 @@ export const installTunService = () => invoke<void>('install_tun_service');
 export const uninstallTunService = () => invoke<void>('uninstall_tun_service');
 export const startTunService = () => invoke<void>('start_tun_service');
 export const stopTunService = () => invoke<void>('stop_tun_service');
+
+// Hotkey commands
+export const getHotkeys = () => invoke<string[]>('get_hotkeys');

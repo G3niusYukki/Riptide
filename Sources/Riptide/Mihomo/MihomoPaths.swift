@@ -7,6 +7,11 @@ public struct MihomoPaths: Sendable {
     /// Base directory: ~/Library/Application Support/Riptide/mihomo
     public let baseDirectory: URL
 
+    /// The main mihomo executable path.
+    public var executable: String {
+        baseDirectory.appendingPathComponent("mihomo").path
+    }
+
     /// Config directory (same as base): ~/Library/Application Support/Riptide/mihomo
     public var configDirectory: URL {
         baseDirectory

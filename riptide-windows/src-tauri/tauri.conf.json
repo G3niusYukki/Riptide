@@ -49,6 +49,24 @@
     ],
     "resources": [
       "resources"
-    ]
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": ["zh-CN", "en-US"],
+        "template": null,
+        "fragmentPaths": [],
+        "componentGroupRefs": [],
+        "componentRefs": [],
+        "featureRefs": [],
+        "featureGroupRefs": [],
+        "mergeRefs": []
+      }
+    }
   }
 }

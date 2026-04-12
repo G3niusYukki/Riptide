@@ -265,6 +265,17 @@
         "ko": { "stringUnit": { "value": "자동" } },
         "fa": { "stringUnit": { "value": "خودکار" } }
       }
+    },
+    "language.system": {
+      "localizations": {
+        "en": { "stringUnit": { "value": "System (Auto)" } },
+        "zh-Hans": { "stringUnit": { "value": "系统 (自动)" } },
+        "es": { "stringUnit": { "value": "Sistema (Auto)" } },
+        "ru": { "stringUnit": { "value": "Системный (Авто)" } },
+        "ja": { "stringUnit": { "value": "システム (自動)" } },
+        "ko": { "stringUnit": { "value": "시스템 (자동)" } },
+        "fa": { "stringUnit": { "value": "سیستم (خودکار)" } }
+      }
     }
   }
 }
