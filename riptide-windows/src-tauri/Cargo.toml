@@ -1,6 +1,6 @@
 [package]
 name = "riptide-windows"
-version = "0.1.0"
+version = "1.1.0"
 description = "Riptide - A native Windows proxy client"
 authors = ["Riptide Team"]
 edition = "2021"
