@@ -1,6 +1,6 @@
 [package]
 name = "riptide-windows"
-version = "0.1.0"
+version = "1.1.0"
 description = "Riptide - A native Windows proxy client"
 authors = ["Riptide Team"]
 edition = "2021"
@@ -35,8 +35,15 @@ uuid = { version = "1", features = ["v4", "serde"] }
 urlencoding = "2"
 tokio-tungstenite = "0.26"
 futures = "0.3"
+which = "7"
+
+# Global hotkey support
+global-hotkey = "0.6"
 
 tauri-plugin-fs = "2"
+
+[target.'cfg(windows)'.dependencies]
+wintun = "0.4"
 
 [profile.release]
 strip = true

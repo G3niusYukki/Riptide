@@ -1,0 +1,166 @@
+/* Riptide English Localization */
+
+/* MARK: - Tab Names */
+"tab.config" = "Config";
+"tab.proxy" = "Proxies";
+"tab.traffic" = "Traffic";
+"tab.rules" = "Rules";
+"tab.logs" = "Logs";
+
+/* MARK: - Config Tab */
+"config.mode" = "Mode";
+"config.system_proxy" = "System Proxy";
+"config.tun_mode" = "TUN Mode";
+"config.import" = "Import Config";
+"config.profiles" = "Profiles";
+"config.subscriptions" = "Subscriptions";
+"config.no_subscriptions" = "No Subscriptions";
+"config.add_subscription_hint" = "Add a remote subscription to get proxy nodes automatically";
+"config.helper_installed" = "Helper Installed";
+"config.helper_not_installed" = "Helper Not Installed";
+"config.install_helper" = "Install Helper";
+"config.install_helper_hint" = "TUN Mode requires Helper tool to configure network interfaces";
+"config.mode_locked" = "Mode Locked";
+"config.all_configs" = "All Configs";
+
+/* MARK: - Profile */
+"profile.active" = "Active";
+"profile.activate" = "Activate";
+"profile.delete" = "Delete";
+"profile.edit" = "Edit";
+"profile.nodes" = "Nodes";
+"profile.rules" = "Rules";
+
+/* MARK: - Subscription */
+"subscription.add" = "Add Subscription";
+"subscription.edit" = "Edit";
+"subscription.update" = "Update";
+"subscription.updating" = "Updating...";
+"subscription.never_updated" = "Never Updated";
+"subscription.error" = "Error";
+"subscription.configs" = "Configs";
+"subscription.name" = "Name";
+"subscription.url" = "URL";
+"subscription.auto_update" = "Auto Update";
+"subscription.update_interval" = "Update Interval";
+"subscription.interval_15m" = "15 Minutes";
+"subscription.interval_30m" = "30 Minutes";
+"subscription.interval_1h" = "1 Hour";
+"subscription.interval_6h" = "6 Hours";
+"subscription.interval_24h" = "24 Hours";
+
+/* MARK: - Proxy Tab */
+"proxy.delay_test" = "Delay Test";
+"proxy.direct" = "Direct";
+"proxy.timeout" = "Timeout";
+
+/* MARK: - Traffic Tab */
+"traffic.upload" = "Upload";
+"traffic.download" = "Download";
+"traffic.active_connections" = "Active Connections";
+"traffic.no_connections" = "No Connections";
+
+/* MARK: - Connection List */
+"connection.search" = "Search";
+"connection.close_all" = "Close All";
+"connection.closing" = "Closing...";
+"connection.no_connections" = "No Connections";
+
+/* MARK: - Logs Tab */
+"logs.clear" = "Clear";
+"logs.export" = "Export";
+"logs.no_logs" = "No Logs";
+"logs.search" = "Search";
+"logs.level" = "Level";
+"logs.all" = "All";
+
+/* MARK: - Rules Tab */
+"rules.list" = "Rules";
+"rules.total" = "Total";
+"rules.direct" = "Direct";
+"rules.proxy" = "Proxy";
+"rules.reject" = "Reject";
+
+/* MARK: - MITM Settings */
+"mitm.title" = "MITM";
+"mitm.enable" = "Enable MITM";
+"mitm.hosts" = "Hosts";
+"mitm.exclude_hosts" = "Exclude Hosts";
+"mitm.install_cert" = "Install Certificate";
+"mitm.cert_installed" = "Certificate Installed";
+"mitm.cert_not_installed" = "Certificate Not Installed";
+"mitm.log" = "Log";
+"mitm.all" = "All";
+
+/* MARK: - Menu Bar */
+"menu.start" = "Start";
+"menu.stop" = "Stop";
+"menu.open_panel" = "Open Panel";
+"menu.quit" = "Quit";
+"menu.mode" = "Mode";
+"menu.configs" = "Configs";
+"menu.connected" = "Connected";
+"menu.disconnected" = "Disconnected";
+"menu.switch_mode_first" = "Switch Mode First";
+
+/* MARK: - Language */
+"language.select" = "Select Language";
+"language.auto" = "Auto";
+"language.system" = "System (Auto)";
+
+/* MARK: - WebDAV Sync */
+"sync.title" = "WebDAV Sync";
+"sync.server_section" = "Server";
+"sync.server_url" = "Server URL";
+"sync.username" = "Username";
+"sync.password" = "Password";
+"sync.options_section" = "Options";
+"sync.remote_path" = "Remote Path";
+"sync.auto_sync" = "Auto Sync";
+"sync.conflict_resolution" = "Conflict Resolution";
+"sync.test_connection" = "Test Connection";
+"sync.test_success" = "Connection Successful";
+"sync.test_failed" = "Connection Failed";
+"sync.save_config" = "Save Configuration";
+"sync.clear_config" = "Clear Configuration";
+"sync.sync_now" = "Sync Now";
+"sync.result_section" = "Sync Results";
+"sync.uploaded_count" = "Uploaded";
+"sync.downloaded_count" = "Downloaded";
+"sync.conflicts_count" = "Conflicts";
+"sync.errors_count" = "Errors";
+"sync.success" = "Success";
+"sync.conflict_local_wins" = "Local Wins";
+"sync.conflict_remote_wins" = "Remote Wins";
+"sync.conflict_ask" = "Ask";
+"sync.conflict_merge" = "Merge";
+"sync.error_not_configured" = "Not Configured";
+"sync.error_invalid_url" = "Invalid URL";
+"sync.error_invalid_credentials" = "Invalid Credentials";
+"sync.error_list_failed" = "List Failed";
+"sync.error_download_failed" = "Download Failed";
+"sync.error_upload_failed" = "Upload Failed";
+"sync.error_delete_failed" = "Delete Failed";
+"sync.error_network" = "Network Error";
+"sync.error_parsing" = "Parsing Error";
+"sync.error_keychain" = "Keychain Error";
+"sync.error_in_progress" = "Sync In Progress";
+"sync.error_conflict_resolution" = "Conflict Resolution Failed";
+"sync.error_server" = "Server Error";
+"sync.error_not_found" = "Not Found";
+
+/* MARK: - Common */
+"common.cancel" = "Cancel";
+"common.confirm" = "Confirm";
+"common.add" = "Add";
+"common.save" = "Save";
+"common.delete" = "Delete";
+"common.edit" = "Edit";
+"common.close" = "Close";
+"common.loading" = "Loading";
+"common.error" = "Error";
+"common.unknown" = "Unknown";
+
+/* MARK: - App */
+"app.name" = "Riptide";
+"app.tagline" = "Fast and Secure Proxy Client";

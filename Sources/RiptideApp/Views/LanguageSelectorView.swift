@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Language selection view with support for 7 languages.
+/// Language selection view with support for 8 options including system auto-detect.
 struct LanguageSelectorView: View {
-    @State private var selectedLanguage: AppLanguage = .english
-    @State private var isAutoDetect = false
+    @State private var selectedLanguage: AppLanguage = .system
+    @State private var isAutoDetect = true
     @Environment(\.dismiss) private var dismiss
     @StateObject private var localization = LocalizationManager()
 
@@ -52,7 +52,7 @@ struct LanguageSelectorView: View {
 
     private var languageSection: some View {
         Section(String.localized("language.select")) {
-            ForEach(AppLanguage.allCases) { language in
+            ForEach(AppLanguage.allCases.filter { $0 != .system }) { language in
                 Button {
                     setLanguage(language)
                 } label: {
@@ -72,8 +72,8 @@ struct LanguageSelectorView: View {
 
     private func loadCurrentLanguage() {
         selectedLanguage = localization.getCurrentLanguage()
-        // Check if using auto-detect (no saved preference)
-        isAutoDetect = UserDefaults.standard.string(forKey: "riptide.language") == nil
+        // Check if using auto-detect (system option)
+        isAutoDetect = (selectedLanguage == .system)
     }
 
     private func setLanguage(_ language: AppLanguage) {
@@ -83,8 +83,7 @@ struct LanguageSelectorView: View {
     }
 
     private func setAutoDetect() {
-        UserDefaults.standard.removeObject(forKey: "riptide.language")
-        localization.setSystemLanguage()
+        localization.setLanguage(.system)
         selectedLanguage = localization.getCurrentLanguage()
         isAutoDetect = true
     }

@@ -88,46 +88,47 @@ export function Connections() {
         </div>
       ) : (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-800 grid grid-cols-12 gap-4 text-sm font-medium text-slate-400">
-            <div className="col-span-4">目标地址</div>
+          <div className="px-4 py-3 border-b border-slate-800 grid grid-cols-12 gap-2 text-sm font-medium text-slate-400">
+            <div className="col-span-3">目标地址</div>
             <div className="col-span-2">节点链</div>
             <div className="col-span-2">上传</div>
             <div className="col-span-2">下载</div>
-            <div className="col-span-1">时长</div>
-            <div className="col-span-1">操作</div>
+            <div className="col-span-2">时长</div>
+            <div className="col-span-1 text-right">操作</div>
           </div>
           
-          <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+          <div className="divide-y divide-slate-800 max-h-[calc(100vh-280px)] overflow-y-auto">
             {connections.map((conn) => (
               <div 
                 key={conn.id}
-                className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-slate-800/30 transition-colors"
+                className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-slate-800/40 transition-colors"
               >
-                <div className="col-span-4">
-                  <div className="text-sm text-slate-200">
+                <div className="col-span-3 min-w-0">
+                  <div className="text-sm text-slate-200 truncate" title={`${conn.metadata.host || conn.metadata.destinationIP || 'unknown'}:${conn.metadata.destinationPort}`}>
                     {conn.metadata.host || conn.metadata.destinationIP || 'unknown'}
                     :{conn.metadata.destinationPort}
                   </div>
-                  <div className="text-xs text-slate-500">{conn.rule || 'DIRECT'}</div>
+                  <div className="text-xs text-slate-500 truncate">{conn.rule || 'DIRECT'}</div>
                 </div>
-                <div className="col-span-2 text-sm text-slate-300 truncate">
+                <div className="col-span-2 text-sm text-slate-300 truncate" title={conn.chains.join(' -> ')}>
                   {conn.chains.join(' -> ')}
                 </div>
-                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1">
-                  <ArrowUp size={12} className="text-blue-400" />
-                  {formatBytes(conn.upload)}
+                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
+                  <ArrowUp size={12} className="text-blue-400 flex-shrink-0" />
+                  <span className="truncate">{formatBytes(conn.upload)}</span>
                 </div>
-                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1">
-                  <ArrowDown size={12} className="text-emerald-400" />
-                  {formatBytes(conn.download)}
+                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
+                  <ArrowDown size={12} className="text-emerald-400 flex-shrink-0" />
+                  <span className="truncate">{formatBytes(conn.download)}</span>
                 </div>
-                <div className="col-span-1 text-sm text-slate-400">
+                <div className="col-span-2 text-sm text-slate-400">
                   {getDuration(conn.start)}
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 text-right">
                   <button
                     onClick={() => closeConnection(conn.id)}
-                    className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"
+                    title="关闭连接"
                   >
                     <X size={16} />
                   </button>

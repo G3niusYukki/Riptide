@@ -1,0 +1,166 @@
+/* Riptide 简体中文本地化 */
+
+/* MARK: - 标签页名称 */
+"tab.config" = "配置";
+"tab.proxy" = "代理";
+"tab.traffic" = "流量";
+"tab.rules" = "规则";
+"tab.logs" = "日志";
+
+/* MARK: - 配置标签页 */
+"config.mode" = "运行模式";
+"config.system_proxy" = "系统代理";
+"config.tun_mode" = "TUN 模式";
+"config.import" = "导入配置文件";
+"config.profiles" = "配置文件";
+"config.subscriptions" = "订阅列表";
+"config.no_subscriptions" = "暂无订阅";
+"config.add_subscription_hint" = "添加远程订阅以自动获取代理节点";
+"config.helper_installed" = "Helper已安装";
+"config.helper_not_installed" = "Helper未安装";
+"config.install_helper" = "安装Helper工具";
+"config.install_helper_hint" = "TUN模式需要安装Helper工具才能配置网络接口";
+"config.mode_locked" = "模式已锁定";
+"config.all_configs" = "所有配置";
+
+/* MARK: - 配置文件 */
+"profile.active" = "激活";
+"profile.activate" = "激活";
+"profile.delete" = "删除";
+"profile.edit" = "编辑";
+"profile.nodes" = "节点";
+"profile.rules" = "规则";
+
+/* MARK: - 订阅 */
+"subscription.add" = "添加订阅";
+"subscription.edit" = "编辑";
+"subscription.update" = "更新";
+"subscription.updating" = "更新中...";
+"subscription.never_updated" = "从未更新";
+"subscription.error" = "错误";
+"subscription.configs" = "配置";
+"subscription.name" = "名称";
+"subscription.url" = "URL";
+"subscription.auto_update" = "自动更新";
+"subscription.update_interval" = "更新间隔";
+"subscription.interval_15m" = "15分钟";
+"subscription.interval_30m" = "30分钟";
+"subscription.interval_1h" = "1小时";
+"subscription.interval_6h" = "6小时";
+"subscription.interval_24h" = "24小时";
+
+/* MARK: - 代理标签页 */
+"proxy.delay_test" = "延迟测试";
+"proxy.direct" = "直连";
+"proxy.timeout" = "超时";
+
+/* MARK: - 流量标签页 */
+"traffic.upload" = "上传";
+"traffic.download" = "下载";
+"traffic.active_connections" = "活动连接";
+"traffic.no_connections" = "暂无连接";
+
+/* MARK: - 连接列表 */
+"connection.search" = "搜索";
+"connection.close_all" = "关闭所有";
+"connection.closing" = "关闭中...";
+"connection.no_connections" = "暂无连接";
+
+/* MARK: - 日志标签页 */
+"logs.clear" = "清除";
+"logs.export" = "导出";
+"logs.no_logs" = "暂无日志";
+"logs.search" = "搜索";
+"logs.level" = "级别";
+"logs.all" = "全部";
+
+/* MARK: - 规则标签页 */
+"rules.list" = "规则列表";
+"rules.total" = "总数";
+"rules.direct" = "直连";
+"rules.proxy" = "代理";
+"rules.reject" = "拒绝";
+
+/* MARK: - MITM 设置 */
+"mitm.title" = "中间人攻击";
+"mitm.enable" = "启用MITM";
+"mitm.hosts" = "主机";
+"mitm.exclude_hosts" = "排除主机";
+"mitm.install_cert" = "安装证书";
+"mitm.cert_installed" = "证书已安装";
+"mitm.cert_not_installed" = "证书未安装";
+"mitm.log" = "日志";
+"mitm.all" = "全部";
+
+/* MARK: - 菜单栏 */
+"menu.start" = "启动";
+"menu.stop" = "停止";
+"menu.open_panel" = "打开面板";
+"menu.quit" = "退出";
+"menu.mode" = "模式";
+"menu.configs" = "配置";
+"menu.connected" = "已连接";
+"menu.disconnected" = "未连接";
+"menu.switch_mode_first" = "请先切换模式";
+
+/* MARK: - 语言 */
+"language.select" = "选择语言";
+"language.auto" = "自动";
+"language.system" = "系统 (自动)";
+
+/* MARK: - WebDAV 同步 */
+"sync.title" = "WebDAV同步";
+"sync.server_section" = "服务器";
+"sync.server_url" = "服务器URL";
+"sync.username" = "用户名";
+"sync.password" = "密码";
+"sync.options_section" = "选项";
+"sync.remote_path" = "远程路径";
+"sync.auto_sync" = "自动同步";
+"sync.conflict_resolution" = "冲突解决";
+"sync.test_connection" = "测试连接";
+"sync.test_success" = "连接成功";
+"sync.test_failed" = "连接失败";
+"sync.save_config" = "保存配置";
+"sync.clear_config" = "清除配置";
+"sync.sync_now" = "立即同步";
+"sync.result_section" = "同步结果";
+"sync.uploaded_count" = "已上传";
+"sync.downloaded_count" = "已下载";
+"sync.conflicts_count" = "冲突";
+"sync.errors_count" = "错误";
+"sync.success" = "成功";
+"sync.conflict_local_wins" = "本地优先";
+"sync.conflict_remote_wins" = "远程优先";
+"sync.conflict_ask" = "询问";
+"sync.conflict_merge" = "合并";
+"sync.error_not_configured" = "未配置";
+"sync.error_invalid_url" = "无效的URL";
+"sync.error_invalid_credentials" = "无效的凭据";
+"sync.error_list_failed" = "获取列表失败";
+"sync.error_download_failed" = "下载失败";
+"sync.error_upload_failed" = "上传失败";
+"sync.error_delete_failed" = "删除失败";
+"sync.error_network" = "网络错误";
+"sync.error_parsing" = "解析错误";
+"sync.error_keychain" = "钥匙串错误";
+"sync.error_in_progress" = "同步进行中";
+"sync.error_conflict_resolution" = "冲突解决失败";
+"sync.error_server" = "服务器错误";
+"sync.error_not_found" = "未找到";
+
+/* MARK: - 通用 */
+"common.cancel" = "取消";
+"common.confirm" = "确认";
+"common.add" = "添加";
+"common.save" = "保存";
+"common.delete" = "删除";
+"common.edit" = "编辑";
+"common.close" = "关闭";
+"common.loading" = "加载中";
+"common.error" = "错误";
+"common.unknown" = "未知";
+
+/* MARK: - 应用 */
+"app.name" = "Riptide";
+"app.tagline" = "快速安全的代理客户端";

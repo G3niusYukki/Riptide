@@ -135,7 +135,6 @@ public struct ConfigMerger: Sendable {
     }
 
     // MARK: - Raw Parsing Helpers
-
     private static func parseRawProxy(_ raw: [String: Any]) throws -> ProxyNode {
         guard let name = raw["name"] as? String,
               let type = raw["type"] as? String,

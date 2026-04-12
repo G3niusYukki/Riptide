@@ -180,8 +180,9 @@ public enum Localized: String, CaseIterable {
     }
 }
 
-/// Extended language codes supported by the app (7 languages total).
+/// Extended language codes supported by the app (8 options including system auto-detect).
 public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
+    case system = "system"
     case chineseSimplified = "zh-Hans"
     case english = "en"
     case spanish = "es"
@@ -195,6 +196,7 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
     /// Display name in the language itself.
     public var displayName: String {
         switch self {
+        case .system: return String.localized("language.system")
         case .chineseSimplified: return "简体中文"
         case .english: return "English"
         case .spanish: return "Español"
@@ -208,5 +210,29 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
     /// Locale identifier for this language.
     public var localeIdentifier: String {
         rawValue
+    }
+
+    /// Returns the actual language to use (resolves system to detected language).
+    public func resolvedLanguage() -> AppLanguage {
+        if self != .system {
+            return self
+        }
+
+        let preferred = Locale.preferredLanguages.first ?? ""
+        if preferred.hasPrefix("zh-Hans") || preferred.hasPrefix("zh-CN") {
+            return .chineseSimplified
+        } else if preferred.hasPrefix("es") {
+            return .spanish
+        } else if preferred.hasPrefix("ru") {
+            return .russian
+        } else if preferred.hasPrefix("ja") || preferred.hasPrefix("jp") {
+            return .japanese
+        } else if preferred.hasPrefix("ko") {
+            return .korean
+        } else if preferred.hasPrefix("fa") {
+            return .persian
+        } else {
+            return .english
+        }
     }
 }

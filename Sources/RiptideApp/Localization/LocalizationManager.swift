@@ -14,12 +14,8 @@ public final class LocalizationManager: ObservableObject {
         if let saved, let lang = AppLanguage(rawValue: saved) {
             self.currentLanguage = lang
         } else {
-            let preferred = Locale.preferredLanguages.first ?? ""
-            if preferred.hasPrefix("zh") {
-                self.currentLanguage = .chineseSimplified
-            } else {
-                self.currentLanguage = .english
-            }
+            // Default to system auto-detect
+            self.currentLanguage = .system
         }
         loadStrings()
     }
@@ -45,27 +41,10 @@ public final class LocalizationManager: ObservableObject {
 
     /// Detect and set system language.
     public func setSystemLanguage() {
-        let preferred = Locale.preferredLanguages.first ?? ""
-        let language: AppLanguage
-        if preferred.hasPrefix("zh") {
-            language = .chineseSimplified
-        } else if preferred.hasPrefix("es") {
-            language = .spanish
-        } else if preferred.hasPrefix("ru") {
-            language = .russian
-        } else if preferred.hasPrefix("ja") || preferred.hasPrefix("jp") {
-            language = .japanese
-        } else if preferred.hasPrefix("ko") {
-            language = .korean
-        } else if preferred.hasPrefix("fa") {
-            language = .persian
-        } else {
-            language = .english
-        }
-        setLanguage(language)
+        setLanguage(.system)
     }
 
-    /// All supported languages.
+    /// All supported languages (including system auto-detect).
     public func supportedLanguages() -> [AppLanguage] {
         AppLanguage.allCases
     }
@@ -100,8 +79,11 @@ public final class LocalizationManager: ObservableObject {
     // MARK: - Private
 
     private func loadStrings() {
+        // Resolve system language to actual language
+        let resolvedLanguage = currentLanguage.resolvedLanguage()
+
         // Try to load strings from the selected language's .lproj bundle
-        if let path = Bundle.main.path(forResource: currentLanguage.localeIdentifier, ofType: "lproj"),
+        if let path = Bundle.main.path(forResource: resolvedLanguage.localeIdentifier, ofType: "lproj"),
            let bundle = Bundle(path: path) {
             for key in Localized.allCases {
                 strings[key.rawValue] = bundle.localizedString(
@@ -147,8 +129,14 @@ extension String {
     /// Access a localized string using the key, honoring the current language selection.
     public static func localized(_ key: String) -> String {
         guard let languageCode = UserDefaults.standard.string(forKey: "riptide.language"),
-              let language = AppLanguage(rawValue: languageCode),
-              let bundlePath = Bundle.main.path(forResource: language.localeIdentifier, ofType: "lproj"),
+              let language = AppLanguage(rawValue: languageCode) else {
+            return NSLocalizedString(key, comment: "")
+        }
+
+        // Resolve system language to actual language
+        let resolvedLanguage = language.resolvedLanguage()
+
+        guard let bundlePath = Bundle.main.path(forResource: resolvedLanguage.localeIdentifier, ofType: "lproj"),
               let bundle = Bundle(path: bundlePath) else {
             return NSLocalizedString(key, comment: "")
         }

@@ -95,17 +95,17 @@ export function Proxies() {
         ) : (
           groups.map((group) => (
             <div key={group.name} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Globe size={20} className="text-blue-400" />
-                  <h3 className="font-semibold text-slate-100">{group.name}</h3>
-                  <span className="text-xs px-2 py-1 bg-slate-800 rounded text-slate-400">
+              <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/70">
+                <div className="flex items-center gap-2.5">
+                  <Globe size={18} className="text-blue-400" />
+                  <h3 className="font-semibold text-slate-100 text-sm">{group.name}</h3>
+                  <span className="text-xs px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">
                     {group.type}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">当前:</span>
-                  <span className="text-sm font-medium text-blue-400">
+                  <span className="text-xs text-slate-400">当前:</span>
+                  <span className="text-xs font-medium text-blue-400">
                     {group.now || 'Auto'}
                   </span>
                 </div>
@@ -113,7 +113,7 @@ export function Proxies() {
               
               <div className="divide-y divide-slate-800">
                 {group.proxies.length === 0 ? (
-                  <div className="px-6 py-3 text-slate-500 text-sm">暂无代理节点</div>
+                  <div className="px-4 py-2.5 text-slate-500 text-xs">暂无代理节点</div>
                 ) : (
                   group.proxies.map((proxyName) => {
                     const proxy = proxies.find(p => p.name === proxyName);
@@ -124,36 +124,36 @@ export function Proxies() {
                       <div 
                         key={proxyName}
                         className={`
-                          px-6 py-3 flex items-center justify-between cursor-pointer
-                          transition-colors hover:bg-slate-800/50
-                          ${isSelected ? 'bg-blue-600/10' : ''}
+                          px-4 py-2.5 flex items-center justify-between cursor-pointer
+                          transition-colors duration-150
+                          ${isSelected ? 'bg-blue-600/10' : 'hover:bg-slate-800/40'}
                           ${isSwitching ? 'opacity-60 cursor-not-allowed' : ''}
                         `}
                         onClick={() => !isSwitching && handleSwitchProxy(group.name, proxyName)}
                       >
-                        <div className="flex items-center gap-3">
-                          {isSelected && <Check size={16} className="text-emerald-400" />}
-                          <span className={`${isSelected ? 'text-slate-100' : 'text-slate-400'}`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {isSelected && <Check size={16} className="text-emerald-400 flex-shrink-0" />}
+                          <span className={`text-sm truncate ${isSelected ? 'text-slate-100' : 'text-slate-400'}`}>
                             {proxyName}
                           </span>
                         </div>
                         
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleTestDelay(proxyName);
                             }}
                             disabled={isCurrentTesting || isSwitching}
-                            className="text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 transition-colors disabled:opacity-50"
+                            className="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 transition-colors disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           >
                             {isCurrentTesting ? (
-                              <Loader2 size={12} className="animate-spin inline mr-1" />
+                              <Loader2 size={10} className="animate-spin inline mr-1" />
                             ) : null}
                             测延迟
                           </button>
                           
-                          <span className={`text-sm font-medium w-16 text-right ${getDelayColor(proxy?.delay)}`}>
+                          <span className={`text-xs font-medium w-14 text-right ${getDelayColor(proxy?.delay)}`}>
                             {proxy?.delay ? `${proxy.delay}ms` : '-'}
                           </span>
                         </div>
@@ -170,31 +170,31 @@ export function Proxies() {
       {/* All Proxies */}
       {proxies.length > 0 && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-800">
-            <h3 className="font-semibold text-slate-100">所有节点 ({proxies.length})</h3>
+          <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/70">
+            <h3 className="font-semibold text-slate-100 text-sm">所有节点 ({proxies.length})</h3>
           </div>
-          <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+          <div className="divide-y divide-slate-800 max-h-[calc(100vh-400px)] overflow-y-auto">
             {proxies.map((proxy) => (
               <div 
                 key={proxy.name}
-                className="px-6 py-3 flex items-center justify-between hover:bg-slate-800/30"
+                className="px-4 py-2.5 flex items-center justify-between hover:bg-slate-800/40 transition-colors duration-150"
               >
-                <div className="flex items-center gap-3">
-                  <Zap size={16} className="text-yellow-400" />
-                  <span className="text-slate-300">{proxy.name}</span>
-                  <span className="text-xs text-slate-500">{proxy.type}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Zap size={14} className="text-yellow-400 flex-shrink-0" />
+                  <span className="text-sm text-slate-300 truncate">{proxy.name}</span>
+                  <span className="text-xs text-slate-500 flex-shrink-0">{proxy.type}</span>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-shrink-0">
                     <button
                     onClick={() => handleTestDelay(proxy.name)}
                     disabled={testingProxy === proxy.name || isSwitching}
-                    className="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 transition-colors disabled:opacity-50"
+                    className="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 transition-colors disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                   >
                     {testingProxy === proxy.name ? (
                       <Loader2 size={10} className="animate-spin inline" />
                     ) : '测'}
                   </button>
-                  <span className={`text-sm font-medium w-16 text-right ${getDelayColor(proxy.delay)}`}>
+                  <span className={`text-xs font-medium w-14 text-right ${getDelayColor(proxy.delay)}`}>
                     {proxy.delay ? `${proxy.delay}ms` : '-'}
                   </span>
                 </div>
