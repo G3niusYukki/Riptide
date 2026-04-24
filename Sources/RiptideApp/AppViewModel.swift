@@ -225,13 +225,8 @@ public final class AppViewModel {
     }
 
     public func start() async {
-        // Check helper installation before starting
+        // Check helper installation (non-blocking — sudo fallback available)
         await checkHelperInstallationAsync()
-
-        guard helperInstalled else {
-            showHelperSetup = true
-            return
-        }
 
         guard let profile = activeProfile else {
             lastError = "No active profile selected"

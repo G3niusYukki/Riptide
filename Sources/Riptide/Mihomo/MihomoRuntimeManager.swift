@@ -97,6 +97,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// XPC connection to the privileged helper tool.
     public let helperConnection: HelperToolConnection
 
+    /// Sudo-based fallback launcher (used when helper is not installed).
+    private let sudoLauncher = SudoMihomoLauncher()
+
+    /// Whether the current session was launched via sudo (vs XPC helper).
+    private var launchedViaSudo: Bool = false
+
     /// API client for communicating with the running mihomo process.
     private var apiClientWrapper: SendableAPIClient?
 
@@ -192,11 +198,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.alreadyRunning
         }
 
-        // 2. Check helper installed
+        // 2. Check if helper is installed — if not, fall back to sudo
         let helperInstalled = await helperConnection.isHelperInstalled()
-        guard helperInstalled else {
-            throw RuntimeError.helperNotInstalled
-        }
 
         // 3. Setup directories
         do {
@@ -227,17 +230,40 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.configGenerationFailed("Failed to write config: \(error.localizedDescription)")
         }
 
-        // 6. Launch via XPC helper and wait for result
         let configPath = paths.configFileURL.path
-        let modeString = mode == .systemProxy ? "systemProxy" : "tun"
 
-        let launchError = await helperConnection.launchMihomo(
-            configPath: configPath,
-            mode: modeString
-        )
+        // 6. Launch mihomo — XPC helper or sudo fallback
+        if helperInstalled {
+            // --- XPC Helper path ---
+            let modeString = mode == .systemProxy ? "systemProxy" : "tun"
+            let launchError = await helperConnection.launchMihomo(
+                configPath: configPath,
+                mode: modeString
+            )
+            if let error = launchError {
+                throw RuntimeError.launchFailed(error.localizedDescription)
+            }
+            launchedViaSudo = false
+        } else {
+            // --- Sudo fallback path ---
+            // Try system-wide binary first, then user-space
+            let systemBinary = "/Library/Application Support/Riptide/mihomo"
+            let userBinary = paths.executable
+            let binaryPath: String
+            if FileManager.default.isExecutableFile(atPath: systemBinary) {
+                binaryPath = systemBinary
+            } else if FileManager.default.isExecutableFile(atPath: userBinary) {
+                binaryPath = userBinary
+            } else {
+                throw RuntimeError.launchFailed("mihomo binary not found at \(systemBinary) or \(userBinary)")
+            }
 
-        if let error = launchError {
-            throw RuntimeError.launchFailed(error.localizedDescription)
+            do {
+                try await sudoLauncher.launch(binaryPath: binaryPath, configPath: configPath)
+            } catch {
+                throw RuntimeError.launchFailed("sudo launch failed: \(error.localizedDescription)")
+            }
+            launchedViaSudo = true
         }
 
         // 7. Initialize API client
@@ -263,20 +289,27 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         guard apiReady else {
             // Attempt cleanup on failure
-            _ = await helperConnection.terminateMihomo()
+            if helperInstalled {
+                _ = await helperConnection.terminateMihomo()
+            } else {
+                try? await sudoLauncher.terminate()
+            }
             throw RuntimeError.apiNotAvailable
         }
 
         // 9. Set system proxy if in systemProxy mode
         if mode == .systemProxy {
-            let service = await detectPrimaryService()
-            if let proxyError = await helperConnection.enableSystemProxy(
-                service: service,
-                httpPort: defaultMixedPort,
-                socksPort: 0
-            ) {
-                // Non-fatal: log but don't fail startup
-                print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
+            if helperInstalled {
+                let service = await detectPrimaryService()
+                if let proxyError = await helperConnection.enableSystemProxy(
+                    service: service,
+                    httpPort: defaultMixedPort,
+                    socksPort: 0
+                ) {
+                    print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
+                }
+            } else {
+                try? await sudoEnableSystemProxy()
             }
         }
 
@@ -294,30 +327,32 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.notRunning
         }
 
-        // 2. Terminate via XPC helper
-        let terminationError = await helperConnection.terminateMihomo()
-
-        // 3. Wait for termination
-        if terminationError == nil {
-            await waitForTermination()
-        }
-
-        // 4. Disconnect XPC
-        await helperConnection.disconnect()
-
-        // 5. Cleanup API client
-        apiClientWrapper = nil
-
-        // 6. Clear system proxy if it was enabled
+        // 2. Clear system proxy first (before killing mihomo)
         if currentMode == .systemProxy {
-            let service = await detectPrimaryService()
-            _ = await helperConnection.disableSystemProxy(service: service)
+            if !launchedViaSudo {
+                let service = await detectPrimaryService()
+                _ = await helperConnection.disableSystemProxy(service: service)
+            } else {
+                try? await sudoDisableSystemProxy()
+            }
         }
 
-        // 7. Set isRunning = false
+        // 3. Terminate mihomo
+        if launchedViaSudo {
+            try? await sudoLauncher.terminate()
+        } else {
+            let terminationError = await helperConnection.terminateMihomo()
+            if terminationError == nil {
+                await waitForTermination()
+            }
+            await helperConnection.disconnect()
+        }
+
+        // 4. Cleanup
+        apiClientWrapper = nil
         isRunning = false
         currentMode = nil
-        // Keep currentProfile for reference
+        launchedViaSudo = false
     }
 
     // MARK: - API Operations
@@ -461,6 +496,73 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     private func detectPrimaryService() async -> String {
         let (service, _) = await helperConnection.detectNetworkService()
         return service ?? "Wi-Fi"
+    }
+
+    /// Detects the primary network service via command line (for sudo fallback).
+    private func detectPrimaryServiceViaCLI() async -> String {
+        let service = await runCommand(
+            "/usr/sbin/networksetup", "-listallnetworkservices"
+        )
+        if let output = service {
+            let lines = output.components(separatedBy: "\n").dropFirst()
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty && !trimmed.hasPrefix("*") {
+                    return trimmed
+                }
+            }
+        }
+        return "Wi-Fi"
+    }
+
+    /// Enables system proxy via sudo networksetup (fallback when helper is not installed).
+    private func sudoEnableSystemProxy() async throws {
+        let service = await detectPrimaryServiceViaCLI()
+        let port = "\(defaultMixedPort)"
+
+        try await runSudoCommand("/usr/sbin/networksetup", "-setwebproxy", service, "127.0.0.1", port)
+        try await runSudoCommand("/usr/sbin/networksetup", "-setsecurewebproxy", service, "127.0.0.1", port)
+    }
+
+    /// Disables system proxy via sudo networksetup (fallback when helper is not installed).
+    private func sudoDisableSystemProxy() async throws {
+        let service = await detectPrimaryServiceViaCLI()
+
+        try? await runSudoCommand("/usr/sbin/networksetup", "-setwebproxystate", service, "off")
+        try? await runSudoCommand("/usr/sbin/networksetup", "-setsecurewebproxystate", service, "off")
+        try? await runSudoCommand("/usr/sbin/networksetup", "-setsocksfirewallproxystate", service, "off")
+    }
+
+    /// Runs a command with sudo, prompting for password if needed.
+    private func runSudoCommand(_ path: String, _ arguments: String...) async throws {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
+        proc.arguments = [path] + arguments
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = FileHandle.nullDevice
+        try proc.run()
+        proc.waitUntilExit()
+        if proc.terminationStatus != 0 {
+            throw RuntimeError.launchFailed("sudo \(path) failed (exit \(proc.terminationStatus))")
+        }
+    }
+
+    /// Runs a command and returns stdout (for non-privileged queries).
+    private func runCommand(_ path: String, _ arguments: String...) async -> String? {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: path)
+        proc.arguments = arguments
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
+        }
     }
 
     /// Writes the config YAML to file with backup of existing config.
