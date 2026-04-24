@@ -573,6 +573,255 @@ struct MihomoConfigGeneratorTests {
         #expect(yaml.contains("server: 2001:db8::1"))
     }
 
+    // MARK: - Custom generation options
+
+    @Test("custom allowLAN option is reflected in config")
+    func testCustomAllowLAN() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152,
+            allowLAN: true
+        )
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("allow-lan: true"))
+    }
+
+    @Test("custom logLevel option is reflected in config")
+    func testCustomLogLevel() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152,
+            logLevel: "debug"
+        )
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("log-level: debug"))
+    }
+
+    @Test("custom ipv6 option is reflected in config")
+    func testCustomIPv6Disabled() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152,
+            ipv6: false
+        )
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("ipv6: false"))
+    }
+
+    @Test("custom apiPort is reflected in external-controller")
+    func testCustomAPIPort() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy,
+            mixedPort: 6152,
+            apiPort: 9091
+        )
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("external-controller: 127.0.0.1:9091"))
+    }
+
+    // MARK: - Additional proxy types
+
+    @Test("generates TUIC proxy correctly")
+    func testGenerateTUICProxy() throws {
+        let node = ProxyNode(
+            name: "test-tuic",
+            kind: .tuic,
+            server: "tuic.example.com",
+            port: 443,
+            password: "tuicpassword",
+            sni: "tuic.example.com",
+            skipCertVerify: false
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("name: test-tuic"))
+        #expect(yaml.contains("type: tuic"))
+        #expect(yaml.contains("password: tuicpassword"))
+        #expect(yaml.contains("sni: tuic.example.com"))
+        #expect(yaml.contains("skip-cert-verify: false"))
+    }
+
+    @Test("generates Snell proxy correctly")
+    func testGenerateSnellProxy() throws {
+        let node = ProxyNode(
+            name: "test-snell",
+            kind: .snell,
+            server: "snell.example.com",
+            port: 8388,
+            password: "snellpassword",
+            snellVersion: 4
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("name: test-snell"))
+        #expect(yaml.contains("type: snell"))
+        #expect(yaml.contains("password: snellpassword"))
+        #expect(yaml.contains("version: 4"))
+    }
+
+    // MARK: - Additional rule types
+
+    @Test("generates SRC-IP-CIDR rule correctly")
+    func testGenerateSrcIPCIDRRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .srcIPCIDR(cidr: "192.168.0.0/16", policy: .direct),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("SRC-IP-CIDR,192.168.0.0/16,DIRECT"))
+    }
+
+    @Test("generates SRC-PORT rule correctly")
+    func testGenerateSrcPortRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .srcPort(port: 12345, policy: .reject),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("SRC-PORT,12345,REJECT"))
+    }
+
+    @Test("generates DST-PORT rule correctly")
+    func testGenerateDstPortRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .dstPort(port: 443, policy: .direct),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("DST-PORT,443,DIRECT"))
+    }
+
+    @Test("generates PROCESS-NAME rule correctly")
+    func testGenerateProcessNameRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .processName(name: "Safari", policy: .reject),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("PROCESS-NAME,Safari,REJECT"))
+    }
+
+    @Test("generates GEOSITE rule correctly")
+    func testGenerateGeoSiteRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .geoSite(code: "google", category: "", policy: .direct),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("GEOSITE,google,DIRECT"))
+    }
+
+    @Test("generates RULE-SET rule correctly")
+    func testGenerateRuleSetRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .ruleSet(name: "my-rule-set", policy: .reject),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("RULE-SET,my-rule-set,REJECT"))
+    }
+
+    @Test("generates MATCH rule correctly for matchAll")
+    func testGenerateMatchAllRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.matchAll]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("MATCH,DIRECT"))
+    }
+
+    @Test("generates NOT rule correctly")
+    func testGenerateNotRule() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [
+                .not(ruleType: "DOMAIN", value: "example.com", policy: .reject),
+                .final(policy: .direct)
+            ]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("NOT,DOMAIN,example.com,REJECT"))
+    }
+
+    // MARK: - Edge cases
+
+    @Test("empty config generates minimal valid YAML")
+    func testEmptyConfig() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("proxies:"))
+        #expect(yaml.contains("rules:"))
+        #expect(yaml.contains("MATCH,DIRECT"))
+        // No proxy-groups section when empty
+        #expect(!yaml.contains("proxy-groups:"))
+    }
+
+    @Test("TUN mode apiPort is reflected in external-controller")
+    func testTUNModeAPIPort() throws {
+        let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .tun,
+            mixedPort: 7890,
+            apiPort: 9091
+        )
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("mixed-port: 7890"))
+        #expect(yaml.contains("external-controller: 127.0.0.1:9091"))
+        #expect(yaml.contains("enable: true"))
+        #expect(yaml.contains("auto-route: true"))
+        #expect(yaml.contains("strict-route: true"))
+    }
+
     @Test("proxy reference consistency between definition and group reference")
     func testProxyReferenceConsistency() throws {
         let proxy = ProxyNode(

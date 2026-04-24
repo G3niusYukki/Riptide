@@ -53,8 +53,7 @@ struct WebSocketExternalControllerTests {
             directDialer: directDialer,
             dnsPipeline: dnsPipeline
         )
-        let healthChecker = HealthChecker()
-        let controller = WebSocketExternalController(runtime: runtime, config: config, healthChecker: healthChecker)
+        let controller = WebSocketExternalController(runtime: runtime, config: config)
 
         let typeCheck = (controller as Any) is WebSocketExternalController
         #expect(typeCheck)
