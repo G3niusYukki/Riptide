@@ -113,6 +113,7 @@ public actor ProxyNodeValidator {
                 errors.append("TUIC requires a password")
             }
 
+
         case .http, .socks5, .relay:
             // No additional required fields
             break

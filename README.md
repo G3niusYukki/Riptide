@@ -6,6 +6,7 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 **Status**: v1.2.0 — Full mihomo sidecar integration, native SwiftUI app, System Proxy & TUN modes, subscription management, profile persistence, sudo-based privilege escalation (no developer certificate required).
 
+
 ---
 
 ## Table of Contents
@@ -241,6 +242,7 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 - **macOS 14+** (Sonoma or later) OR **Windows 10/11**
 - **Swift 6.2+** / **Xcode 16+** (仅用于从源码构建 macOS 版本)
 - Apple Developer certificate **可选** — 不需要证书也能使用 TUN 模式（通过 sudo 获取权限）
+
 
 ### 安装方式
 
@@ -553,6 +555,7 @@ swift run RiptideApp
 | WebDAV 同步 | ✅ | ✅ | ❌ |
 | Profile 持久化 | ✅ | ✅ | ✅ |
 | 安装包大小 | ~15MB | ~40MB | ~50MB |
+
 
 ## 安装指南
 

@@ -233,6 +233,7 @@ public struct ProxyFieldRequirements {
                 supportsWebSocket: false
             )
 
+
         case .http, .socks5, .relay:
             return ProxyFieldRequirements(
                 requiresCipher: false,

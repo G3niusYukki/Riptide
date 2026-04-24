@@ -159,6 +159,7 @@ struct NodeRow: View {
         case .relay: return "arrow.2.squarepath"
         case .snell: return "lock.square"
         case .tuic: return "lock.shield"
+
         }
     }
 }

@@ -202,6 +202,7 @@ public final class AppViewModel {
         checkHelperInstallation()
         Task {
             await loadProfilesFromStore()
+
             await loadSubscriptionsFromBackend()
             await checkMihomoOnLaunch()
         }
@@ -851,6 +852,7 @@ public final class AppViewModel {
             // Non-fatal: binary may already be installed and up-to-date
             print("[AppViewModel] installMihomoToSystemPath: \(error.localizedDescription)")
         }
+
     }
 
     /// Downloads the latest mihomo version.

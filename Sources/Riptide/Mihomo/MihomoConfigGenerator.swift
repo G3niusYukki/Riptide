@@ -148,10 +148,10 @@ public enum MihomoConfigGenerator {
             return "http"
         case .socks5:
             return "socks5"
-        case .relay:
-            return "relay"
         case .tuic:
             return "tuic"
+        case .relay:
+            return "relay"
         }
     }
 
@@ -263,6 +263,7 @@ public enum MihomoConfigGenerator {
             if let skipCertVerify = proxy.skipCertVerify {
                 lines.append("    skip-cert-verify: \(skipCertVerify)")
             }
+
 
         case .http, .socks5:
             // For HTTP/SOCKS5, cipher is used as username

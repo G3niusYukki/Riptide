@@ -16,3 +16,4 @@ Resources/mihomo
 Resources/mihomo-*
 *.gz
 .omc/
+.claude/
