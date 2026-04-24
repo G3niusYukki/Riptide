@@ -178,21 +178,30 @@ public final class AppViewModel {
 
     // MARK: - Private
 
+    private let mihomoManager: MihomoRuntimeManager
     private let modeCoordinator: ModeCoordinator
     private let importService: ConfigImportService
     private let subscriptionManager: SubscriptionManager
+    private let profileStore: ProfileStore
     private var statsTask: Task<Void, Never>?
     private let smManager = SMJobBlessManager()
 
     // MARK: - Init
 
     public init() {
-        let mihomoManager = MihomoRuntimeManager()
-        self.modeCoordinator = ModeCoordinator(mihomoManager: mihomoManager)
+        let manager = MihomoRuntimeManager()
+        self.mihomoManager = manager
+        self.modeCoordinator = ModeCoordinator(mihomoManager: manager)
         self.importService = ConfigImportService()
         self.subscriptionManager = SubscriptionManager()
+        do {
+            self.profileStore = try ProfileStore()
+        } catch {
+            fatalError("Failed to initialize ProfileStore: \(error)")
+        }
         checkHelperInstallation()
         Task {
+            await loadProfilesFromStore()
             await loadSubscriptionsFromBackend()
             await checkMihomoOnLaunch()
         }
@@ -464,8 +473,40 @@ public final class AppViewModel {
             activeProfile = profile
             rebuildProxyGroupDisplays()
             lastError = nil
+
+            // Persist to ProfileStore
+            try? await profileStore.importProfile(name: profile.name, yaml: yaml)
         } catch {
             lastError = String(describing: error)
+        }
+    }
+
+    /// Loads persisted profiles from ProfileStore on startup.
+    private func loadProfilesFromStore() async {
+        let stored = await profileStore.allProfiles()
+        guard !stored.isEmpty else { return }
+
+        var loaded: [Profile] = []
+        for storedProfile in stored {
+            if let (config, _) = try? ClashConfigParser.parse(yaml: storedProfile.rawYAML) {
+                let profile = Profile(
+                    id: storedProfile.id,
+                    name: storedProfile.name,
+                    config: config,
+                    source: .local
+                )
+                loaded.append(profile)
+            }
+        }
+
+        await MainActor.run {
+            if !loaded.isEmpty {
+                self.profiles = loaded
+                if self.activeProfile == nil {
+                    self.activeProfile = loaded.first
+                    self.rebuildProxyGroupDisplays()
+                }
+            }
         }
     }
 
@@ -793,6 +834,27 @@ public final class AppViewModel {
                     self.mihomoDownloadError = nil
                 }
             }
+        }
+
+        // Install mihomo to system path via helper (needed for privileged TUN mode)
+        await installMihomoToSystemPath()
+    }
+
+    /// Copies the user-space mihomo binary to the system path via the XPC helper.
+    /// The helper runs as root and can write to /Library/Application Support/Riptide/mihomo.
+    private func installMihomoToSystemPath() async {
+        guard helperInstalled else { return }
+
+        let paths = MihomoPaths()
+        let userBinaryPath = paths.executable
+
+        guard FileManager.default.isExecutableFile(atPath: userBinaryPath) else {
+            return
+        }
+
+        if let error = await mihomoManager.helperConnection.installMihomo(binaryPath: userBinaryPath) {
+            // Non-fatal: binary may already be installed and up-to-date
+            print("[AppViewModel] installMihomoToSystemPath: \(error.localizedDescription)")
         }
     }
 
