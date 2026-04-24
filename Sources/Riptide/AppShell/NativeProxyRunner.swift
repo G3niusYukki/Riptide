@@ -122,8 +122,7 @@ public actor NativeProxyRunner {
             // 7. Start the WebSocket controller
             let wsController = WebSocketExternalController(
                 runtime: runtime,
-                config: config,
-                healthChecker: newHealthChecker
+                config: config
             )
             let wsEndpoint = try await wsController.start(host: "127.0.0.1", port: wsPort)
             self.webSocketController = wsController
