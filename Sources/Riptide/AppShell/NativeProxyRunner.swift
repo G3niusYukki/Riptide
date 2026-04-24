@@ -190,7 +190,10 @@ public actor NativeProxyRunner {
     }
 
     /// Test the delay of a specific proxy node.
-    public func testProxyDelay(node: ProxyNode, testURL: URL = URL(string: "http://www.gstatic.com/generate_204")!, timeout: Duration = .seconds(5)
+    public func testProxyDelay(
+        node: ProxyNode,
+        testURL: URL = URL(string: "http://www.gstatic.com/generate_204")!,
+        timeout: Duration = .seconds(5)
     ) async -> HealthResult {
         await healthChecker.check(node: node, testURL: testURL, timeout: timeout)
     }

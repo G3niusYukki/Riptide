@@ -1,3 +1,4 @@
+// swiftlint:disable file_length function_body_length
 import Foundation
 
 // MARK: - Path Validation
@@ -62,8 +63,8 @@ protocol HelperToolProtocol {
 
 /// Launch modes for mihomo core.
 enum MihomoLaunchMode: String, Sendable, Codable {
-    case systemProxy = "systemProxy"
-    case tun = "tun"
+    case systemProxy
+    case tun
 }
 
 // MARK: - Status
@@ -398,12 +399,17 @@ extension HelperTool: HelperToolProtocol {
 
     // MARK: - System Proxy Control
 
-    nonisolated func enableSystemProxy(service: String, httpPort: Int, socksPort: Int, reply: @escaping @Sendable (Error?) -> Void) {
+    nonisolated func enableSystemProxy(
+        service: String, httpPort: Int, socksPort: Int,
+        reply: @escaping @Sendable (Error?) -> Void
+    ) {
         logMessageNonIsolated("enableSystemProxy - service: \(service), http: \(httpPort), socks: \(socksPort)")
         if let err = runNetworksetup(["-setwebproxy", service, "127.0.0.1", "\(httpPort)"]) { reply(err); return }
         if let err = runNetworksetup(["-setsecurewebproxy", service, "127.0.0.1", "\(httpPort)"]) { reply(err); return }
         if socksPort > 0 {
-            if let err = runNetworksetup(["-setsocksfirewallproxy", service, "127.0.0.1", "\(socksPort)"]) { reply(err); return }
+            if let err = runNetworksetup(
+                ["-setsocksfirewallproxy", service, "127.0.0.1", "\(socksPort)"]
+            ) { reply(err); return }
         }
         reply(nil)
     }
