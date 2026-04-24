@@ -172,6 +172,23 @@ public actor HelperToolConnection {
         }
     }
 
+    /// Installs or updates the mihomo binary to the system location via the helper tool.
+    /// - Parameter binaryPath: Path to the mihomo binary to install.
+    /// - Returns: Error if installation failed, nil on success.
+    public func installMihomo(binaryPath: String) async -> Error? {
+        await ensureConnection()
+
+        guard let wrapper = proxyWrapper else {
+            return ConnectionError.notInstalled
+        }
+
+        return await withCheckedContinuation { continuation in
+            wrapper.proxy.installMihomo(binaryPath: binaryPath) { error in
+                continuation.resume(returning: error)
+            }
+        }
+    }
+
     // MARK: - System Proxy Control
 
     /// Enables system-wide proxy via the helper tool.
