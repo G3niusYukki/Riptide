@@ -108,6 +108,11 @@ public actor ProxyNodeValidator {
                 errors.append("Snell requires a password")
             }
 
+        case .tuic:
+            if node.password == nil || node.password?.isEmpty == true {
+                errors.append("TUIC requires a password")
+            }
+
         case .http, .socks5, .relay:
             // No additional required fields
             break

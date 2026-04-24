@@ -233,6 +233,7 @@ public actor ExternalController {
         case .hysteria2: return "Hysteria2"
         case .snell: return "Snell"
         case .relay: return "Relay"
+        case .tuic: return "TUIC"
         }
     }
 
