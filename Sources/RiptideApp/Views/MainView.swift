@@ -109,6 +109,7 @@ extension ProxyKind {
         case .hysteria2: return "H2"
         case .snell: return "Snell"
         case .relay: return "Relay"
+        case .tuic: return "TUIC"
         }
     }
 }

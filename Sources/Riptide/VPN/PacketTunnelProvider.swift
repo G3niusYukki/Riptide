@@ -26,7 +26,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-public class PacketTunnelProvider: NEPacketTunnelProvider {
+public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     /// The TUN routing engine for processing IP packets.
     /// Subclasses should set this before calling `startPacketFlow()`.
     public nonisolated(unsafe) var routingEngine: TUNRoutingEngine?

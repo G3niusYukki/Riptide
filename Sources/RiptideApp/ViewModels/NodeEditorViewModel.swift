@@ -228,6 +228,7 @@ extension ProxyKind {
         case .hysteria2: return "Hysteria2"
         case .snell: return "Snell"
         case .relay: return "Relay"
+        case .tuic: return "TUIC"
         }
     }
 
@@ -242,6 +243,7 @@ extension ProxyKind {
         case .http: return "http"
         case .socks5: return "socks5"
         case .relay: return "relay"
+        case .tuic: return "tuic"
         }
     }
 }
