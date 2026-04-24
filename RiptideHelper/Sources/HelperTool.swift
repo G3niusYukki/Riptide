@@ -1,4 +1,4 @@
-// swiftlint:disable:this file_length
+
 import Foundation
 
 // MARK: - Path Validation
@@ -212,7 +212,7 @@ extension HelperTool: NSXPCListenerDelegate {
 
 extension HelperTool: HelperToolProtocol {
 
-    nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) {
+    nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) { // swiftlint:disable:this function_body_length
         logMessageNonIsolated("Received launchMihomo request - config: \(configPath), mode: \(mode)")
 
         // Validate mode using MihomoLaunchMode enum
@@ -512,3 +512,4 @@ extension HelperTool: HelperToolProtocol {
         return nil
     }
 }
+// swiftlint:disable:this file_length
