@@ -1,4 +1,4 @@
-// swiftlint:disable file_length function_body_length
+// swiftlint:disable:this file_length
 import Foundation
 
 // MARK: - Path Validation
