@@ -1,0 +1,23 @@
+Riptide - macOS Proxy Client
+============================
+
+安装步骤：
+
+1. 将 RiptideApp.app 拖入 Applications 文件夹
+
+2. 打开终端（Terminal.app），运行以下命令解除安全限制：
+   xattr -cr /Applications/RiptideApp.app
+
+3. 正常打开 RiptideApp 即可使用
+
+为什么需要第2步？
+  Riptide 是免费开源软件，没有购买 Apple 开发者证书（$99/年）。
+  macOS 会阻止未签名的应用运行，运行 xattr 命令只是移除
+  "从互联网下载"的安全标记，App 本身完全安全。
+  源代码：https://github.com/G3niusYukki/Riptide
+
+使用说明：
+  - 导入 Clash 格式的 YAML 配置文件
+  - 菜单栏右键图标：启动/停止、切换节点、选择模式
+  - System Proxy 模式：自动设置系统代理
+  - TUN 模式：所有流量走代理（会弹出密码框）

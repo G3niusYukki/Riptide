@@ -250,13 +250,21 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 1. 从 [GitHub Releases](https://github.com/G3niusYukki/Riptide/releases) 下载 `Riptide-x.x.x-arm64.dmg`
 2. 打开 DMG，将 RiptideApp 拖入 Applications 文件夹
-3. **首次打开会提示"已损坏"或"无法验证开发者"**，需要手动允许：
-   - 打开 **系统设置 → 隐私与安全性**
-   - 滚动到底部，找到 "RiptideApp 已被阻止使用，因为来自身份不明的开发者"
-   - 点击 **"仍要打开"**
-   - 或者在终端运行：`xattr -cr /Applications/RiptideApp.app`
+3. **直接双击会提示"已损坏"，请按以下步骤操作：**
 
-> **为什么会有这个提示？** Riptide 没有 Apple Developer 证书 ($99/年)，所以 macOS Gatekeeper 会阻止运行。App 本身是安全的，代码完全开源。
+   **方法一（推荐）：终端运行**
+   ```bash
+   xattr -cr /Applications/RiptideApp.app
+   ```
+   然后正常打开即可。
+
+   **方法二：系统设置**
+   - 双击 App（会弹出"已损坏"提示，点"取消"）
+   - 打开 **系统设置 → 隐私与安全性**
+   - 滚动到底部，找到 "RiptideApp 已被阻止..."
+   - 点击 **"仍要打开"**，输入密码确认
+
+> **为什么会有这个提示？** Riptide 没有 Apple 开发者证书（$99/年），macOS Gatekeeper 会阻止未签名应用运行。App 本身完全开源且安全，只是没有付费签名。运行 `xattr -cr` 只是移除"从互联网下载"的标记。
 
 #### macOS (Homebrew)
 
