@@ -4,7 +4,7 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 > **Architecture**: Library-first design. The `Riptide` library implements protocol framing, transport orchestration, DNS resolution, rule matching, and connection lifecycle management — all in pure Swift. The `RiptideApp` SwiftUI client (macOS) / WebView2 client (Windows) and the `mihomo` sidecar are interchangeable consumers of this library.
 
-**Status**: Beta — Full mihomo integration, native app, subscription management, connection monitoring, MITM framework, i18n, TUN mode, and WebDAV config sync.
+**Status**: v1.2.0 — Full mihomo sidecar integration, native SwiftUI app, System Proxy & TUN modes, subscription management, profile persistence, sudo-based privilege escalation (no developer certificate required).
 
 ---
 
@@ -240,7 +240,7 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 - **macOS 14+** (Sonoma or later) OR **Windows 10/11**
 - **Swift 6.2+** / **Xcode 16+** (仅用于从源码构建 macOS 版本)
-- Apple Developer account (用于 macOS 签名特权助手 — TUN 模式必需)
+- Apple Developer certificate **可选** — 不需要证书也能使用 TUN 模式（通过 sudo 获取权限）
 
 ### 安装方式
 
@@ -291,7 +291,11 @@ Open project → Select "RiptideApp" scheme → Run
 swift run RiptideApp
 ```
 
-### 5. (Optional) Build Privileged Helper for TUN Mode
+### 5. (Optional) Install Privileged Helper for TUN Mode
+
+By default, Riptide uses `sudo` to get root privileges for TUN mode. macOS will prompt for your password at each launch (cached 5-15 minutes).
+
+If you have an Apple Developer certificate, you can install the privileged helper for a smoother experience (no password prompt after installation):
 
 1. Open `RiptideHelper/Resources/Info.plist`
 2. Replace `YOUR_TEAM_ID` with your Apple Developer Team ID
@@ -304,6 +308,8 @@ codesign --sign "Developer ID Application: Your Name" \
   --entitlements Entitlements.plist \
   .build/debug/RiptideHelper
 ```
+
+4. In the app, go to Helper Setup and click "安装 Helper"
 
 ---
 
@@ -323,9 +329,13 @@ codesign --sign "Developer ID Application: Your Name" \
 
 ### TUN Mode
 
-1. First time: Install the privileged helper via the guided setup flow
-2. Select "TUN 模式" mode
-3. Click "启动" — all system traffic routes through the TUN interface
+1. Select "TUN 模式" mode
+2. Click "启动"
+3. macOS 会弹出密码框，输入管理员密码（首次需要，之后缓存 5-15 分钟）
+4. All system traffic routes through the TUN interface
+
+> **无需证书**: Riptide 通过 sudo 获取 root 权限来创建 TUN 接口，不需要 Apple Developer 证书。
+> 如果安装了 Helper 工具（需要证书），启动时不会弹出密码框。
 
 ### Proxy Switching
 
@@ -532,18 +542,17 @@ swift run RiptideApp
 
 ## 对比其他客户端
 
-| 功能 | Riptide | Clash Verge Rev | Clash for Windows |
-|------|---------|-----------------|-------------------|
-| 原生引擎 | ✅ Swift 自研 | ❌ Tauri 封装 | ❌ Electron |
-| macOS 集成 | ✅ 深度集成 | ⚠️ 一般 | ❌ 不支持 |
-| Windows 支持 | ✅ WebView2 | ✅ Tauri | ✅ Electron |
+| 功能 | Riptide | Clash Verge Rev | Hiddify Next |
+|------|---------|-----------------|-------------|
+| 核心引擎 | ✅ Swift 自研 + mihomo | ❌ mihomo 封装 | ❌ sing-box 封装 |
+| macOS 集成 | ✅ SwiftUI 原生 | ⚠️ Tauri | ⚠️ Flutter |
+| Windows 支持 | 🔧 开发中 | ✅ Tauri | ✅ Flutter |
 | Linux 支持 | ❌ 暂无 | ✅ 支持 | ✅ 支持 |
-| Clash 兼容 | ✅ 完全兼容 | ✅ 完全兼容 | ✅ 完全兼容 |
-| TUN 模式 | ✅ 支持 | ✅ 支持 | ⚠️ 有限支持 |
-| WebDAV 同步 | ✅ v1.1+ | ✅ 支持 | ❌ 不支持 |
-| 自动更新 | ✅ 支持 | ✅ 支持 | ❌ 不支持 |
-| 安装包大小 | ~15MB | ~40MB | ~80MB |
-| 内存占用 | ~50MB | ~150MB | ~200MB |
+| TUN 模式 | ✅ sudo / Helper | ✅ mihomo | ✅ sing-box |
+| 无需证书运行 | ✅ sudo 模式 | ✅ | ✅ |
+| WebDAV 同步 | ✅ | ✅ | ❌ |
+| Profile 持久化 | ✅ | ✅ | ✅ |
+| 安装包大小 | ~15MB | ~40MB | ~50MB |
 
 ## 安装指南
 
