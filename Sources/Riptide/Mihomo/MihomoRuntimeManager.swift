@@ -267,7 +267,20 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.apiNotAvailable
         }
 
-        // 9. Set isRunning = true
+        // 9. Set system proxy if in systemProxy mode
+        if mode == .systemProxy {
+            let service = await detectPrimaryService()
+            if let proxyError = await helperConnection.enableSystemProxy(
+                service: service,
+                httpPort: defaultMixedPort,
+                socksPort: 0
+            ) {
+                // Non-fatal: log but don't fail startup
+                print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
+            }
+        }
+
+        // 10. Set isRunning = true
         isRunning = true
         currentMode = mode
         currentProfile = profile
@@ -295,7 +308,13 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         // 5. Cleanup API client
         apiClientWrapper = nil
 
-        // 6. Set isRunning = false
+        // 6. Clear system proxy if it was enabled
+        if currentMode == .systemProxy {
+            let service = await detectPrimaryService()
+            _ = await helperConnection.disableSystemProxy(service: service)
+        }
+
+        // 7. Set isRunning = false
         isRunning = false
         currentMode = nil
         // Keep currentProfile for reference
@@ -437,6 +456,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     }
 
     // MARK: - Private Methods
+
+    /// Detects the primary network service name for system proxy configuration.
+    private func detectPrimaryService() async -> String {
+        let (service, _) = await helperConnection.detectNetworkService()
+        return service ?? "Wi-Fi"
+    }
 
     /// Writes the config YAML to file with backup of existing config.
     /// - Parameter yaml: The YAML configuration string.
