@@ -49,6 +49,13 @@ protocol HelperToolProtocol {
     func terminateMihomo(reply: @escaping @Sendable (Error?) -> Void)
     func getMihomoStatus(reply: @escaping @Sendable (Data?, Error?) -> Void)
     func installMihomo(binaryPath: String, reply: @escaping @Sendable (Error?) -> Void)
+
+    // MARK: - System Proxy Control
+
+    func enableSystemProxy(service: String, httpPort: Int, socksPort: Int, reply: @escaping @Sendable (Error?) -> Void)
+    func disableSystemProxy(service: String, reply: @escaping @Sendable (Error?) -> Void)
+    func querySystemProxyState(service: String, reply: @escaping @Sendable (String?, Error?) -> Void)
+    func detectNetworkService(reply: @escaping @Sendable (String?, Error?) -> Void)
 }
 
 // MARK: - Launch Mode
@@ -140,6 +147,33 @@ final class HelperTool: NSObject {
     /// Logs a message (MainActor version).
     private func logMessage(_ message: String) {
         logMessageNonIsolated(message)
+    }
+
+    // MARK: - Networksetup
+
+    /// Runs `/usr/sbin/networksetup` with the given arguments.
+    /// - Parameter arguments: Arguments to pass to networksetup
+    /// - Returns: nil on success, Error on failure
+    nonisolated private func runNetworksetup(_ arguments: [String]) -> Error? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus != 0 {
+                return NSError(
+                    domain: "RiptideHelper",
+                    code: Int(process.terminationStatus),
+                    userInfo: [NSLocalizedDescriptionKey: "networksetup failed: exit \(process.terminationStatus)"]
+                )
+            }
+            return nil
+        } catch {
+            return error
+        }
     }
 }
 
@@ -359,5 +393,116 @@ extension HelperTool: HelperToolProtocol {
             logMessageNonIsolated("Install failed: \(error)")
             reply(nsError)
         }
+    }
+
+    // MARK: - System Proxy Control
+
+    nonisolated func enableSystemProxy(service: String, httpPort: Int, socksPort: Int, reply: @escaping @Sendable (Error?) -> Void) {
+        logMessageNonIsolated("enableSystemProxy - service: \(service), http: \(httpPort), socks: \(socksPort)")
+        if let err = runNetworksetup(["-setwebproxy", service, "127.0.0.1", "\(httpPort)"]) { reply(err); return }
+        if let err = runNetworksetup(["-setsecurewebproxy", service, "127.0.0.1", "\(httpPort)"]) { reply(err); return }
+        if socksPort > 0 {
+            if let err = runNetworksetup(["-setsocksfirewallproxy", service, "127.0.0.1", "\(socksPort)"]) { reply(err); return }
+        }
+        reply(nil)
+    }
+
+    nonisolated func disableSystemProxy(service: String, reply: @escaping @Sendable (Error?) -> Void) {
+        logMessageNonIsolated("disableSystemProxy - service: \(service)")
+        let e1 = runNetworksetup(["-setwebproxystate", service, "off"])
+        let e2 = runNetworksetup(["-setsecurewebproxystate", service, "off"])
+        let e3 = runNetworksetup(["-setsocksfirewallproxystate", service, "off"])
+        reply(e1 ?? e2 ?? e3)
+    }
+
+    nonisolated func querySystemProxyState(service: String, reply: @escaping @Sendable (String?, Error?) -> Void) {
+        logMessageNonIsolated("querySystemProxyState - service: \(service)")
+
+        let httpResult = runNetworksetupCapture(["-getwebproxy", service])
+        let socksResult = runNetworksetupCapture(["-getsocksfirewallproxy", service])
+
+        guard let httpOutput = httpResult.output else {
+            reply(nil, httpResult.error ?? NSError(domain: "RiptideHelper", code: 20,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to query HTTP proxy state"]))
+            return
+        }
+        guard let socksOutput = socksResult.output else {
+            reply(nil, socksResult.error ?? NSError(domain: "RiptideHelper", code: 21,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to query SOCKS proxy state"]))
+            return
+        }
+
+        let httpEnabled = httpOutput.range(of: "Enabled: Yes", options: .caseInsensitive) != nil
+        let socksEnabled = socksOutput.range(of: "Enabled: Yes", options: .caseInsensitive) != nil
+        let httpPort = parsePort(from: httpOutput) ?? 0
+        let socksPort = parsePort(from: socksOutput) ?? 0
+
+        let json = """
+        {"httpEnabled":\(httpEnabled),"httpPort":\(httpPort),"socksEnabled":\(socksEnabled),"socksPort":\(socksPort)}
+        """
+        reply(json, nil)
+    }
+
+    nonisolated func detectNetworkService(reply: @escaping @Sendable (String?, Error?) -> Void) {
+        logMessageNonIsolated("detectNetworkService")
+
+        let result = runNetworksetupCapture(["-listallnetworkservices"])
+        guard let output = result.output else {
+            reply(nil, result.error ?? NSError(domain: "RiptideHelper", code: 22,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to list network services"]))
+            return
+        }
+
+        let lines = output.components(separatedBy: .newlines)
+        for line in lines.dropFirst() { // skip "An asterisk (*) denotes..."
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty && !trimmed.hasPrefix("*") {
+                logMessageNonIsolated("Detected network service: \(trimmed)")
+                reply(trimmed, nil)
+                return
+            }
+        }
+
+        reply(nil, NSError(domain: "RiptideHelper", code: 23,
+            userInfo: [NSLocalizedDescriptionKey: "No active network service found"]))
+    }
+
+    // MARK: - Networksetup Helpers
+
+    /// Runs networksetup and captures stdout.
+    nonisolated private func runNetworksetupCapture(_ arguments: [String]) -> (output: String?, error: Error?) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
+        process.arguments = arguments
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)
+            if process.terminationStatus != 0 {
+                let error = NSError(domain: "RiptideHelper", code: Int(process.terminationStatus),
+                    userInfo: [NSLocalizedDescriptionKey: "networksetup failed: exit \(process.terminationStatus)"])
+                return (output, error)
+            }
+            return (output, nil)
+        } catch {
+            return (nil, error)
+        }
+    }
+
+    /// Parses the port number from networksetup output (e.g. "Port: 7890").
+    nonisolated private func parsePort(from output: String) -> Int? {
+        for line in output.components(separatedBy: .newlines) {
+            if line.hasPrefix("Port:") {
+                let value = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                return Int(value)
+            }
+        }
+        return nil
     }
 }
