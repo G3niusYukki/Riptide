@@ -181,7 +181,8 @@ final class HelperTool: NSObject {
 
 extension HelperTool: NSXPCListenerDelegate {
 
-    nonisolated func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+    nonisolated func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection
+    ) -> Bool {
         // Configure the connection with the helper tool protocol
         let interface = NSXPCInterface(with: HelperToolProtocol.self)
         newConnection.exportedInterface = interface
@@ -359,28 +360,28 @@ extension HelperTool: HelperToolProtocol {
 
         // Perform installation
         do {
-            let fm = FileManager.default
+            let fileManager = FileManager.default
             let destURL = URL(fileURLWithPath: destinationPath)
 
             // Create directory if needed
-            try fm.createDirectory(
+            try fileManager.createDirectory(
                 at: destURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
 
             // Remove existing binary if present
-            if fm.fileExists(atPath: destinationPath) {
-                try fm.removeItem(atPath: destinationPath)
+            if fileManager.fileExists(atPath: destinationPath) {
+                try fileManager.removeItem(atPath: destinationPath)
             }
 
             // Copy new binary
-            try fm.copyItem(atPath: binaryPath, toPath: destinationPath)
+            try fileManager.copyItem(atPath: binaryPath, toPath: destinationPath)
 
             // Set executable permissions
             let attrs: [FileAttributeKey: Any] = [
                 .posixPermissions: 0o755
             ]
-            try fm.setAttributes(attrs, ofItemAtPath: destinationPath)
+            try fileManager.setAttributes(attrs, ofItemAtPath: destinationPath)
 
             logMessageNonIsolated("Mihomo installed successfully to \(destinationPath)")
             reply(nil)
@@ -409,10 +410,10 @@ extension HelperTool: HelperToolProtocol {
 
     nonisolated func disableSystemProxy(service: String, reply: @escaping @Sendable (Error?) -> Void) {
         logMessageNonIsolated("disableSystemProxy - service: \(service)")
-        let e1 = runNetworksetup(["-setwebproxystate", service, "off"])
-        let e2 = runNetworksetup(["-setsecurewebproxystate", service, "off"])
-        let e3 = runNetworksetup(["-setsocksfirewallproxystate", service, "off"])
-        reply(e1 ?? e2 ?? e3)
+        let webError = runNetworksetup(["-setwebproxystate", service, "off"])
+        let secureError = runNetworksetup(["-setsecurewebproxystate", service, "off"])
+        let socksError = runNetworksetup(["-setsocksfirewallproxystate", service, "off"])
+        reply(webError ?? secureError ?? socksError)
     }
 
     nonisolated func querySystemProxyState(service: String, reply: @escaping @Sendable (String?, Error?) -> Void) {
@@ -497,8 +498,7 @@ extension HelperTool: HelperToolProtocol {
 
     /// Parses the port number from networksetup output (e.g. "Port: 7890").
     nonisolated private func parsePort(from output: String) -> Int? {
-        for line in output.components(separatedBy: .newlines) {
-            if line.hasPrefix("Port:") {
+        for line in output.components(separatedBy: .newlines) where line.hasPrefix("Port:") {
                 let value = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
                 return Int(value)
             }

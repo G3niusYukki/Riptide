@@ -152,8 +152,8 @@ public actor NativeProxyRunner {
         }
 
         // Stop external controllers
-        if let ec = externalController {
-            Task.detached { await ec.stop() }
+        if let controller = externalController {
+            Task.detached { await controller.stop() }
         }
         if let wsc = webSocketController {
             await wsc.stop()
@@ -190,7 +190,8 @@ public actor NativeProxyRunner {
     }
 
     /// Test the delay of a specific proxy node.
-    public func testProxyDelay(node: ProxyNode, testURL: URL = URL(string: "http://www.gstatic.com/generate_204")!, timeout: Duration = .seconds(5)) async -> HealthResult {
+    public func testProxyDelay(node: ProxyNode, testURL: URL = URL(string: "http://www.gstatic.com/generate_204")!, timeout: Duration = .seconds(5)
+    ) async -> HealthResult {
         await healthChecker.check(node: node, testURL: testURL, timeout: timeout)
     }
 
