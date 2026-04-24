@@ -212,7 +212,8 @@ extension HelperTool: NSXPCListenerDelegate {
 
 extension HelperTool: HelperToolProtocol {
 
-    nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) { // swiftlint:disable:this function_body_length
+    // swiftlint:disable:next function_body_length
+    nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) {
         logMessageNonIsolated("Received launchMihomo request - config: \(configPath), mode: \(mode)")
 
         // Validate mode using MihomoLaunchMode enum
