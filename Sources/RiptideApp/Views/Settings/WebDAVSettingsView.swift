@@ -2,6 +2,7 @@ import SwiftUI
 import Riptide
 
 /// WebDAV configuration synchronization settings view
+@MainActor
 struct WebDAVSettingsView: View {
     @StateObject private var viewModel: WebDAVViewModel
     @State private var showConflictResolution = false
