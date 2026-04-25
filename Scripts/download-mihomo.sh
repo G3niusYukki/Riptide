@@ -12,14 +12,14 @@ AMD64_URL="https://github.com/MetaCubeX/mihomo/releases/download/$MIHOMO_VERSION
 
 # Download arm64
 curl -L "$ARM64_URL" -o "$RESOURCES_DIR/mihomo-arm64.gz"
-gunzip "$RESOURCES_DIR/mihomo-arm64.gz"
-mv "$RESOURCES_DIR/mihomo-darwin-arm64-$MIHOMO_VERSION" "$RESOURCES_DIR/mihomo-arm64"
+gunzip -c "$RESOURCES_DIR/mihomo-arm64.gz" > "$RESOURCES_DIR/mihomo-arm64"
+rm -f "$RESOURCES_DIR/mihomo-arm64.gz"
 chmod +x "$RESOURCES_DIR/mihomo-arm64"
 
 # Download amd64
 curl -L "$AMD64_URL" -o "$RESOURCES_DIR/mihomo-amd64.gz"
-gunzip "$RESOURCES_DIR/mihomo-amd64.gz"
-mv "$RESOURCES_DIR/mihomo-darwin-amd64-$MIHOMO_VERSION" "$RESOURCES_DIR/mihomo-amd64"
+gunzip -c "$RESOURCES_DIR/mihomo-amd64.gz" > "$RESOURCES_DIR/mihomo-amd64"
+rm -f "$RESOURCES_DIR/mihomo-amd64.gz"
 chmod +x "$RESOURCES_DIR/mihomo-amd64"
 
 # Create universal binary

@@ -50,6 +50,10 @@ pub struct HotkeyManager {
     app_handle: Option<AppHandle>,
 }
 
+// Safe: GlobalHotKeyManager operations are internally synchronized via OS APIs
+unsafe impl Send for HotkeyManager {}
+unsafe impl Sync for HotkeyManager {}
+
 impl HotkeyManager {
     /// Create a new hotkey manager
     pub fn new() -> Result<Self, HotkeyError> {
@@ -222,8 +226,8 @@ pub fn init_hotkeys(app_handle: AppHandle) -> Result<HotkeyManager, HotkeyError>
 
 /// Command to get registered hotkeys (for frontend)
 #[tauri::command]
-pub fn get_hotkeys(manager: tauri::State<'_, std::sync::Mutex<HotkeyManager>>) -> Result<Vec<String>, String> {
-    let manager = manager.inner().lock().map_err(|e| e.to_string())?;
+pub fn get_hotkeys(state: tauri::State<'_, std::sync::Mutex<HotkeyManager>>) -> Result<Vec<String>, String> {
+    let manager = state.lock().map_err(|e| e.to_string())?;
     let descriptions: Vec<String> = manager.get_registered_hotkeys()
         .iter()
         .map(|c| c.description.clone())
