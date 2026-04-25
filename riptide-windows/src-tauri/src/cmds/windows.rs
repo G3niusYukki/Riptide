@@ -155,13 +155,9 @@ pub fn init_windows_tun_state(app_handle: &AppHandle) -> anyhow::Result<WindowsT
 #[tauri::command]
 pub async fn start_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
     let mut manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-    
-    // Create adapter if not already created
-    if manager.get_status().await == crate::core::windows_tun::TUNStatus::Stopped {
+    if manager.get_status() == crate::core::windows_tun::TUNStatus::Stopped {
         manager.create_adapter().map_err(|e| e.to_string())?;
     }
-    
-    // Start TUN session
     manager.start().await.map_err(|e| e.to_string())
 }
 
@@ -177,12 +173,9 @@ pub async fn stop_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), Stri
 pub fn get_tun_status(state: State<'_, WindowsTUNState>) -> Result<TUNStatusDto, String> {
     let manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
     let config = manager.get_config();
-    
-    // For sync command, we'll return the config info without checking real-time status
-    // The status will be determined by the config and last known state
     Ok(TUNStatusDto {
-        status: "unknown".to_string(),
-        running: false, // Frontend can call the async start/stop commands to change this
+        status: format!("{}", manager.get_status()),
+        running: false,
         adapter_name: Some(config.adapter_name.clone()),
         interface_ip: Some(config.interface_ip.clone()),
         gateway: Some(config.gateway.clone()),
