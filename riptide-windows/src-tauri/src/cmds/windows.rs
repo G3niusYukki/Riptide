@@ -154,18 +154,17 @@ pub fn init_windows_tun_state(app_handle: &AppHandle) -> anyhow::Result<WindowsT
 /// Start TUN mode
 #[tauri::command]
 pub async fn start_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
-    let mut manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-    if manager.get_status() == crate::core::windows_tun::TUNStatus::Stopped {
-        manager.create_adapter().map_err(|e| e.to_string())?;
+    let mut mgr = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+    if mgr.get_status() == crate::core::windows_tun::TUNStatus::Stopped {
+        mgr.create_adapter().map_err(|e| e.to_string())?;
     }
-    manager.start().await.map_err(|e| e.to_string())
+    mgr.start().map_err(|e| e.to_string())
 }
 
 /// Stop TUN mode
 #[tauri::command]
 pub async fn stop_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
-    let mut manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-    manager.stop().await.map_err(|e| e.to_string())
+    state.0.lock().map_err(|e| format!("Lock error: {}", e))?.stop().map_err(|e| e.to_string())
 }
 
 /// Get TUN mode status

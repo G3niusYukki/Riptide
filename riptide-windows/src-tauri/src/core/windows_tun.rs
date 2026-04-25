@@ -168,12 +168,12 @@ impl WindowsTUNManager {
         Err(TUNError::DriverNotInstalled)
     }
 
-    pub async fn start(&mut self) -> Result<(), TUNError> {
+    pub fn start(&self) -> Result<(), TUNError> {
         Err(TUNError::DriverNotInstalled)
     }
 
-    pub async fn stop(&mut self) -> Result<(), TUNError> {
-        *self.status.write().await = TUNStatus::Stopped;
+    pub fn stop(&self) -> Result<(), TUNError> {
+        *self.status.blocking_write() = TUNStatus::Stopped;
         Ok(())
     }
 
