@@ -2,6 +2,7 @@ import SwiftUI
 import Riptide
 
 /// WebDAV configuration synchronization settings view
+@MainActor
 struct WebDAVSettingsView: View {
     @StateObject private var viewModel: WebDAVViewModel
     @State private var showConflictResolution = false
@@ -142,12 +143,13 @@ struct WebDAVSettingsView: View {
                 }
             }
             
+            let shouldDisable = viewModel.serverURL.isEmpty && viewModel.username.isEmpty
             Button(role: .destructive) {
                 viewModel.clearCredentials()
             } label: {
                 Text("清除配置")
             }
-            .disabled(viewModel.serverURL.isEmpty && viewModel.username.isEmpty)
+            .disabled(shouldDisable)
         }
     }
 }
