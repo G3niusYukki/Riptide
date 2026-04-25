@@ -1,10 +1,11 @@
 import { useTraffic } from '../hooks/useTraffic';
 import { useRiptideStore } from '../stores/riptide';
 import { Activity, ArrowDown, ArrowUp, Clock } from 'lucide-react';
+import { TrafficChart } from './Dashboard/TrafficChart';
 
 export function Dashboard() {
   const { isRunning, traffic, activeProfile } = useRiptideStore();
-  const { isLoading, isError } = useTraffic();
+  const { isError } = useTraffic();
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -69,27 +70,20 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Traffic Chart Placeholder */}
+      {/* Traffic Chart */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-slate-100 mb-4">流量统计</h3>
-        {isLoading && isRunning ? (
-          <div className="h-64 flex items-center justify-center">
-            <span className="text-slate-500">加载中...</span>
+        <h3 className="text-lg font-semibold text-slate-100 mb-4">实时流量</h3>
+        {!isRunning ? (
+          <div className="h-64 flex items-center justify-center text-slate-500">
+            <Activity size={48} className="opacity-20 mr-4" />
+            <span>启动代理以查看流量统计</span>
           </div>
         ) : isError ? (
           <div className="h-64 flex items-center justify-center">
             <span className="text-red-400">加载流量数据失败</span>
           </div>
-        ) : !isRunning ? (
-          <div className="h-64 flex items-center justify-center text-slate-500">
-            <Activity size={48} className="opacity-20 mr-4" />
-            <span>启动代理以查看流量统计</span>
-          </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-slate-500">
-            <Activity size={48} className="opacity-20" />
-            <span className="ml-4">实时流量图表即将上线</span>
-          </div>
+          <TrafficChart />
         )}
       </div>
     </div>

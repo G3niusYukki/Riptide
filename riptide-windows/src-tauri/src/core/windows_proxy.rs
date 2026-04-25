@@ -4,6 +4,7 @@
 //! including better process tracking and Windows-specific process control.
 
 use std::process::{Command, Child};
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -157,8 +158,8 @@ impl WindowsProxyManager {
 
     /// Internal helper to check if a process is alive
     fn is_process_alive(&self, handle: &Mutex<Option<Child>>) -> bool {
-        let guard = handle.lock().unwrap();
-        if let Some(ref child) = *guard {
+        let mut guard = handle.lock().unwrap();
+        if let Some(ref mut child) = *guard {
             // On Windows, try_wait returns Ok(None) if process is still running
             matches!(child.try_wait(), Ok(None))
         } else {

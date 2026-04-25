@@ -4,11 +4,11 @@
 //! - Ctrl+Alt+P: Toggle proxy on/off
 //! - Ctrl+Alt+M: Toggle proxy mode (System Proxy / TUN)
 
-use global_hotkey::{GlobalHotKeyManager, HotKey, GlobalHotKeyEvent};
-use global_hotkey::hotkey::{Modifiers, Code};
+use global_hotkey::{GlobalHotKeyManager, GlobalHotKeyEvent};
+use global_hotkey::hotkey::{HotKey, Modifiers, Code};
 use std::sync::Arc;
 use std::thread;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
 /// Errors that can occur during hotkey operations
@@ -223,7 +223,7 @@ pub fn init_hotkeys(app_handle: AppHandle) -> Result<HotkeyManager, HotkeyError>
 /// Command to get registered hotkeys (for frontend)
 #[tauri::command]
 pub fn get_hotkeys(manager: tauri::State<'_, std::sync::Mutex<HotkeyManager>>) -> Result<Vec<String>, String> {
-    let manager = manager.lock().map_err(|e| e.to_string())?;
+    let manager = manager.inner().lock().map_err(|e| e.to_string())?;
     let descriptions: Vec<String> = manager.get_registered_hotkeys()
         .iter()
         .map(|c| c.description.clone())

@@ -6,6 +6,7 @@ import { Profiles } from './components/Profiles';
 import { Rules } from './components/Rules';
 import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
+import { Logs } from './components/Logs';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="rules" element={<Rules />} />
           <Route path="connections" element={<Connections />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="logs" element={<Logs />} />
         </Route>
       </Routes>
     </BrowserRouter>

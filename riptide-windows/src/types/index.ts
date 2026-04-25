@@ -81,6 +81,12 @@ export interface Rule {
   policy: string;
 }
 
+export interface RuleInfo {
+  type: string;
+  payload: string;
+  proxy: string;
+}
+
 export interface Connection {
   id: string;
   host: string;
@@ -104,4 +110,6 @@ export interface AppState {
   activeProfile: string | null;
   systemProxyEnabled: boolean;
   tunModeEnabled: boolean;
+  autoStart: boolean;
+  silentStart: boolean;
 }

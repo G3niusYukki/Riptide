@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Activity, 
-  Globe, 
-  FileText, 
-  Settings, 
+import {
+  Activity,
+  Globe,
+  FileText,
+  Settings,
   Shield,
-  Zap
+  Terminal,
+  Zap,
 } from 'lucide-react';
 
 const navItems = [
@@ -14,6 +15,7 @@ const navItems = [
   { path: '/profiles', icon: FileText, label: '配置' },
   { path: '/rules', icon: Shield, label: '规则' },
   { path: '/connections', icon: Zap, label: '连接' },
+  { path: '/logs', icon: Terminal, label: '日志' },
   { path: '/settings', icon: Settings, label: '设置' },
 ];
 

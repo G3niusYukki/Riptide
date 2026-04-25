@@ -206,6 +206,40 @@ pub async fn close_all_connections(
     Ok(())
 }
 
+/// Get routing rules
+#[tauri::command]
+pub async fn get_rules(
+    state: State<'_, MihomoManager>,
+) -> Result<Vec<crate::core::mihomo_api::RuleInfo>, String> {
+    let api_client = state.get_api_client().await
+        .map_err(|e| format!("Failed to get API client: {}", e))?;
+
+    let rules = api_client
+        .get_rules()
+        .await
+        .map_err(|e| format!("Failed to get rules: {}", e))?;
+
+    Ok(rules)
+}
+
+/// Get mihomo logs
+#[tauri::command]
+pub async fn get_logs(
+    state: State<'_, MihomoManager>,
+    level: Option<String>,
+    lines: Option<u32>,
+) -> Result<String, String> {
+    let api_client = state.get_api_client().await
+        .map_err(|e| format!("Failed to get API client: {}", e))?;
+
+    let log_text = api_client
+        .get_logs(&level.unwrap_or_else(|| "info".to_string()), lines.unwrap_or(100))
+        .await
+        .map_err(|e| format!("Failed to get logs: {}", e))?;
+
+    Ok(log_text)
+}
+
 /// Get traffic statistics
 #[tauri::command]
 pub async fn get_traffic(
@@ -213,11 +247,11 @@ pub async fn get_traffic(
 ) -> Result<crate::core::mihomo_api::TrafficData, String> {
     let api_client = state.get_api_client().await
         .map_err(|e| format!("Failed to get API client: {}", e))?;
-    
+
     let traffic = api_client
         .get_traffic()
         .await
         .map_err(|e| format!("Failed to get traffic: {}", e))?;
-    
+
     Ok(traffic)
 }

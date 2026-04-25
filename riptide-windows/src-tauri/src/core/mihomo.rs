@@ -1,6 +1,7 @@
 //! mihomo sidecar process management
 
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
+use std::fs;
 use tauri::AppHandle;
 use tokio::sync::Mutex;
 
@@ -26,7 +27,7 @@ impl MihomoManager {
     /// Start mihomo process
     pub async fn start(&self) -> anyhow::Result<()> {
         let mut process = self.process.lock().await;
-        
+
         if process.is_some() {
             return Err(anyhow::anyhow!("mihomo is already running"));
         }
@@ -34,21 +35,32 @@ impl MihomoManager {
         // Get mihomo binary path
         let mihomo_path = crate::utils::dirs::get_mihomo_binary_path(&self.app_handle)?;
         let config_path = crate::utils::dirs::get_config_path(&self.app_handle)?;
+        let app_data = crate::utils::dirs::get_app_data_dir(&self.app_handle)?;
 
-        // Start mihomo process
+        // Open log file for mihomo stdout/stderr
+        let log_dir = crate::utils::dirs::get_logs_dir(&self.app_handle)?;
+        let log_file = log_dir.join("mihomo.log");
+        let stdout_file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)?;
+
+        // Start mihomo process with stdout/stderr redirected to log file
         let child = Command::new(&mihomo_path)
             .arg("-f")
             .arg(&config_path)
             .arg("-d")
-            .arg(crate::utils::dirs::get_app_data_dir(&self.app_handle)?)
+            .arg(app_data)
+            .stdout(Stdio::from(stdout_file.try_clone()?))
+            .stderr(Stdio::from(stdout_file))
             .spawn()?;
 
         *process = Some(child);
-        log::info!("mihomo started");
-        
+        log::info!("mihomo started (logs: {:?})", log_file);
+
         // Wait a moment for mihomo to start its API
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        
+
         Ok(())
     }
 

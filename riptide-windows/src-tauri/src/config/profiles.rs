@@ -145,7 +145,7 @@ pub mod storage {
             .chars()
             .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
             .collect::<String>();
-        format!("{}_{}.yaml", sanitized, uuid::Uuid::new_v4().to_simple())
+        format!("{}_{}.yaml", sanitized, uuid::Uuid::new_v4().simple())
     }
 
     /// Save a profile to disk

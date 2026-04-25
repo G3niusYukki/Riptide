@@ -137,6 +137,48 @@ pub async fn import_profile_from_url(
     Ok(profile)
 }
 
+/// Import profile from a share URI (ss://, trojan://, vless://, vmess://, hysteria2://)
+#[tauri::command]
+pub async fn import_share_uri(
+    uri: String,
+    state: State<'_, Mutex<Vec<Profile>>>,
+) -> Result<Profile, String> {
+    use crate::config::parser::{serialize_clash_config, ClashRawConfig};
+    use crate::config::uri::parse_share_uri;
+
+    // Parse the URI into a single proxy
+    let proxy = parse_share_uri(&uri)
+        .map_err(|e| format!("Failed to parse share URI: {}", e))?;
+
+    let name = proxy.name.clone();
+
+    // Wrap in a minimal Clash config
+    let config = ClashRawConfig {
+        proxies: Some(vec![proxy]),
+        proxy_groups: Some(vec![
+            crate::config::parser::ClashRawProxyGroup {
+                name: Some("Proxy".into()),
+                group_type: Some("select".into()),
+                proxies: Some(vec![name.clone()]),
+                ..Default::default()
+            },
+        ]),
+        mode: Some("rule".into()),
+        ..Default::default()
+    };
+
+    let yaml = serialize_clash_config(&config)
+        .map_err(|e| format!("Failed to generate config: {}", e))?;
+
+    // Create and store the profile
+    let profile = Profile::new(name, yaml);
+    let mut profiles = state.lock().unwrap();
+    profiles.push(profile.clone());
+
+    log::info!("Profile '{}' created from share URI", profile.name);
+    Ok(profile)
+}
+
 /// Get active profile ID
 #[tauri::command]
 pub fn get_active_profile() -> Option<String> {

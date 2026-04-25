@@ -1,0 +1,107 @@
+{
+  "app": {
+    "title": "Riptide",
+    "overview": "概览",
+    "proxies": "代理节点",
+    "profiles": "配置文件",
+    "rules": "规则列表",
+    "connections": "连接列表",
+    "logs": "日志",
+    "settings": "设置"
+  },
+  "dashboard": {
+    "running": "运行中",
+    "stopped": "已停止",
+    "status": "运行状态",
+    "currentConfig": "当前配置",
+    "downloadSpeed": "下载速度",
+    "uploadSpeed": "上传速度",
+    "total": "总计",
+    "realtimeTraffic": "实时流量",
+    "startToView": "启动代理以查看流量统计",
+    "loading": "加载中...",
+    "loadFailed": "加载流量数据失败",
+    "waitingData": "等待流量数据..."
+  },
+  "proxies": {
+    "title": "代理节点",
+    "startToView": "启动代理以查看节点列表",
+    "loadFailed": "加载代理数据失败，请确保 mihomo 正在运行",
+    "testAll": "测试全部延迟",
+    "testing": "测试中...",
+    "testDelay": "测延迟",
+    "current": "当前",
+    "noGroups": "暂无代理组",
+    "noProxies": "暂无代理节点",
+    "allProxies": "所有节点"
+  },
+  "profiles": {
+    "title": "配置文件",
+    "importUrl": "从 URL 导入",
+    "importShare": "分享链接",
+    "newProfile": "新建配置",
+    "create": "创建",
+    "import": "导入",
+    "cancel": "取消",
+    "activate": "激活",
+    "delete": "删除配置",
+    "updated": "更新于",
+    "editTitle": "编辑配置",
+    "save": "保存",
+    "saving": "保存中..."
+  },
+  "connections": {
+    "title": "连接列表",
+    "startToView": "启动代理以查看连接列表",
+    "loadFailed": "加载连接数据失败",
+    "activeConnections": "个活动连接",
+    "closeAll": "关闭全部",
+    "noConnections": "暂无活动连接",
+    "target": "目标地址",
+    "chain": "节点链",
+    "upload": "上传",
+    "download": "下载",
+    "duration": "时长"
+  },
+  "rules": {
+    "title": "规则列表",
+    "startToView": "启动代理以查看规则列表",
+    "loadFailed": "加载规则数据失败，请确保 mihomo 正在运行",
+    "noRules": "暂无规则",
+    "ruleCount": "条规则"
+  },
+  "logs": {
+    "title": "日志",
+    "startToView": "启动代理以查看实时日志",
+    "loading": "加载日志中...",
+    "noLogs": "暂无日志"
+  },
+  "settings": {
+    "title": "设置",
+    "general": "常规设置",
+    "autoStart": "开机启动",
+    "autoStartDesc": "系统启动时自动运行 Riptide",
+    "silentStart": "静默启动",
+    "silentStartDesc": "启动时最小化到托盘",
+    "systemProxy": "系统代理",
+    "enableProxy": "启用系统代理",
+    "enableProxyDesc": "自动配置 Windows 系统代理设置",
+    "httpPort": "HTTP 端口",
+    "socksPort": "SOCKS 端口",
+    "tunMode": "TUN 模式",
+    "installService": "安装 TUN 服务",
+    "installServiceDesc": "需要管理员权限安装 Windows 服务",
+    "installBtn": "安装服务",
+    "installing": "安装中...",
+    "enableTun": "启用 TUN 模式",
+    "enableTunDesc": "系统级流量拦截（需要先安装服务）",
+    "installSuccess": "TUN 服务安装成功",
+    "installFailed": "TUN 服务安装失败",
+    "about": "关于",
+    "aboutText": "A native Windows proxy client powered by mihomo"
+  },
+  "common": {
+    "loading": "加载中...",
+    "notSelected": "未选择"
+  }
+}
