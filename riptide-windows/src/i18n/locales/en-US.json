@@ -1,0 +1,107 @@
+{
+  "app": {
+    "title": "Riptide",
+    "overview": "Overview",
+    "proxies": "Proxies",
+    "profiles": "Profiles",
+    "rules": "Rules",
+    "connections": "Connections",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "status": "Status",
+    "currentConfig": "Current Config",
+    "downloadSpeed": "Download",
+    "uploadSpeed": "Upload",
+    "total": "Total",
+    "realtimeTraffic": "Real-time Traffic",
+    "startToView": "Start the proxy to view traffic",
+    "loading": "Loading...",
+    "loadFailed": "Failed to load traffic data",
+    "waitingData": "Waiting for traffic data..."
+  },
+  "proxies": {
+    "title": "Proxies",
+    "startToView": "Start the proxy to view nodes",
+    "loadFailed": "Failed to load proxy data, ensure mihomo is running",
+    "testAll": "Test All",
+    "testing": "Testing...",
+    "testDelay": "Test",
+    "current": "Current",
+    "noGroups": "No proxy groups",
+    "noProxies": "No proxy nodes",
+    "allProxies": "All Proxies"
+  },
+  "profiles": {
+    "title": "Profiles",
+    "importUrl": "Import from URL",
+    "importShare": "Share Link",
+    "newProfile": "New Profile",
+    "create": "Create",
+    "import": "Import",
+    "cancel": "Cancel",
+    "activate": "Activate",
+    "delete": "Delete",
+    "updated": "Updated",
+    "editTitle": "Edit Profile",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "connections": {
+    "title": "Connections",
+    "startToView": "Start the proxy to view connections",
+    "loadFailed": "Failed to load connection data",
+    "activeConnections": "active connections",
+    "closeAll": "Close All",
+    "noConnections": "No active connections",
+    "target": "Target",
+    "chain": "Chain",
+    "upload": "Upload",
+    "download": "Download",
+    "duration": "Duration"
+  },
+  "rules": {
+    "title": "Rules",
+    "startToView": "Start the proxy to view rules",
+    "loadFailed": "Failed to load rules, ensure mihomo is running",
+    "noRules": "No rules",
+    "ruleCount": "rules"
+  },
+  "logs": {
+    "title": "Logs",
+    "startToView": "Start the proxy to view logs",
+    "loading": "Loading logs...",
+    "noLogs": "No logs"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "autoStart": "Start on Boot",
+    "autoStartDesc": "Automatically launch Riptide at system startup",
+    "silentStart": "Silent Start",
+    "silentStartDesc": "Start minimized to system tray",
+    "systemProxy": "System Proxy",
+    "enableProxy": "Enable System Proxy",
+    "enableProxyDesc": "Automatically configure Windows system proxy",
+    "httpPort": "HTTP Port",
+    "socksPort": "SOCKS Port",
+    "tunMode": "TUN Mode",
+    "installService": "Install TUN Service",
+    "installServiceDesc": "Requires administrator privileges",
+    "installBtn": "Install Service",
+    "installing": "Installing...",
+    "enableTun": "Enable TUN Mode",
+    "enableTunDesc": "System-level traffic interception (requires service installation)",
+    "installSuccess": "TUN service installed successfully",
+    "installFailed": "TUN service installation failed",
+    "about": "About",
+    "aboutText": "A native Windows proxy client powered by mihomo"
+  },
+  "common": {
+    "loading": "Loading...",
+    "notSelected": "Not selected"
+  }
+}

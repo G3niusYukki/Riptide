@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Top-level Clash configuration structure
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ClashRawConfig {
     /// HTTP proxy port
     pub port: Option<u16>,
@@ -77,7 +77,7 @@ pub struct ClashRawConfig {
 }
 
 /// Proxy node configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ClashRawProxy {
     /// Proxy name (required)
     pub name: String,
@@ -239,7 +239,7 @@ pub struct ClashRawRealityOpts {
 }
 
 /// Proxy group configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ClashRawProxyGroup {
     /// Group name (required)
     pub name: Option<String>,

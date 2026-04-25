@@ -163,12 +163,9 @@ impl WindowsTUNManager {
             return Err(TUNError::AlreadyRunning);
         }
 
-        // Load wintun.dll
-        log::info!("Loading wintun.dll from: {:?}", self.wintun_dll_path);
-        unsafe {
-            wintun::load_wintun_dll(&self.wintun_dll_path)
-                .map_err(|e| TUNError::DllLoadFailed(e.to_string()))?;
-        }
+        // Tell wintun where to find the DLL
+        log::info!("Setting WINTUN_COMPATIBLE_DLL_PATH to: {:?}", self.wintun_dll_path);
+        std::env::set_var("WINTUN_COMPATIBLE_DLL_PATH", &self.wintun_dll_path);
 
         // Create adapter with display name and tunnel type
         let adapter_name = format!("{} {}", self.config.adapter_name, self.config.tunnel_type);
@@ -209,9 +206,10 @@ impl WindowsTUNManager {
         let adapter = self.adapter.as_ref()
             .ok_or_else(|| TUNError::InvalidConfiguration("Adapter not created".to_string()))?;
 
-        // Start wintun session with maximum ring capacity for best performance
-        log::info!("Starting TUN session with capacity: {}", wintun::MAX_RING_CAPACITY);
-        let session = adapter.start_session(wintun::MAX_RING_CAPACITY)
+        // Start wintun session with 4 MiB ring capacity for best performance
+        let capacity: u32 = 0x400000;
+        log::info!("Starting TUN session with capacity: {}", capacity);
+        let session = adapter.start_session(capacity)
             .map_err(|e| TUNError::SessionCreationFailed(e.to_string()))?;
 
         let session_arc = Arc::new(session);

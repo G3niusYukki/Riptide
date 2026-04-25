@@ -125,12 +125,15 @@ pub fn run() {
             cmds::proxy::close_connection,
             cmds::proxy::close_all_connections,
             cmds::proxy::get_traffic,
+            cmds::proxy::get_rules,
+            cmds::proxy::get_logs,
             // Legacy config commands
             cmds::config::get_profiles,
             cmds::config::add_profile,
             cmds::config::remove_profile,
             cmds::config::update_profile,
             cmds::config::import_profile_from_url,
+            cmds::config::import_share_uri,
             cmds::config::get_active_profile,
             cmds::config::set_active_profile,
             // Windows profile management commands
@@ -148,6 +151,7 @@ pub fn run() {
             cmds::system::uninstall_tun_service,
             cmds::system::start_tun_service,
             cmds::system::stop_tun_service,
+            cmds::system::check_update,
             // Windows-specific commands
             #[cfg(target_os = "windows")]
             cmds::windows::start_windows_proxy,

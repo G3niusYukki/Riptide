@@ -61,6 +61,15 @@ pub struct ProxyGroupDetail {
     pub delay: Option<u32>,
 }
 
+/// Routing rule information
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RuleInfo {
+    #[serde(rename = "type")]
+    pub rule_type: String,
+    pub payload: String,
+    pub proxy: String,
+}
+
 /// Connection metadata
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConnectionMetadata {
@@ -375,6 +384,26 @@ impl MihomoApiClient {
         if response.status().is_success() {
             let text = response.text().await?;
             Ok(text)
+        } else {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            Err(MihomoError::ApiError { status, message: text })
+        }
+    }
+
+    /// Get routing rules (from config or currently applied)
+    pub async fn get_rules(&self) -> Result<Vec<RuleInfo>, MihomoError> {
+        let response = self.build_request(reqwest::Method::GET, "/rules")
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            #[derive(Deserialize)]
+            struct RulesResponse {
+                rules: Vec<RuleInfo>,
+            }
+            let data: RulesResponse = response.json().await?;
+            Ok(data.rules)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
 import { Header } from './Header';
+import { ToastContainer } from '../Toast';
 
 export function Layout() {
   return (
@@ -12,6 +13,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <ToastContainer />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 // Tauri IPC service wrappers
 
 import { invoke } from '@tauri-apps/api/core';
-import type { 
-  Profile, 
-  ProxyInfo, 
-  ProxyGroupDetail, 
-  ConnectionInfo, 
-  TrafficData 
+import type {
+  Profile,
+  ProxyInfo,
+  ProxyGroupDetail,
+  ConnectionInfo,
+  TrafficData,
+  RuleInfo,
 } from '../types';
 
 // Proxy commands
@@ -26,14 +27,16 @@ export const testGroupDelay = (group: string) =>
   invoke<Record<string, number>>('test_group_delay', { group });
 
 // Connection commands
-export const getConnections = () => 
+export const getConnections = () =>
   invoke<ConnectionInfo[]>('get_connections');
-export const closeConnection = (id: string) => 
+export const closeConnection = (id: string) =>
   invoke<void>('close_connection', { id });
-export const closeAllConnections = () => 
+export const closeAllConnections = () =>
   invoke<void>('close_all_connections');
-export const getTraffic = () => 
+export const getTraffic = () =>
   invoke<TrafficData>('get_traffic');
+export const getRules = () =>
+  invoke<RuleInfo[]>('get_rules');
 
 // Config commands
 export const getProfiles = () => invoke<Profile[]>('get_profiles');
@@ -43,8 +46,10 @@ export const removeProfile = (id: string) =>
   invoke<void>('remove_profile', { id });
 export const updateProfile = (id: string, content: string) => 
   invoke<void>('update_profile', { id, content });
-export const importProfileFromUrl = (url: string) => 
+export const importProfileFromUrl = (url: string) =>
   invoke<Profile>('import_profile_from_url', { url });
+export const importShareUri = (uri: string) =>
+  invoke<Profile>('import_share_uri', { uri });
 export const getActiveProfile = () => invoke<string | null>('get_active_profile');
 export const setActiveProfile = (id: string) => 
   invoke<void>('set_active_profile', { id });
@@ -61,3 +66,16 @@ export const stopTunService = () => invoke<void>('stop_tun_service');
 
 // Hotkey commands
 export const getHotkeys = () => invoke<string[]>('get_hotkeys');
+
+// Update check
+export interface UpdateInfo {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  release_url: string;
+}
+export const checkUpdate = () => invoke<UpdateInfo>('check_update');
+
+// Log commands
+export const getLogs = (level?: string, lines?: number) =>
+  invoke<string>('get_logs', { level, lines });

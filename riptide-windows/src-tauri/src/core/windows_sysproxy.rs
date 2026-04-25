@@ -149,30 +149,26 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
         use std::mem;
 
         unsafe {
-            // Build proxy server string
+            // Build proxy server string — keep alive on stack through InternetSetOptionA
             let proxy_server = CString::new(config.proxy_server.clone())
                 .map_err(|_| SysproxyError::InvalidHost("Invalid proxy server string".to_string()))?;
-            
-            // Build bypass list string
-            let bypass_list = if config.bypass_list.is_empty() {
-                ptr::null()
+
+            // Build bypass list string — keep alive on stack through InternetSetOptionA
+            let bypass_cstring = if config.bypass_list.is_empty() {
+                None
             } else {
-                CString::new(config.bypass_list.clone())
-                    .map_err(|_| SysproxyError::InvalidHost("Invalid bypass list string".to_string()))?
-                    .as_ptr()
+                Some(CString::new(config.bypass_list.clone())
+                    .map_err(|_| SysproxyError::InvalidHost("Invalid bypass list string".to_string()))?)
             };
 
             // Configure proxy info structure
             let mut proxy_info: INTERNET_PROXY_INFO = mem::zeroed();
-            
+
             if config.enable {
                 proxy_info.dwAccessType = 3; // INTERNET_OPEN_TYPE_PROXY
                 proxy_info.lpszProxy = proxy_server.as_ptr() as *mut i8;
-                if !bypass_list.is_null() {
-                    // Need to keep the CString alive, so we use a static approach
-                    static mut BYPASS_STORAGE: Option<CString> = None;
-                    BYPASS_STORAGE = Some(CString::new(config.bypass_list.clone()).unwrap());
-                    proxy_info.lpszProxyBypass = BYPASS_STORAGE.as_ref().unwrap().as_ptr() as *mut i8;
+                if let Some(ref bypass) = bypass_cstring {
+                    proxy_info.lpszProxyBypass = bypass.as_ptr() as *mut i8;
                 }
             } else {
                 proxy_info.dwAccessType = 1; // INTERNET_OPEN_TYPE_DIRECT
