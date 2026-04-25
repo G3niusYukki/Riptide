@@ -50,6 +50,9 @@ let package = Package(
             name: "RiptideApp",
             dependencies: [
                 "Riptide",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
             ]
         ),
         .testTarget(

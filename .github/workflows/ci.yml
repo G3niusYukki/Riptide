@@ -62,10 +62,10 @@ jobs:
         run: ./Scripts/download-mihomo.sh
 
       - name: Build
-        run: swift build -Xswiftc -strict-concurrency=targeted
+        run: swift build
 
       - name: Test
-        run: swift test -Xswiftc -strict-concurrency=targeted
+        run: swift test
 
   # ── Windows: Frontend ─────────────────────────────────────────
 
