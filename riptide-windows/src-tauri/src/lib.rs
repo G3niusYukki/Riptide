@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use crate::core::mihomo::MihomoManager;
 use crate::core::sysproxy::SystemProxyController;
-use crate::core::windows_tun::{WindowsTUNManager, TUNStatusDto};
+use crate::core::windows_tun::WindowsTUNManager;
 use crate::config::profiles::Profile;
 use crate::cmds::config::AppState;
 use crate::utils::hotkeys::{HotkeyManager, init_hotkeys};

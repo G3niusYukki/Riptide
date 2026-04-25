@@ -3,9 +3,9 @@
 //! These commands provide access to Windows-optimized proxy and system proxy
 //! management features.
 
-use crate::core::windows_proxy::{WindowsProxyManager, ProxyError};
+use crate::core::windows_proxy::WindowsProxyManager;
 use crate::core::windows_sysproxy::{WindowsSysProxyController, WindowsProxyConfig};
-use crate::core::windows_tun::{WindowsTUNManager, TUNError, TUNStatusDto};
+use crate::core::windows_tun::{WindowsTUNManager, TUNStatusDto};
 use tauri::{AppHandle, State};
 use std::sync::Mutex;
 

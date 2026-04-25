@@ -145,7 +145,7 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
     #[cfg(target_os = "windows")]
     {
         use winapi::um::wininet::{InternetSetOptionA, INTERNET_OPTION_PROXY, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, INTERNET_OPTION_REFRESH};
-        use winapi::shared::minwindef::{DWORD, LPVOID, BOOL, TRUE};
+        use winapi::shared::minwindef::{DWORD, LPVOID, BOOL};
         use winapi::um::wininet::INTERNET_PROXY_INFO;
         use std::mem;
 
