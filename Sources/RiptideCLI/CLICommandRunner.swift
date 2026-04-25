@@ -47,7 +47,7 @@ public enum CLICommandRunner {
         switch statusResponse {
         case .status(let snapshot):
             return
-                "state=\(snapshot.state) profile=\(snapshot.activeProfileName ?? "none") up=\(snapshot.bytesUp) down=\(snapshot.bytesDown) conn=\(snapshot.activeConnections)"
+                "runtime=simulation state=\(snapshot.state) profile=\(snapshot.activeProfileName ?? "none") up=\(snapshot.bytesUp) down=\(snapshot.bytesDown) conn=\(snapshot.activeConnections) note=CLI run validates the in-process lifecycle only; use the app mihomo runtime for system proxy operation."
         case .error(let message):
             throw CLICommandRunnerError.statusFailed(message)
         case .ack:
@@ -87,9 +87,9 @@ public enum CLICommandRunner {
 
         do {
             _ = try await runtime.openConnection(target: ConnectionTarget(host: targetHost, port: targetPort))
-            return "smoke=ok target=\(targetHost):\(targetPort)"
+            return "selftest=ok runtime=self-contained target=\(targetHost):\(targetPort)"
         } catch {
-            return "smoke=error target=\(targetHost):\(targetPort) reason=\(String(describing: error))"
+            return "selftest=error runtime=self-contained target=\(targetHost):\(targetPort) reason=\(String(describing: error))"
         }
     }
 }

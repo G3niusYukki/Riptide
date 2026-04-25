@@ -224,16 +224,40 @@ struct ModeCoordinatorMihomoTests {
         #expect(hasModeChanged)
     }
 
-    @Test("mode coordinator starts runtime in TUN mode")
-    func coordinatorStartsTunMode() async throws {
+    @Test("mode coordinator gates TUN mode until real mihomo TUN is verified")
+    func coordinatorGatesTunMode() async throws {
         let manager = MockMihomoRuntimeManager()
         let coordinator = ModeCoordinator(mihomoManager: manager)
         let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
         let profile = TunnelProfile(name: "test", config: config)
 
-        try await coordinator.start(mode: .tun, profile: profile)
-        #expect(await manager.isRunning == true)
-        #expect(await manager.currentMode == .tun)
+        do {
+            try await coordinator.start(mode: .tun, profile: profile)
+            Issue.record("Expected TUN mode to be gated")
+        } catch RuntimeError.tunUnavailable(let message) {
+            #expect(message.contains("TUN mode is not available yet"))
+        } catch {
+            Issue.record("Expected RuntimeError.tunUnavailable, got \(error)")
+        }
+
+        #expect(await manager.isRunning == false)
+        #expect(await manager.currentMode == nil)
+
+        let events = await coordinator.recentEvents()
+        let hasDegraded = events.contains { event in
+            if case .degraded(.tun, let message) = event {
+                return message.contains("TUN mode is not available yet")
+            }
+            return false
+        }
+        let hasError = events.contains { event in
+            if case .error(let snapshot) = event {
+                return snapshot.code == "E_TUN_UNAVAILABLE"
+            }
+            return false
+        }
+        #expect(hasDegraded)
+        #expect(hasError)
     }
 
     @Test("mode coordinator requires profile to start")

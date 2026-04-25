@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Riptide
 
+
 // MARK: - Mock URL Protocol
 
 /// Thread-safe storage for MockURLProtocol using NSLock
@@ -18,8 +19,8 @@ final class MockURLProtocolStorage: @unchecked Sendable {
         }
         set {
             lock.lock()
+            defer { lock.unlock() }
             _requestHandler = newValue
-            lock.unlock()
         }
     }
 
@@ -31,16 +32,16 @@ final class MockURLProtocolStorage: @unchecked Sendable {
         }
         set {
             lock.lock()
+            defer { lock.unlock() }
             _errorHandler = newValue
-            lock.unlock()
         }
     }
 
     func reset() {
         lock.lock()
+        defer { lock.unlock() }
         _requestHandler = nil
         _errorHandler = nil
-        lock.unlock()
     }
 }
 
@@ -63,13 +64,11 @@ final class MockURLProtocol: URLProtocol {
 
         if let error = MockURLProtocol.storage.errorHandler?(currentRequest) {
             client?.urlProtocol(self, didFailWithError: error)
-            client?.urlProtocolDidFinishLoading(self)
             return
         }
 
         guard let handler = MockURLProtocol.storage.requestHandler else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
-            client?.urlProtocolDidFinishLoading(self)
             return
         }
 
@@ -80,7 +79,6 @@ final class MockURLProtocol: URLProtocol {
             client?.urlProtocolDidFinishLoading(self)
         } catch {
             client?.urlProtocol(self, didFailWithError: error)
-            client?.urlProtocolDidFinishLoading(self)
         }
     }
 

@@ -79,7 +79,7 @@ public struct RiptideMenuBar: View {
             Section("模式") {
                 Picker("模式", selection: $viewModel.selectedMode) {
                     Text("系统代理").tag(RuntimeMode.systemProxy)
-                    Text("TUN").tag(RuntimeMode.tun)
+                    Text("TUN（暂不可用）").tag(RuntimeMode.tun).disabled(true)
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()

@@ -21,6 +21,13 @@ public actor ModeCoordinator {
     }
 
     public func start(mode: RuntimeMode, profile: TunnelProfile?) async throws {
+        if mode == .tun {
+            let msg = "TUN mode is not available yet: the current product runtime only supports mihomo system proxy mode. Enable TUN only after a real mihomo TUN integration passes e2e verification."
+            emit(.degraded(mode, msg))
+            emit(.error(RuntimeErrorSnapshot(code: "E_TUN_UNAVAILABLE", message: msg)))
+            throw RuntimeError.tunUnavailable(msg)
+        }
+
         guard let profile else {
             let msg = "Mode requires a profile"
             emit(.degraded(mode, msg))

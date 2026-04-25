@@ -170,13 +170,18 @@ struct ConfigTabView: View {
 
             // Mode selector
             Picker("模式", selection: $vm.connectionMode) {
-                Text("系统代理")
-                    .tag(ConnectionMode.systemProxy)
-                Text("TUN模式")
-                    .tag(ConnectionMode.tun)
+                ForEach(ConnectionMode.productAvailableModes, id: \.self) { mode in
+                    Text(mode.displayName)
+                        .tag(mode)
+                }
             }
             .pickerStyle(.segmented)
             .disabled(vm.isRunning)
+
+            Text("TUN 模式暂未开放：需完成真实 mihomo TUN 集成、权限链路和端到端验证后再启用。")
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             // Helper installation button (shown when TUN selected but helper not installed)
             if vm.connectionMode == .tun && !vm.helperInstalled {

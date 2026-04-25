@@ -6,7 +6,7 @@ import Riptide
 struct RiptideCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "riptide",
-        abstract: "Riptide CLI",
+        abstract: "Riptide developer CLI for config validation and self-contained runtime checks",
         subcommands: [Validate.self, Run.self, Smoke.self, Serve.self]
     )
 
@@ -24,7 +24,7 @@ struct RiptideCLI: AsyncParsableCommand {
     }
 
     struct Run: AsyncParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Run lifecycle simulation with config")
+        static let configuration = CommandConfiguration(abstract: "Run an in-process lifecycle simulation with config")
 
         @Option(name: [.short, .long], help: "Path to yaml config")
         var config: String
@@ -37,7 +37,7 @@ struct RiptideCLI: AsyncParsableCommand {
     }
 
     struct Smoke: AsyncParsableCommand {
-        static let configuration = CommandConfiguration(abstract: "Run live connectivity smoke check")
+        static let configuration = CommandConfiguration(abstract: "Run a self-contained connectivity check through the Swift runtime")
 
         @Option(name: [.short, .long], help: "Path to yaml config")
         var config: String
@@ -56,13 +56,13 @@ struct RiptideCLI: AsyncParsableCommand {
                 targetHost: host,
                 targetPort: port
             )
-            print("SMOKE \(summary)")
+            print("SELFTEST \(summary)")
         }
     }
 
     struct Serve: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run a local HTTP CONNECT proxy backed by the live runtime"
+            abstract: "Run a developer-only local HTTP CONNECT proxy backed by the Swift runtime"
         )
 
         @Option(name: [.short, .long], help: "Path to yaml config")
@@ -91,7 +91,7 @@ struct RiptideCLI: AsyncParsableCommand {
             let server = LocalHTTPConnectProxyServer(runtime: runtime)
             let endpoint = try await server.start(host: host, port: UInt16(port))
 
-            print("SERVING http-connect=\(endpoint.host):\(endpoint.port) profile=\(imported.profile.name)")
+            print("SERVING runtime=swift-experimental http-connect=\(endpoint.host):\(endpoint.port) profile=\(imported.profile.name)")
 
             while true {
                 try await Task.sleep(for: .seconds(3600))

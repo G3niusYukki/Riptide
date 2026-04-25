@@ -113,9 +113,29 @@ public struct RuleMatchLog: Identifiable {
     public let resolvedNode: String
 }
 
-public enum ConnectionMode: String, Equatable {
+public enum ConnectionMode: String, Equatable, CaseIterable {
     case systemProxy
     case tun
+
+    public static var productAvailableModes: [ConnectionMode] {
+        RuntimeMode.productAvailableModes.map { mode in
+            switch mode {
+            case .systemProxy:
+                return .systemProxy
+            case .tun:
+                return .tun
+            }
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .systemProxy:
+            return "系统代理"
+        case .tun:
+            return "TUN模式"
+        }
+    }
 }
 
 // MARK: - AppViewModel

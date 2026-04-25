@@ -1,10 +1,23 @@
 # Riptide
 
-A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-native proxy engine** with optional [mihomo](https://github.com/MetaCubeX/mihomo) sidecar integration, delivering a Clash-compatible configuration system, TUN mode, and a polished native user interface.
+A native Swift proxy-client project for macOS. Riptide currently focuses on a SwiftUI app shell, Clash-compatible configuration parsing, and [mihomo](https://github.com/MetaCubeX/mihomo) sidecar integration for product runtime.
 
-> **Architecture**: Library-first design. The `Riptide` library implements protocol framing, transport orchestration, DNS resolution, rule matching, and connection lifecycle management — all in pure Swift. The `RiptideApp` SwiftUI client (macOS) / WebView2 client (Windows) and the `mihomo` sidecar are interchangeable consumers of this library.
+> **Architecture**: Library-first design. The `Riptide` library contains protocol, DNS, rule, runtime, and mihomo integration components. Product readiness is intentionally scoped to the verified mihomo-backed System Proxy path first; native protocol and TUN work remain under active development.
 
-**Status**: v1.2.0 — Full mihomo sidecar integration, native SwiftUI app, System Proxy & TUN modes, subscription management, profile persistence, sudo-based privilege escalation (no developer certificate required).
+**Status**: Beta / product-readiness hardening. System Proxy via mihomo is the only product-exposed runtime path in this phase. TUN mode is gated until real mihomo TUN integration, signing/entitlements, and recovery behavior are verified end-to-end.
+
+## Product capability matrix
+
+| Capability | Product status | Notes |
+|------------|----------------|-------|
+| macOS app shell | Beta | SwiftUI app and menu bar are present; packaging/signing still need product validation. |
+| Clash YAML import | Beta | Parser and profile import are covered by tests; broad provider compatibility still needs real subscription coverage. |
+| mihomo System Proxy runtime | Beta | Intended primary path. Requires a usable mihomo binary and verified local permissions. |
+| TUN / VPN runtime | Gated | Hidden/disabled in product UI until mihomo TUN, NetworkExtension entitlement, signing, and cleanup are verified. |
+| Native Swift proxy stack | Experimental | Useful for library tests and self-contained smoke checks; not the recommended product runtime. |
+| CLI `validate` | Supported helper | Validates config parsing/import. |
+| CLI `run` | Simulation only | Exercises the in-process lifecycle; it does not launch the product mihomo runtime. |
+| CLI `smoke` | Self-contained self-test | Opens through the native runtime test path; not a guarantee that real proxy nodes or mihomo are production-ready. |
 
 
 ---
@@ -25,13 +38,13 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 ## Features
 
-### 跨平台支持
+### Platform support
 
-| 平台 | 状态 | 说明 |
-|------|------|------|
-| macOS 14+ | ✅ 完整支持 | SwiftUI 原生界面，完整 TUN 支持 |
-| Windows 10/11 | ✅ v1.0+ 支持 | WebView2 界面，MSI 安装包 |
-| Linux | ❌ 计划中 | - |
+| Platform | Status | Notes |
+|----------|--------|-------|
+| macOS 14+ | Beta | SwiftUI app shell and mihomo-backed System Proxy path are the current product focus. |
+| Windows | Not supported | No product Windows client is shipped by this Swift package. |
+| Linux | Not supported | No product Linux client is shipped by this Swift package. |
 
 ### 配置同步
 
@@ -110,12 +123,11 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 ### Runtime Modes
 
-| Mode | Status | Notes |
-|------|--------|-------|
-| **System Proxy** | ✅ | macOS system proxy via `Network` framework |
-| **TUN Mode** | ✅ | Full userspace TCP stack + DNS interception |
-| **Direct** | ✅ | All traffic bypasses proxy |
-| **Global** | ✅ | All traffic through single proxy node |
+| Mode | Product status | Notes |
+|------|----------------|-------|
+| **System Proxy** | Beta | Primary product path via mihomo sidecar and macOS system proxy configuration. |
+| **TUN Mode** | Gated | Runtime entry points now reject TUN until real mihomo TUN integration is verified end-to-end. |
+| **Direct / Global routing** | Config-level | Available as routing concepts in Clash/mihomo config, not standalone product runtime modes. |
 
 ### MITM Framework
 
@@ -141,12 +153,12 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 | Traffic Monitor | ✅ | Upload/download speed + cumulative totals |
 | Rule Viewer | ✅ | Full rule list with type indicators |
 | Log Viewer | ✅ | Level filter, search, auto-scroll, export |
-| Menu Bar Extra | ✅ | Status icon, traffic speed, profile switching, mode selector |
+| Menu Bar Extra | Beta | Status icon, traffic speed, profile switching; TUN is shown as unavailable/disabled |
 | Theme Manager | ✅ | System / Light / Dark appearance persistence |
-| Global Hotkeys | ✅ | Configurable shortcuts (e.g., toggle proxy, switch mode) |
-| MITM Settings | ✅ | Interception patterns, certificate management, logging |
+| Global Hotkeys | Beta | Configurable shortcuts for verified product actions |
+| MITM Settings | Experimental | Interception patterns, certificate management, logging |
 | i18n (中文/English) | ✅ | 80+ localized string keys, auto-detect system language |
-| Helper Setup | ✅ | Guided installation flow for privileged XPC helper |
+| Helper Setup | Gated | Historical privileged-helper flow; not product-ready until TUN/signing is verified |
 
 ### External Control
 
@@ -201,10 +213,10 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 └───────┼─────────────────────────────────────────────────────────┘
         │
   ┌─────▼──────┐          ┌─────────────────────────────────────┐
-  │ SMJobBless │  XPC     │  RiptideHelper (root, privileged)   │
-  │ Manager    │◄────────►│  • Launch/terminate mihomo           │
-  └────────────┘          │  • Validate config paths             │
-                          │  • TUN device management             │
+  │ SMJobBless │  XPC     │  RiptideHelper (gated)               │
+  │ Manager    │◄────────►│  • Helper/TUN scaffolding             │
+  └────────────┘          │  • Not product-ready yet              │
+                          │  • Requires signing validation        │
                           └─────────┬───────────────────────────┘
                                     │
                           ┌─────────▼─────────┐
@@ -239,9 +251,10 @@ A native Swift proxy client for macOS and Windows. Riptide combines a **Swift-na
 
 ### Requirements
 
-- **macOS 14+** (Sonoma or later) OR **Windows 10/11**
-- **Swift 6.2+** / **Xcode 16+** (仅用于从源码构建 macOS 版本)
-- Apple Developer certificate **可选** — 不需要证书也能使用 TUN 模式（通过 sudo 获取权限）
+- **macOS 14+** (Sonoma or later)
+- **Swift 6.2+** / **Xcode 16+** (when building from source)
+- A local **mihomo** binary for the product System Proxy runtime
+- TUN mode is currently gated; do not rely on sudo/helper/NetworkExtension flows for product use yet.
 
 
 ### 安装方式
@@ -281,9 +294,9 @@ cd Riptide
 swift build
 ```
 
-#### Windows (MSI 安装包)
+#### Windows
 
-从 [GitHub Releases](https://github.com/G3niusYukki/Riptide/releases) 下载 `.msi` 安装包并运行。
+Windows is not a shipped product target for this Swift package in the current product-readiness phase.
 
 ### 2. 下载 mihomo Binary
 
@@ -313,25 +326,9 @@ Open project → Select "RiptideApp" scheme → Run
 swift run RiptideApp
 ```
 
-### 5. (Optional) Install Privileged Helper for TUN Mode
+### 5. TUN / Helper status
 
-By default, Riptide uses `sudo` to get root privileges for TUN mode. macOS will prompt for your password at each launch (cached 5-15 minutes).
-
-If you have an Apple Developer certificate, you can install the privileged helper for a smoother experience (no password prompt after installation):
-
-1. Open `RiptideHelper/Resources/Info.plist`
-2. Replace `YOUR_TEAM_ID` with your Apple Developer Team ID
-3. Build and sign:
-
-```bash
-cd RiptideHelper
-swift build
-codesign --sign "Developer ID Application: Your Name" \
-  --entitlements Entitlements.plist \
-  .build/debug/RiptideHelper
-```
-
-4. In the app, go to Helper Setup and click "安装 Helper"
+TUN mode and privileged helper flows are intentionally not product-exposed in this phase. Keep them disabled until mihomo TUN integration, signing/entitlements, privilege installation, and system-proxy cleanup are verified end-to-end.
 
 ---
 
@@ -351,13 +348,7 @@ codesign --sign "Developer ID Application: Your Name" \
 
 ### TUN Mode
 
-1. Select "TUN 模式" mode
-2. Click "启动"
-3. macOS 会弹出密码框，输入管理员密码（首次需要，之后缓存 5-15 分钟）
-4. All system traffic routes through the TUN interface
-
-> **无需证书**: Riptide 通过 sudo 获取 root 权限来创建 TUN 接口，不需要 Apple Developer 证书。
-> 如果安装了 Helper 工具（需要证书），启动时不会弹出密码框。
+TUN mode is currently gated. Product UI should hide or disable it, and runtime entry points reject `.tun` until the mihomo-backed TUN path is verified end-to-end.
 
 ### Proxy Switching
 
@@ -566,12 +557,12 @@ swift run RiptideApp
 
 | 功能 | Riptide | Clash Verge Rev | Hiddify Next |
 |------|---------|-----------------|-------------|
-| 核心引擎 | ✅ Swift 自研 + mihomo | ❌ mihomo 封装 | ❌ sing-box 封装 |
-| macOS 集成 | ✅ SwiftUI 原生 | ⚠️ Tauri | ⚠️ Flutter |
-| Windows 支持 | 🔧 开发中 | ✅ Tauri | ✅ Flutter |
+| 核心引擎 | ⚠️ mihomo product path + Swift experimental stack | ❌ mihomo 封装 | ❌ sing-box 封装 |
+| macOS 集成 | ⚠️ SwiftUI beta | ⚠️ Tauri | ⚠️ Flutter |
+| Windows 支持 | ❌ 暂无产品目标 | ✅ Tauri | ✅ Flutter |
 | Linux 支持 | ❌ 暂无 | ✅ 支持 | ✅ 支持 |
-| TUN 模式 | ✅ sudo / Helper | ✅ mihomo | ✅ sing-box |
-| 无需证书运行 | ✅ sudo 模式 | ✅ | ✅ |
+| TUN 模式 | ❌ Gated until verified | ✅ mihomo | ✅ sing-box |
+| 无需证书运行 | ⚠️ System Proxy path only | ✅ | ✅ |
 | WebDAV 同步 | ✅ | ✅ | ❌ |
 | Profile 持久化 | ✅ | ✅ | ✅ |
 | 安装包大小 | ~15MB | ~40MB | ~50MB |
@@ -579,16 +570,18 @@ swift run RiptideApp
 
 ## 安装指南
 
-- [完整安装指南](docs/INSTALL.md) - 包含 macOS 和 Windows 的详细安装步骤
-- [从 Clash Verge Rev 迁移](docs/MIGRATION.md) - 平滑迁移指南
+- [完整安装指南](docs/INSTALL.md) - 可能包含历史安装说明；请以本 README 的当前能力矩阵为准
+- [从 Clash Verge Rev 迁移](docs/MIGRATION.md) - 迁移说明仍需按当前 Beta 能力重新验证
 
 ---
 
 ## Security
 
-### Privileged Helper (TUN Mode)
+### Privileged Helper / TUN status
 
-RiptideHelper runs as root via `SMJobBless`. Its capabilities are strictly limited:
+Privileged helper and TUN flows are not product-ready in this phase. Historical helper scaffolding exists, but it must not be treated as verified product behavior until signing, installation, privilege boundaries, NetworkExtension/TUN behavior, and recovery cleanup are tested end-to-end.
+
+The intended helper capability boundary is:
 
 - Launches mihomo **only** from `/Library/Application Support/Riptide/mihomo/`
 - Validates all config paths are within the allowed directory

@@ -16,6 +16,8 @@ public enum RuntimeError: Error, Equatable, Sendable {
     case alreadyRunning
     /// The runtime is not running.
     case notRunning
+    /// TUN mode is intentionally hidden until real mihomo TUN integration is verified.
+    case tunUnavailable(String)
 }
 
 // MARK: - Protocol Definition

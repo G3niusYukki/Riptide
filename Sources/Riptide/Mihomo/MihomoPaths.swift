@@ -54,9 +54,17 @@ public struct MihomoPaths: Sendable {
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first!
-        self.baseDirectory = appSupport
-            .appendingPathComponent("Riptide", isDirectory: true)
-            .appendingPathComponent("mihomo", isDirectory: true)
+        self.init(
+            baseDirectory: appSupport
+                .appendingPathComponent("Riptide", isDirectory: true)
+                .appendingPathComponent("mihomo", isDirectory: true)
+        )
+    }
+
+    /// Creates a new MihomoPaths instance with an explicit base directory.
+    /// Useful for tests and isolated runtime environments.
+    public init(baseDirectory: URL) {
+        self.baseDirectory = baseDirectory
     }
 
     /// Creates all necessary directories with intermediate directories.

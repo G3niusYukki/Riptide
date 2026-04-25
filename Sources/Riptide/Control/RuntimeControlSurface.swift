@@ -1,9 +1,11 @@
 import Foundation
 
 /// The operating mode of the Riptide runtime.
-public enum RuntimeMode: String, Sendable, Codable, Equatable {
+public enum RuntimeMode: String, Sendable, Codable, Equatable, CaseIterable {
     case systemProxy
     case tun
+
+    public static var productAvailableModes: [RuntimeMode] { [.systemProxy] }
 }
 
 /// A snapshot of a single active connection passing through the runtime.

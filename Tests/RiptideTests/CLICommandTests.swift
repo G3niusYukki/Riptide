@@ -49,6 +49,7 @@ struct CLICommandTests {
             yamlContent: yaml,
             profileName: "test"
         )
+        #expect(text.contains("runtime=simulation"))
         #expect(text.contains("state=running"))
         #expect(text.contains("profile=test"))
     }
@@ -106,6 +107,8 @@ struct CLICommandTests {
             directDialer: mockDialer,
             dnsPipeline: DNSPipeline()
         )
-        #expect(text.contains("smoke=ok"))
+        #expect(text.contains("selftest=ok"))
+        #expect(text.contains("runtime=self-contained"))
+        #expect(!text.contains("smoke=ok"))
     }
 }
