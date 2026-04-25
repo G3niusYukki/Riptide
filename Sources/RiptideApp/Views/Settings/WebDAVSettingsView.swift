@@ -142,12 +142,13 @@ struct WebDAVSettingsView: View {
                 }
             }
             
+            let shouldDisable = viewModel.serverURL.isEmpty && viewModel.username.isEmpty
             Button(role: .destructive) {
                 viewModel.clearCredentials()
             } label: {
                 Text("清除配置")
             }
-            .disabled(viewModel.serverURL.isEmpty && viewModel.username.isEmpty)
+            .disabled(shouldDisable)
         }
     }
 }
