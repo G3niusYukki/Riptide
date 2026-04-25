@@ -35,6 +35,9 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "X509", package: "swift-certificates"),
             ],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
         ),
         .executableTarget(
             name: "RiptideCLI",
