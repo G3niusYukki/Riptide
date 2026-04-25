@@ -2,17 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 env:
   SWIFT_VERSION: "6.2"
 
 jobs:
-  macos-test:
+  # ── macOS: Swift ──────────────────────────────────────────────
+
+  swift-lint:
+    name: SwiftLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed Swift files
+        id: changed-swift-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.swift
+            Package.swift
+
+      - name: SwiftLint
+        if: steps.changed-swift-files.outputs.any_changed == 'true'
+        uses: norio-nomura/action-swiftlint@3.2.1
+        with:
+          args: --strict ${{ steps.changed-swift-files.outputs.all_changed_files }}
+
+      - name: No Swift files changed
+        if: steps.changed-swift-files.outputs.any_changed != 'true'
+        run: echo 'No Swift files changed; skipping.'
+
+  swift-build-test:
+    name: Swift Build & Test
     runs-on: macos-14
+    needs: swift-lint
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +50,13 @@ jobs:
         uses: swift-actions/setup-swift@v2
         with:
           swift-version: ${{ env.SWIFT_VERSION }}
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
+          restore-keys: ${{ runner.os }}-swift-
 
       - name: Download mihomo binary
         run: ./Scripts/download-mihomo.sh
@@ -30,30 +67,63 @@ jobs:
       - name: Test
         run: swift test
 
-  windows-test:
+  # ── Windows: Frontend ─────────────────────────────────────────
+
+  frontend-check:
+    name: Frontend (tsc + build)
     runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./riptide-windows
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-action@stable
-
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ./riptide-windows/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./riptide-windows
         run: npm ci
 
-      - name: Build Windows
-        working-directory: ./riptide-windows/src-tauri
-        run: cargo build
+      - name: TypeScript check
+        run: npx tsc --noEmit
 
-      - name: Test Windows
+      - name: Vite build
+        run: npm run build
+
+  # ── Windows: Rust ─────────────────────────────────────────────
+
+  rust-check:
+    name: Rust (check + test)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
         working-directory: ./riptide-windows/src-tauri
-        run: cargo test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js (for Tauri runtime dep)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./riptide-windows/src-tauri
+
+      - name: Cargo check
+        run: cargo check
+
+      - name: Cargo test
+        run: cargo test --verbose
