@@ -103,6 +103,10 @@ impl std::fmt::Display for TUNStatus {
 /// - Creating the virtual adapter
 /// - Starting/stopping packet processing
 /// - Integration with mihomo for traffic forwarding
+///
+/// # Safety
+/// Wintun operations are internally synchronized via Windows kernel objects.
+/// The adapter and session handles are thread-safe at the OS level.
 #[cfg(target_os = "windows")]
 pub struct WindowsTUNManager {
     /// Current TUN configuration
@@ -122,6 +126,11 @@ pub struct WindowsTUNManager {
     /// Path to wintun.dll
     wintun_dll_path: PathBuf,
 }
+
+#[cfg(target_os = "windows")]
+unsafe impl Send for WindowsTUNManager {}
+#[cfg(target_os = "windows")]
+unsafe impl Sync for WindowsTUNManager {}
 
 #[cfg(target_os = "windows")]
 impl WindowsTUNManager {
