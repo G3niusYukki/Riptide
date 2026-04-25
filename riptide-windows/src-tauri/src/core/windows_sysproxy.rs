@@ -4,8 +4,9 @@
 //! offering an alternative to the sysproxy crate for advanced use cases.
 //! Reference: Clash Verge Rev implementation approach
 
-use std::ffi::CString;
 use std::ptr;
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
 
 /// Errors that can occur when managing Windows system proxy
 #[derive(Debug, thiserror::Error)]
@@ -149,26 +150,28 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
         use std::mem;
 
         unsafe {
-            // Build proxy server string — keep alive on stack through InternetSetOptionA
-            let proxy_server = CString::new(config.proxy_server.clone())
-                .map_err(|_| SysproxyError::InvalidHost("Invalid proxy server string".to_string()))?;
+            // Build wide strings (UTF-16) for WinAPI
+            let proxy_wide: Vec<u16> = OsStr::new(&config.proxy_server)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
 
-            // Build bypass list string — keep alive on stack through InternetSetOptionA
-            let bypass_cstring = if config.bypass_list.is_empty() {
-                None
-            } else {
-                Some(CString::new(config.bypass_list.clone())
-                    .map_err(|_| SysproxyError::InvalidHost("Invalid bypass list string".to_string()))?)
-            };
+            let mut bypass_wide: Vec<u16> = Vec::new();
+            if !config.bypass_list.is_empty() {
+                bypass_wide = OsStr::new(&config.bypass_list)
+                    .encode_wide()
+                    .chain(std::iter::once(0))
+                    .collect();
+            }
 
             // Configure proxy info structure
             let mut proxy_info: INTERNET_PROXY_INFO = mem::zeroed();
 
             if config.enable {
                 proxy_info.dwAccessType = 3; // INTERNET_OPEN_TYPE_PROXY
-                proxy_info.lpszProxy = proxy_server.as_ptr() as *mut i8;
-                if let Some(ref bypass) = bypass_cstring {
-                    proxy_info.lpszProxyBypass = bypass.as_ptr() as *mut i8;
+                proxy_info.lpszProxy = proxy_wide.as_ptr() as *mut _;
+                if !bypass_wide.is_empty() {
+                    proxy_info.lpszProxyBypass = bypass_wide.as_ptr() as *mut _;
                 }
             } else {
                 proxy_info.dwAccessType = 1; // INTERNET_OPEN_TYPE_DIRECT
@@ -228,17 +231,17 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
 fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
     #[cfg(target_os = "windows")]
     {
-        use winapi::um::wininet::{InternetQueryOptionA, INTERNET_OPTION_PROXY};
+        use winapi::um::wininet::{InternetQueryOptionW, INTERNET_OPTION_PROXY};
         use winapi::shared::minwindef::{DWORD, LPVOID};
         use winapi::um::wininet::INTERNET_PROXY_INFO;
         use std::mem;
-        use std::ffi::CStr;
+        use std::os::windows::ffi::OsStringExt;
 
         unsafe {
             let mut proxy_info: INTERNET_PROXY_INFO = mem::zeroed();
             let mut buffer_size: DWORD = mem::size_of::<INTERNET_PROXY_INFO>() as DWORD;
 
-            let result = InternetQueryOptionA(
+            let result = InternetQueryOptionW(
                 ptr::null_mut(),
                 INTERNET_OPTION_PROXY,
                 &mut proxy_info as *mut _ as LPVOID,
@@ -247,14 +250,16 @@ fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
 
             if result == 0 {
                 return Err(SysproxyError::GetProxyFailed(
-                    "InternetQueryOptionA failed".to_string()
+                    "InternetQueryOptionW failed".to_string()
                 ));
             }
 
             let enable = proxy_info.dwAccessType == 3; // INTERNET_OPEN_TYPE_PROXY
-            
+
             let proxy_server = if !proxy_info.lpszProxy.is_null() {
-                CStr::from_ptr(proxy_info.lpszProxy)
+                let len = (0..).take_while(|&i| *proxy_info.lpszProxy.offset(i) != 0).count();
+                let wide_slice: &[u16] = std::slice::from_raw_parts(proxy_info.lpszProxy, len);
+                std::ffi::OsString::from_wide(wide_slice)
                     .to_string_lossy()
                     .to_string()
             } else {
@@ -262,7 +267,9 @@ fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
             };
 
             let bypass_list = if !proxy_info.lpszProxyBypass.is_null() {
-                CStr::from_ptr(proxy_info.lpszProxyBypass)
+                let len = (0..).take_while(|&i| *proxy_info.lpszProxyBypass.offset(i) != 0).count();
+                let wide_slice: &[u16] = std::slice::from_raw_parts(proxy_info.lpszProxyBypass, len);
+                std::ffi::OsString::from_wide(wide_slice)
                     .to_string_lossy()
                     .to_string()
             } else {

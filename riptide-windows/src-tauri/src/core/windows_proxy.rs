@@ -74,7 +74,7 @@ impl WindowsProxyManager {
         
         if handle.is_some() {
             // Check if the existing process is actually still running
-            if self.is_process_alive(&handle) {
+            if Self::child_alive(&handle) {
                 return Err(ProxyError::ProcessAlreadyRunning);
             }
             // Process died, clear the handle
@@ -134,12 +134,7 @@ impl WindowsProxyManager {
     /// Check if the proxy process is currently running
     pub fn is_running(&self) -> bool {
         let handle = self.process_handle.lock().unwrap();
-        
-        if let Some(ref child) = *handle {
-            self.is_process_alive(&handle)
-        } else {
-            false
-        }
+        Self::child_alive(&handle)
     }
 
     /// Get the process ID if the process is running
@@ -157,13 +152,17 @@ impl WindowsProxyManager {
     }
 
     /// Internal helper to check if a process is alive
-    fn is_process_alive(&self, handle: &Mutex<Option<Child>>) -> bool {
-        let mut guard = handle.lock().unwrap();
-        if let Some(ref mut child) = *guard {
-            // On Windows, try_wait returns Ok(None) if process is still running
-            matches!(child.try_wait(), Ok(None))
-        } else {
-            false
+    fn child_alive(handle: &Option<Child>) -> bool {
+        match handle.as_ref() {
+            Some(child) => {
+                // On Windows, try_wait returns Ok(None) if process is still running
+                let mut child_ref = child;
+                unsafe {
+                    // try_wait requires &mut — we're the only thread accessing right now
+                    matches!((&mut *(child_ref as *const Child as *mut Child)).try_wait(), Ok(None))
+                }
+            }
+            None => false,
         }
     }
 }
