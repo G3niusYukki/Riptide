@@ -1,5 +1,3 @@
-// swiftlint:disable type_body_length file_length
-
 import Foundation
 import Observation
 import AppKit
