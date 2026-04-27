@@ -1,9 +1,8 @@
 import SwiftUI
 import Riptide
 
-@MainActor
 @Observable
-final class VPNViewModel {
+final class VPNViewModel: @unchecked Sendable {
     var isRunning = false
     var statusText = "Disconnected"
     var bytesUp: UInt64 = 0
@@ -14,6 +13,7 @@ final class VPNViewModel {
     private var runtime: LiveTunnelRuntime?
     private var statsTask: Task<Void, Never>?
 
+    @MainActor
     func start() async {
         do {
             let proxyDialer = TCPTransportDialer()
@@ -28,7 +28,7 @@ final class VPNViewModel {
             isRunning = true
             statusText = "Connected"
 
-            statsTask = Task { [weak self] in
+            statsTask = Task { @MainActor [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(1))
                     guard let self, let runtime = self.runtime else { break }
@@ -44,6 +44,7 @@ final class VPNViewModel {
         }
     }
 
+    @MainActor
     func stop() async {
         statsTask?.cancel()
         statsTask = nil

@@ -3,10 +3,9 @@ import Riptide
 
 // MARK: - Node Editor ViewModel
 
-/// MainActor-isolated view model for the node editor UI
-@MainActor
+/// View model for the node editor UI
 @Observable
-public final class NodeEditorViewModel {
+public final class NodeEditorViewModel: @unchecked Sendable {
     // MARK: - State
     private(set) var nodes: [ProxyNode] = []
     private(set) var selectedNode: ProxyNode?
