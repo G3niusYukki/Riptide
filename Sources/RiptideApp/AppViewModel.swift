@@ -207,7 +207,6 @@ public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Init
 
-    @MainActor
     public init() {
         let manager = MihomoRuntimeManager()
         self.mihomoManager = manager
@@ -231,7 +230,6 @@ public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Helper Installation
 
-    @MainActor
     public func checkHelperInstallation() {
         smManager.checkHelperStatus()
         helperInstalled = smManager.isHelperInstalled

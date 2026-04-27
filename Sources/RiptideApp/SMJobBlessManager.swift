@@ -5,7 +5,6 @@ import Combine
 
 /// Manages the installation and status checking of the privileged helper tool via SMJobBless.
 /// This is required for TUN mode which needs root privileges to configure network interfaces.
-@MainActor
 final class SMJobBlessManager: ObservableObject {
     @Published var isHelperInstalled: Bool = false
     @Published var installationError: String?
