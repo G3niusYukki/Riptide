@@ -3,10 +3,10 @@ import Testing
 @testable import Riptide
 
 
-// MARK: - Mock URL Protocol
+// MARK: - Dedicated Mock URL Protocol for Mihomo API Client tests
 
-/// Thread-safe storage for MockURLProtocol using NSLock
-final class MockURLProtocolStorage: @unchecked Sendable {
+/// Thread-safe storage for MihomoMockURLProtocol using NSLock
+final class MihomoMockURLProtocolStorage: @unchecked Sendable {
     private let lock = NSLock()
     private var _requestHandler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
     private var _errorHandler: (@Sendable (URLRequest) -> Error?)?
@@ -45,9 +45,9 @@ final class MockURLProtocolStorage: @unchecked Sendable {
     }
 }
 
-/// Mock URLProtocol for testing HTTP requests without making real network calls
-final class MockURLProtocol: URLProtocol {
-    static let storage = MockURLProtocolStorage()
+/// Mock URLProtocol dedicated to MihomoAPIClient tests (avoids shared state with MihomoDownloaderTests)
+final class MihomoMockURLProtocol: URLProtocol {
+    static let storage = MihomoMockURLProtocolStorage()
 
     override class func canInit(with request: URLRequest) -> Bool {
         return true
@@ -58,16 +58,15 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        // Execute synchronously to avoid race conditions
         let currentRequest = self.request
         let client = self.client
 
-        if let error = MockURLProtocol.storage.errorHandler?(currentRequest) {
+        if let error = MihomoMockURLProtocol.storage.errorHandler?(currentRequest) {
             client?.urlProtocol(self, didFailWithError: error)
             return
         }
 
-        guard let handler = MockURLProtocol.storage.requestHandler else {
+        guard let handler = MihomoMockURLProtocol.storage.requestHandler else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
         }
@@ -87,7 +86,7 @@ final class MockURLProtocol: URLProtocol {
 
 // MARK: - Test Helpers
 
-extension MockURLProtocol {
+extension MihomoMockURLProtocol {
     static func reset() {
         storage.reset()
     }
@@ -101,15 +100,12 @@ extension MockURLProtocol {
     }
 }
 
-extension URLSession {
-    static func makeMockSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
-        // Disable caching and connection pooling
-        configuration.urlCache = nil
-        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        return URLSession(configuration: configuration)
-    }
+private func makeMihomoMockSession() -> URLSession {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [MihomoMockURLProtocol.self]
+    configuration.urlCache = nil
+    configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+    return URLSession(configuration: configuration)
 }
 
 // MARK: - MihomoAPIClient Tests
@@ -117,9 +113,8 @@ extension URLSession {
 @Suite("Mihomo API Client", .serialized)
 struct MihomoAPIClientTests {
 
-    // Helper to set up mock before each test
     private func setupMock() {
-        MockURLProtocol.reset()
+        MihomoMockURLProtocol.reset()
     }
 
     // MARK: - Test 1: Health Check Success
@@ -129,9 +124,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/version")
             #expect(request.httpMethod == "GET")
 
@@ -158,9 +153,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setErrorHandler { _ in
+        MihomoMockURLProtocol.setErrorHandler { _ in
             return URLError(.cannotConnectToHost)
         }
 
@@ -177,7 +172,7 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
         let jsonResponse = """
         {
@@ -198,7 +193,7 @@ struct MihomoAPIClientTests {
         }
         """
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/proxies")
             #expect(request.httpMethod == "GET")
 
@@ -215,7 +210,6 @@ struct MihomoAPIClientTests {
         let proxies = try await client.getProxies()
 
         #expect(proxies.count == 2)
-        // Sort by name for consistent ordering since dictionary order isn't guaranteed
         let sortedProxies = proxies.sorted { $0.name < $1.name }
         #expect(sortedProxies[0].name == "Proxy1")
         #expect(sortedProxies[0].type == "Shadowsocks")
@@ -233,13 +227,12 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/proxies/GLOBAL")
             #expect(request.httpMethod == "PUT")
 
-            // Read body data - either from httpBody or httpBodyStream
             var bodyData: Data?
             if let body = request.httpBody {
                 bodyData = body
@@ -272,8 +265,6 @@ struct MihomoAPIClientTests {
 
         let client = MihomoAPIClient(baseURL: baseURL, urlSession: mockSession)
         try await client.switchProxy(to: "Proxy1", inGroup: "GLOBAL")
-
-        // Test passes if no error thrown
     }
 
     // MARK: - Test 5: API Error
@@ -283,9 +274,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 404,
@@ -310,7 +301,7 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
         let jsonResponse = """
         {
@@ -318,7 +309,7 @@ struct MihomoAPIClientTests {
         }
         """
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/proxies/Proxy1/delay")
             #expect(request.httpMethod == "GET")
             #expect(request.url?.query?.contains("url=https://www.google.com") == true)
@@ -344,7 +335,7 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
         let jsonResponse = """
         {
@@ -366,7 +357,7 @@ struct MihomoAPIClientTests {
         }
         """
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/connections")
             #expect(request.httpMethod == "GET")
 
@@ -396,9 +387,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/connections/conn-123")
             #expect(request.httpMethod == "DELETE")
 
@@ -413,8 +404,6 @@ struct MihomoAPIClientTests {
 
         let client = MihomoAPIClient(baseURL: baseURL, urlSession: mockSession)
         try await client.closeConnection(id: "conn-123")
-
-        // Test passes if no error thrown
     }
 
     @Test("closeAllConnections sends DELETE to /connections")
@@ -422,9 +411,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/connections")
             #expect(request.httpMethod == "DELETE")
 
@@ -439,8 +428,6 @@ struct MihomoAPIClientTests {
 
         let client = MihomoAPIClient(baseURL: baseURL, urlSession: mockSession)
         try await client.closeAllConnections()
-
-        // Test passes if no error thrown
     }
 
     @Test("reloadConfig sends PUT request")
@@ -448,9 +435,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/configs")
             #expect(request.httpMethod == "PUT")
 
@@ -465,8 +452,6 @@ struct MihomoAPIClientTests {
 
         let client = MihomoAPIClient(baseURL: baseURL, urlSession: mockSession)
         try await client.reloadConfig()
-
-        // Test passes if no error thrown
     }
 
     @Test("patchConfig sends PATCH with correct body")
@@ -474,13 +459,12 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             #expect(request.url?.path == "/configs")
             #expect(request.httpMethod == "PATCH")
 
-            // Read body data - either from httpBody or httpBodyStream
             var bodyData: Data?
             if let body = request.httpBody {
                 bodyData = body
@@ -514,8 +498,6 @@ struct MihomoAPIClientTests {
 
         let client = MihomoAPIClient(baseURL: baseURL, urlSession: mockSession)
         try await client.patchConfig(partial: ["mixed-port": 9091])
-
-        // Test passes if no error thrown
     }
 
     @Test("throws proxyNotFound when proxy does not exist")
@@ -523,9 +505,9 @@ struct MihomoAPIClientTests {
         setupMock()
 
         let baseURL = URL(string: "http://127.0.0.1:9090")!
-        let mockSession = URLSession.makeMockSession()
+        let mockSession = makeMihomoMockSession()
 
-        MockURLProtocol.setRequestHandler { request in
+        MihomoMockURLProtocol.setRequestHandler { request in
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 404,

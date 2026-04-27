@@ -2,6 +2,59 @@ import Foundation
 import Testing
 @testable import Riptide
 
+// MARK: - Dedicated Mock URL Protocol for MihomoDownloader tests
+
+final class MihomoDownloaderMockURLProtocolStorage: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _requestHandler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    var requestHandler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))? {
+        get { lock.lock(); defer { lock.unlock() }; return _requestHandler }
+        set { lock.lock(); defer { lock.unlock() }; _requestHandler = newValue }
+    }
+
+    func reset() { lock.lock(); defer { lock.unlock() }; _requestHandler = nil }
+}
+
+final class MihomoDownloaderMockURLProtocol: URLProtocol {
+    static let storage = MihomoDownloaderMockURLProtocolStorage()
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = MihomoDownloaderMockURLProtocol.storage.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            return
+        }
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
+extension MihomoDownloaderMockURLProtocol {
+    static func reset() { storage.reset() }
+    static func setRequestHandler(_ handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?) {
+        storage.requestHandler = handler
+    }
+}
+
+private func makeDownloaderMockSession() -> URLSession {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [MihomoDownloaderMockURLProtocol.self]
+    config.urlCache = nil
+    config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+    return URLSession(configuration: config)
+}
+
 // MARK: - Mock Progress Delegate
 
 actor MockProgressDelegate: MihomoDownloadProgressDelegate {
@@ -67,7 +120,7 @@ struct MihomoDownloaderTests {
     // MARK: - Setup/Teardown
 
     init() {
-        MockURLProtocol.reset()
+        MihomoDownloaderMockURLProtocol.reset()
     }
 
     // MARK: - Channel Tests
@@ -222,7 +275,7 @@ struct MihomoDownloaderTests {
     @Test("checkForUpdate returns nil when versions match")
     func checkForUpdateNilWhenSameVersion() async throws {
         // Setup mock response
-        MockURLProtocol.setRequestHandler { request in
+        MihomoDownloaderMockURLProtocol.setRequestHandler { request in
             let data = sampleGitHubReleaseJSON.data(using: .utf8)!
             let response = HTTPURLResponse(
                 url: request.url!,
@@ -295,7 +348,7 @@ struct MihomoDownloaderTests {
 struct MihomoDownloaderIntegrationTests {
 
     init() {
-        MockURLProtocol.reset()
+        MihomoDownloaderMockURLProtocol.reset()
     }
 
     @Test("Download and extraction flow - mocked")
@@ -304,7 +357,7 @@ struct MihomoDownloaderIntegrationTests {
         let mockBinaryContent = Data([0x1f, 0x8b, 0x08, 0x00]) // gzip magic bytes
 
         // Setup mock response for download
-        MockURLProtocol.setRequestHandler { request in
+        MihomoDownloaderMockURLProtocol.setRequestHandler { request in
             let url = request.url?.absoluteString ?? ""
 
             if url.contains("api.github.com") {
