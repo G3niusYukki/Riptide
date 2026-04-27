@@ -1,3 +1,5 @@
+// swiftlint:disable type_body_length file_length
+
 import Foundation
 import Observation
 import AppKit
@@ -611,8 +613,8 @@ public final class AppViewModel: @unchecked Sendable {
                     dnsPolicy: DNSPolicy()
                 )
                 await MainActor.run {
-                    if let idx = profiles.firstIndex(where: { p in
-                        if case .subscription(let sid, _) = p.source { return sid == id }
+                    if let idx = profiles.firstIndex(where: { profile in
+                        if case .subscription(let sid, _) = profile.source { return sid == id }
                         return false
                     }) {
                         // Preserve original profile ID so activeProfile reference stays valid
@@ -987,7 +989,7 @@ public final class AppViewModel: @unchecked Sendable {
 // MARK: - MihomoDownloadProgressDelegate
 
 extension AppViewModel: MihomoDownloadProgressDelegate {
-    public nonisolated func downloadProgress(_ bytesDownloaded: Int64, totalBytes: Int64) {
+    nonisolated public func downloadProgress(_ bytesDownloaded: Int64, totalBytes: Int64) {
         guard totalBytes > 0 else { return }
         let progress = Double(bytesDownloaded) / Double(totalBytes)
         Task { @MainActor in
