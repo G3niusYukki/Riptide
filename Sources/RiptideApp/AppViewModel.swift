@@ -140,9 +140,8 @@ public enum ConnectionMode: String, Equatable, CaseIterable {
 
 // MARK: - AppViewModel
 
-@MainActor
 @Observable
-public final class AppViewModel {
+public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Published State
 
@@ -204,10 +203,11 @@ public final class AppViewModel {
     private let subscriptionManager: SubscriptionManager
     private let profileStore: ProfileStore
     private var statsTask: Task<Void, Never>?
-    private let smManager = SMJobBlessManager()
+    private let smManager: SMJobBlessManager
 
     // MARK: - Init
 
+    @MainActor
     public init() {
         let manager = MihomoRuntimeManager()
         self.mihomoManager = manager
@@ -219,6 +219,7 @@ public final class AppViewModel {
         } catch {
             fatalError("Failed to initialize ProfileStore: \(error)")
         }
+        self.smManager = SMJobBlessManager()
         checkHelperInstallation()
         Task {
             await loadProfilesFromStore()
@@ -230,6 +231,7 @@ public final class AppViewModel {
 
     // MARK: - Helper Installation
 
+    @MainActor
     public func checkHelperInstallation() {
         smManager.checkHelperStatus()
         helperInstalled = smManager.isHelperInstalled

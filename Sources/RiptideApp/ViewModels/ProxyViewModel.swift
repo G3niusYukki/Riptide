@@ -1,9 +1,8 @@
 import SwiftUI
 import Riptide
 
-@MainActor
 @Observable
-final class ProxyViewModel {
+final class ProxyViewModel: @unchecked Sendable {
     var proxyNodes: [ProxyNode] = []
     var selectedProxy: String = ""
 
