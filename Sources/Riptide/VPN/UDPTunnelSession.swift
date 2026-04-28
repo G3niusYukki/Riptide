@@ -170,7 +170,7 @@ public actor UDPTunnelSession {
 
         // Build and send UDP ASSOCIATE request via SOCKS5Protocol
         let clientAddr = ConnectionTarget(host: sessionID.srcIP, port: Int(sessionID.srcPort))
-        let associateRequests = SOCKS5Protocol().makeUDPAssociateRequest(clientAddress: clientAddr)
+        let associateRequests = try SOCKS5Protocol().makeUDPAssociateRequest(clientAddress: clientAddr)
         for req in associateRequests {
             try await relayConnection?.send(req)
         }

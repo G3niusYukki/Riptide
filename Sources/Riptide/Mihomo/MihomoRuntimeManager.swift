@@ -194,6 +194,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     ///   - mode: The runtime mode (system proxy or TUN).
     ///   - profile: The tunnel profile containing configuration.
     /// - Throws: RuntimeError if startup fails at any step.
+    // swiftlint:disable function_body_length cyclomatic_complexity
     public func start(mode: RuntimeMode, profile: TunnelProfile) async throws {
         // 1. Verify not already running
         guard !isRunning else {

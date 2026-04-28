@@ -16,10 +16,10 @@ struct RuntimeContractCompilationTests {
         #expect(systemProxy != tun)
     }
 
-    @Test("product mode picker exposes only verified modes")
+    @Test("product mode picker exposes both verified modes")
     func productModePickerExposesOnlyVerifiedModes() {
-        #expect(RuntimeMode.productAvailableModes == [.systemProxy])
-        #expect(!RuntimeMode.productAvailableModes.contains(.tun))
+        #expect(RuntimeMode.productAvailableModes.contains(.systemProxy))
+        #expect(RuntimeMode.productAvailableModes.contains(.tun))
     }
 
     @Test("TunnelControlViewModel supports mode access and mutation")

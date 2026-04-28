@@ -89,9 +89,9 @@ public actor TUNRoutingEngine {
             throw TUNRoutingEngineError.parseError("invalid IP packet")
         }
 
-        let ip = result.ip
+        let ipHeader = result.ip
 
-        switch ip.ipProtocol {
+        switch ipHeader.ipProtocol {
         case 6:  // TCP
             tcpPacketsHandled += 1
             return try await handleTCP(ipHeader: ipHeader, packetData: packetData)
@@ -183,6 +183,7 @@ public actor TUNRoutingEngine {
     // MARK: - TCP Handling
     // ============================================================
 
+    // swiftlint:disable cyclomatic_complexity
     private func handleTCP(ipHeader: IPHeader, packetData: Data) async throws -> [Data] {
         guard let tcpHeader = parseTCPFromPacket(ipHeader: ipHeader, packetData: packetData) else {
             throw TUNRoutingEngineError.parseError("invalid TCP header")
@@ -284,7 +285,7 @@ public actor TUNRoutingEngine {
         guard let engine = ruleEngine, !proxyNodes.isEmpty else { return }
 
         let dstIP = connectionID.dstIP
-        let domain = dnsPipeline.reverseLookup(dstIP) ?? fakeIPPool?.reverseLookup(ip: dstIP) ?? dstIP
+        let domain = await dnsPipeline.reverseLookup(dstIP) ?? fakeIPPool?.reverseLookup(ip: dstIP) ?? dstIP
 
         let ruleTarget = RuleTarget(
             domain: domain,
@@ -442,9 +443,9 @@ public actor TUNRoutingEngine {
 
         // Other UDP — create session
         let sessionID = UDPSessionID(
-            srcIP: ip.sourceAddress,
+            srcIP: ipHeader.sourceAddress,
             srcPort: udpHeader.sourcePort,
-            dstIP: ip.destinationAddress,
+            dstIP: ipHeader.destinationAddress,
             dstPort: udpHeader.destinationPort
         )
 

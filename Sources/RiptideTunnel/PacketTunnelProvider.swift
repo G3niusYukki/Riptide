@@ -45,13 +45,17 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
                     dialerSelector: .defaultSelector
                 ))
                 let vpnConfig = VPNConfiguration()
+                var ruleSets: [String: [ProxyRule]] = [:]
+                for (name, provider) in ruleSetProviders {
+                    ruleSets[name] = await provider.rules()
+                }
                 self.routingEngine = TUNRoutingEngine(
                     proxyConnector: connector,
                     dnsPipeline: pipeline,
                     configuration: vpnConfig,
                     ruleEngine: RuleEngine(
                         rules: config.rules,
-                        ruleSets: ruleSetProviders.mapValues { $0.rules }
+                        ruleSets: ruleSets
                     ),
                     proxyNodes: config.proxies
                 )

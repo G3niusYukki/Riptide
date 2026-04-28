@@ -209,11 +209,11 @@ public actor Hysteria2Stream {
     /// Apply salamander obfuscation (XOR keystream derived from password).
     private func applyObfuscation(_ data: Data, password: String) -> Data {
         let keyData = Data(password.utf8)
-        let hash = SHA256.hash(data: keyData)
+        let hash = Data(SHA256.hash(data: keyData))
         var result = Data()
         result.reserveCapacity(data.count)
         for byteIndex in 0..<data.count {
-            let keyByte = hash[hash.index(hash.startIndex, offsetBy: byteIndex % 32)]
+            let keyByte = hash[byteIndex % 32]
             result.append(data[byteIndex] ^ keyByte)
         }
         return result

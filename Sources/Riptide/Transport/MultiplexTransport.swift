@@ -19,6 +19,8 @@ public actor MultiplexTransport: TransportSession {
     private var streams: [UInt32: MultiplexStream] = [:]
     private var nextStreamID: UInt32 = 1
     private var isClosed: Bool = false
+    /// Non-actor accessor for the closed flag, used from the receive task.
+    private func checkIsClosed() -> Bool { isClosed }
     private var receiveTask: Task<Void, Never>?
 
     public init(session: any TransportSession) {
@@ -85,7 +87,9 @@ public actor MultiplexTransport: TransportSession {
         receiveTask = Task { [weak self] in
             guard let self else { return }
             var buffer = Data()
-            while !Task.isCancelled && !(await self.isClosed) {
+            while !Task.isCancelled {
+                let closed = await self.checkIsClosed()
+                if closed { break }
                 do {
                     let chunk = try await self.innerSession.receive()
                     if chunk.isEmpty { break }

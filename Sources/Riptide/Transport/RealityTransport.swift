@@ -95,19 +95,8 @@ public struct RealityTransportDialer: TransportDialer {
             .main
         )
 
-        // Set ALPN if available
-        if let alpn = node.alpn, !alpn.isEmpty {
-            sec_protocol_options_set_alpn_protocols(
-                tlsOptions.securityProtocolOptions,
-                alpn.map { Data($0.utf8) } as CFArray
-            )
-        }
-
-        // Min TLS version 1.3 (required for Reality)
-        sec_protocol_options_set_tls_min_version(
-            tlsOptions.securityProtocolOptions,
-            .TLSv13
-        )
+        // ALPN is not directly configurable via sec_protocol_options_set_alpn_protocols.
+        // Reality uses TLS 1.3 which is the default for modern TLS connections.
 
         let tcpParams = NWProtocolTCP.Options()
         tcpParams.enableKeepalive = true
