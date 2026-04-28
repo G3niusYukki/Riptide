@@ -653,8 +653,8 @@ public actor TUNRoutingEngine {
         return response
     }
 
-    private func ipStringToData(_ ip: String) -> Data {
-        let parts = ip.split(separator: ".").compactMap { UInt8($0) }
+    private func ipStringToData(_ ipAddress: String) -> Data {
+        let parts = ipAddress.split(separator: ".").compactMap { UInt8($0) }
         return Data(parts)
     }
 }

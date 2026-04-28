@@ -65,7 +65,7 @@ public actor VMessStream {
         recvKey = deriveSubKey(key: authKey, label: Data("d4712b59-7f38-4a33-8fd0-8a52d3d46a77".utf8))
 
         let headerIV = Data([UInt8](repeating: 0, count: 16))
-        let encryptedHeader = try encryptAES128(header, key: headerKey, iv: headerIV)
+        let encryptedHeader = try encryptAES128(header, key: headerKey, ivData: headerIV)
 
         var authData = Data(count: 8)
         for _ in 0..<8 { authData.append(UInt8.random(in: 0...255)) }
@@ -73,7 +73,7 @@ public actor VMessStream {
         authData.append(encryptedHeader)
         authData.append(1) // header length
 
-        let authEncrypted = try encryptAES128(authData, key: authKey, iv: Data([UInt8](repeating: 0, count: 16)))
+        let authEncrypted = try encryptAES128(authData, key: authKey, ivData: Data([UInt8](repeating: 0, count: 16)))
         try await session.send(authEncrypted)
     }
 
@@ -85,8 +85,8 @@ public actor VMessStream {
         frame.append(UInt8(length & 0xFF))
         frame.append(data)
 
-        let iv = makeNonce(counter: sendNonce)
-        let encrypted = try encryptAES128(frame, key: key, iv: iv)
+        let initVector = makeNonce(counter: sendNonce)
+        let encrypted = try encryptAES128(frame, key: key, ivData: initVector)
         sendNonce += 1
         try await session.send(encrypted)
     }
@@ -94,17 +94,17 @@ public actor VMessStream {
     public func receive() async throws -> Data {
         while true {
             if recvBuffer.count >= 2 + 16 {
-                let iv = makeNonce(counter: recvNonce)
+                let initVector = makeNonce(counter: recvNonce)
                 guard let key = recvKey else { throw VMessError.invalidRequestHeader }
                 let encryptedLength = recvBuffer.prefix(2 + 16)
-                let lengthData = try decryptAES128(Data(encryptedLength), key: key, iv: iv)
+                let lengthData = try decryptAES128(Data(encryptedLength), key: key, ivData: initVector)
                 let payloadLength = Int(UInt16(lengthData[0]) << 8 | UInt16(lengthData[1]))
                 let totalNeeded = 2 + 16 + payloadLength + 16
 
                 if recvBuffer.count >= totalNeeded {
-                    let payloadIV = makeNonce(counter: recvNonce + 1)
+                    let payloadInitVector = makeNonce(counter: recvNonce + 1)
                     let encryptedPayload = recvBuffer.dropFirst(2 + 16).prefix(payloadLength + 16)
-                    let payload = try decryptAES128(Data(encryptedPayload), key: key, iv: payloadIV)
+                    let payload = try decryptAES128(Data(encryptedPayload), key: key, ivData: payloadInitVector)
                     recvBuffer.removeFirst(totalNeeded)
                     recvNonce += 2
                     return payload
@@ -153,14 +153,14 @@ public actor VMessStream {
         return SymmetricKey(data: Data(md5Result))
     }
 
-    private func encryptAES128(_ plaintext: Data, key: SymmetricKey, iv: Data) throws -> Data {
-        let nonce = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
+    private func encryptAES128(_ plaintext: Data, key: SymmetricKey, ivData: Data) throws -> Data {
+        let nonce = try AES.GCM.Nonce(data: Data(ivData.prefix(12)))
         let sealed = try AES.GCM.seal(plaintext, using: key, nonce: nonce)
         return Data(sealed.combined!)
     }
 
-    private func decryptAES128(_ ciphertext: Data, key: SymmetricKey, iv: Data) throws -> Data {
-        let nonceValue = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
+    private func decryptAES128(_ ciphertext: Data, key: SymmetricKey, ivData: Data) throws -> Data {
+        let nonceValue = try AES.GCM.Nonce(data: Data(ivData.prefix(12)))
         let sealed = try AES.GCM.SealedBox(combined: ciphertext)
         return try AES.GCM.open(sealed, using: key)
     }

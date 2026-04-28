@@ -7,7 +7,7 @@ public enum VLESSError: Error, Equatable, Sendable {
     case missingTLS
 }
 
-public actor VLESSStream: Sendable {
+public actor VLESSStream {
     private let session: any TransportSession
     private let uuid: UUID
     private let reality: RealityConfig?

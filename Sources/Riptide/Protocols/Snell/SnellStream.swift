@@ -236,7 +236,7 @@ public final class SnellStream {
 
     private func encodeAddress(for target: ConnectionTarget, into data: inout Data) throws {
         let address = target.host
-        if let _ = IPv4AddressParser.parse(address) {
+        if IPv4AddressParser.parse(address) != nil {
             // IPv4
             data.append(0x01)
             let octets = address.split(separator: ".").compactMap { UInt8($0) }

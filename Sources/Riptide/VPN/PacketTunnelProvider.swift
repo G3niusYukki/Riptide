@@ -76,10 +76,8 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     /// Convert CIDR prefix length to dotted-decimal subnet mask.
     private func maskBitsToMask(_ bits: Int) -> String {
         var mask: UInt32 = 0
-        for i in 0..<32 {
-            if i < bits {
-                mask |= (1 << (31 - i))
-            }
+        for bitIndex in 0..<32 where bitIndex < bits {
+            mask |= (1 << (31 - bitIndex))
         }
         return "\((mask >> 24) & 0xFF).\((mask >> 16) & 0xFF).\((mask >> 8) & 0xFF).\(mask & 0xFF)"
     }
@@ -127,7 +125,7 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
             if !responsePackets.isEmpty {
                 let protocols = responsePackets.map { packet -> NSNumber in
-                    if packet.count > 0, packet[0] >> 4 == 6 {
+                    if !packet.isEmpty, packet[0] >> 4 == 6 {
                         return NSNumber(value: AF_INET6)
                     }
                     return NSNumber(value: AF_INET)

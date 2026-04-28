@@ -233,10 +233,8 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
     /// Convert CIDR prefix length to dotted-decimal subnet mask.
     private func maskBitsToMask(_ bits: Int) -> String {
         var mask: UInt32 = 0
-        for i in 0..<32 {
-            if i < bits {
-                mask |= (1 << (31 - i))
-            }
+        for bitIndex in 0..<32 where bitIndex < bits {
+            mask |= (1 << (31 - bitIndex))
         }
         return "\((mask >> 24) & 0xFF).\((mask >> 16) & 0xFF).\((mask >> 8) & 0xFF).\(mask & 0xFF)"
     }

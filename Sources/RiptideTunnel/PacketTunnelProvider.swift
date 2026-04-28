@@ -139,7 +139,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
                 }
                 if !responsePackets.isEmpty {
                     let protoArray = responsePackets.map { packet -> NSNumber in
-                        if packet.count > 0, packet[0] >> 4 == 6 {
+                        if !packet.isEmpty, packet[0] >> 4 == 6 {
                             return NSNumber(value: AF_INET6)
                         }
                         return NSNumber(value: AF_INET)

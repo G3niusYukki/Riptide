@@ -212,9 +212,9 @@ public actor Hysteria2Stream {
         let hash = SHA256.hash(data: keyData)
         var result = Data()
         result.reserveCapacity(data.count)
-        for i in 0..<data.count {
-            let keyByte = hash[hash.index(hash.startIndex, offsetBy: i % 32)]
-            result.append(data[i] ^ keyByte)
+        for byteIndex in 0..<data.count {
+            let keyByte = hash[hash.index(hash.startIndex, offsetBy: byteIndex % 32)]
+            result.append(data[byteIndex] ^ keyByte)
         }
         return result
     }
