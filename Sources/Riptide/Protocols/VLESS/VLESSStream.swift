@@ -10,11 +10,14 @@ public enum VLESSError: Error, Equatable, Sendable {
 public actor VLESSStream: Sendable {
     private let session: any TransportSession
     private let uuid: UUID
+    private let reality: RealityConfig?
     private var recvBuffer = Data()
+    private var versionByteConsumed = false
 
-    public init(session: any TransportSession, uuid: UUID) {
+    public init(session: any TransportSession, uuid: UUID, reality: RealityConfig? = nil) {
         self.session = session
         self.uuid = uuid
+        self.reality = reality
     }
 
     public func connect(to target: ConnectionTarget, flow: String? = nil) async throws {
@@ -32,6 +35,16 @@ public actor VLESSStream: Sendable {
         request.append(try encodeVLESSTarget(target))
 
         try await session.send(request)
+
+        // Read 1-byte version response from server
+        let response = try await session.receive()
+        guard !response.isEmpty else {
+            throw VLESSError.invalidRequest
+        }
+        versionByteConsumed = true
+        if response.count > 1 {
+            recvBuffer = Data(response.dropFirst())
+        }
     }
 
     public func send(_ data: Data) async throws {
@@ -39,8 +52,12 @@ public actor VLESSStream: Sendable {
     }
 
     public func receive() async throws -> Data {
-        let data = try await session.receive()
-        return data
+        if !recvBuffer.isEmpty {
+            let data = recvBuffer
+            recvBuffer = Data()
+            return data
+        }
+        return try await session.receive()
     }
 
     public func close() async {

@@ -49,7 +49,7 @@ public struct ProxyConnector: Sendable {
             case .snell:
                 return try await performSnellConnect(connection: connection, node: node, target: target)
             case .tuic:
-                throw ProtocolError.connectionRejected("TUIC protocol requires macOS 14+ and is not yet fully implemented")
+                return try await performTUICConnect(connection: connection, node: node, target: target)
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never
@@ -133,8 +133,9 @@ public struct ProxyConnector: Sendable {
         guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString) else {
             throw ProtocolError.malformedResponse("VLESS node missing uuid")
         }
-        let vlessStream = VLESSStream(session: connection.session, uuid: uuid)
-        try await vlessStream.connect(to: target, flow: node.flow)
+        let reality = RealityConfig.from(node: node)
+        let vlessStream = VLESSStream(session: connection.session, uuid: uuid, reality: reality)
+        try await vlessStream.connect(to: target, flow: reality != nil ? nil : node.flow)
         return ConnectedProxyContext(node: node, connection: connection)
     }
 
@@ -198,6 +199,32 @@ public struct ProxyConnector: Sendable {
             let fallbackStream = Hysteria2Stream(session: connection.session, password: password)
             try await fallbackStream.connect(to: target)
             return ConnectedProxyContext(node: node, connection: connection)
+        }
+    }
+
+    private func performTUICConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString), let password = node.password else {
+            throw ProtocolError.malformedResponse("TUIC node missing uuid or password")
+        }
+        let tuicConfig = TUICConfig(
+            uuid: uuid,
+            password: password,
+            server: node.server,
+            port: node.port,
+            congestionControl: .bbr,
+            alpn: node.alpn
+        )
+        if #available(macOS 14.0, *) {
+            let client = TUICClient(config: tuicConfig)
+            _ = try await client.connect()
+            _ = try await client.openStream(to: target)
+            return ConnectedProxyContext(node: node, connection: connection)
+        } else {
+            throw ProtocolError.connectionRejected("TUIC requires macOS 14+")
         }
     }
 

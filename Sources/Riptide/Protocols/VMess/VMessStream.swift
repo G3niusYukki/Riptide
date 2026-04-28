@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import CommonCrypto
 
 public enum VMessError: Error, Equatable, Sendable {
     case invalidUUID
@@ -142,9 +143,14 @@ public actor VMessStream: Sendable {
     }
 
     private func deriveSubKey(key: SymmetricKey, label: Data) -> SymmetricKey {
-        let prk = HKDF<SHA256>.extract(inputKeyMaterial: key, salt: Data([UInt8](repeating: 0, count: 16)))
-        let expanded = HKDF<SHA256>.expand(pseudoRandomKey: prk, info: label, outputByteCount: 16)
-        return SymmetricKey(data: expanded.withUnsafeBytes { Data($0) })
+        // Use MD5-based KDF as specified by VMess AEAD protocol
+        let keyData = key.withUnsafeBytes { Data($0) }
+        let combined = keyData + label
+        var md5Result = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
+        combined.withUnsafeBytes { ptr in
+            _ = CC_MD5(ptr.baseAddress, CC_LONG(combined.count), &md5Result)
+        }
+        return SymmetricKey(data: Data(md5Result))
     }
 
     private func encryptAES128(_ plaintext: Data, key: SymmetricKey, iv: Data) throws -> Data {
@@ -165,10 +171,19 @@ public actor VMessStream: Sendable {
             data.append(1) // ATYP IPv4
             data.append(contentsOf: ipv4)
         } else if target.host.contains(":") {
-            data.append(3) // ATYP IPv6 (simplified)
-            let hostData = Data(target.host.utf8)
-            data.append(UInt8(hostData.count))
-            data.append(hostData)
+            // Proper IPv6: ATYP = 4, 16 raw bytes
+            var sin6 = sockaddr_in6()
+            let parsed = target.host.withCString { inet_pton(AF_INET6, $0, &sin6.sin6_addr) }
+            if parsed == 1 {
+                data.append(4) // ATYP IPv6
+                withUnsafeBytes(of: sin6.sin6_addr) { data.append(contentsOf: $0) }
+            } else {
+                // Malformed IPv6 — treat as domain
+                let hostData = Data(target.host.utf8)
+                data.append(2)
+                data.append(UInt8(hostData.count))
+                data.append(hostData)
+            }
         } else {
             data.append(2) // ATYP Domain
             let hostData = Data(target.host.utf8)

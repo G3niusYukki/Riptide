@@ -306,7 +306,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
                 if let proxyError = await helperConnection.enableSystemProxy(
                     service: service,
                     httpPort: defaultMixedPort,
-                    socksPort: 0
+                    socksPort: defaultMixedPort
                 ) {
                     print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
                 }
@@ -524,6 +524,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         try await runSudoCommand("/usr/sbin/networksetup", "-setwebproxy", service, "127.0.0.1", port)
         try await runSudoCommand("/usr/sbin/networksetup", "-setsecurewebproxy", service, "127.0.0.1", port)
+        try await runSudoCommand("/usr/sbin/networksetup", "-setsocksfirewallproxy", service, "127.0.0.1", port)
     }
 
     /// Disables system proxy via sudo networksetup (fallback when helper is not installed).

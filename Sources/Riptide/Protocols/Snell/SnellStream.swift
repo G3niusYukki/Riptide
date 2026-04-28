@@ -43,10 +43,20 @@ public final class SnellStream {
     private let password: String
     private let version: Int
 
+    /// Key derived from password, cached for v3 encryption/decryption.
+    private let cachedKey: SymmetricKey?
+
     public init(session: any TransportSession, password: String, version: Int = 2) {
         self.session = session
         self.password = password
         self.version = version
+        if version >= 3 {
+            let keyData = password.data(using: .utf8) ?? Data()
+            let hash = SHA256.hash(data: keyData)
+            self.cachedKey = SymmetricKey(data: hash)
+        } else {
+            self.cachedKey = nil
+        }
     }
 
     // MARK: - Public
@@ -189,25 +199,23 @@ public final class SnellStream {
 
         // Read and decrypt response
         let response = try await session.receive()
-        let _ = try decryptPayload(response)
+        let decrypted = try decryptPayload(response)
+        guard !decrypted.isEmpty, decrypted[0] == 0x00 else {
+            throw SnellError.handshakeFailed("v3 handshake rejected")
+        }
     }
 
     // MARK: - Encryption (v3)
 
     private func encryptPayload(_ data: Data) throws -> Data {
-        // Derive 32-byte key from password using SHA256
-        let keyData = password.data(using: .utf8) ?? Data()
-        let hash = SHA256.hash(data: keyData)
-        let symmetricKey = SymmetricKey(data: hash)
-
-        // Generate nonce (12 bytes for ChaCha20-Poly1305)
+        guard let symmetricKey = cachedKey else {
+            throw SnellError.encryptionFailed("no cached key for v3")
+        }
         var nonce = [UInt8](repeating: 0, count: 12)
         guard SecRandomCopyBytes(kSecRandomDefault, nonce.count, &nonce) == errSecSuccess else {
             throw SnellError.encryptionFailed("failed to generate nonce")
         }
-
         let seal = try ChaChaPoly.seal(data, using: symmetricKey, nonce: ChaChaPoly.Nonce(data: Data(nonce)))
-        // seal.combined already contains nonce + ciphertext + tag
         return seal.combined
     }
 
@@ -215,15 +223,11 @@ public final class SnellStream {
         guard data.count > 12 else {
             throw SnellError.decryptionFailed("data too short")
         }
-
-        // seal.combined format: nonce (12 bytes) + ciphertext + tag (16 bytes)
+        guard let symmetricKey = cachedKey else {
+            throw SnellError.decryptionFailed("no cached key for v3")
+        }
         let nonce = data.prefix(12)
         let ciphertextWithTag = data.suffix(from: 12)
-
-        let keyData = password.data(using: .utf8) ?? Data()
-        let hash = SHA256.hash(data: keyData)
-        let symmetricKey = SymmetricKey(data: hash)
-
         let sealedBox = try ChaChaPoly.SealedBox(combined: Data(nonce) + ciphertextWithTag)
         return try ChaChaPoly.open(sealedBox, using: symmetricKey)
     }
@@ -242,9 +246,13 @@ public final class SnellStream {
             data.append(contentsOf: octets)
         } else if address.contains(":") {
             // IPv6
+            var sin6 = sockaddr_in6()
+            let parsed = address.withCString { inet_pton(AF_INET6, $0, &sin6.sin6_addr) }
+            guard parsed == 1 else {
+                throw SnellError.handshakeFailed("invalid IPv6 address")
+            }
             data.append(0x04)
-            // Simplified: just use placeholder for IPv6
-            data.append(contentsOf: [UInt8](repeating: 0, count: 16))
+            withUnsafeBytes(of: sin6.sin6_addr) { data.append(contentsOf: $0) }
         } else {
             // Domain
             guard address.utf8.count <= 255 else {

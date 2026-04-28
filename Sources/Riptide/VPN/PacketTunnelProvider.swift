@@ -107,34 +107,29 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         protocols: [NSNumber],
         flow: NEPacketTunnelFlow
     ) {
-        guard routingEngine != nil else {
-            // No routing engine set — read next batch
+        guard let engine = routingEngine else {
             readPacketsFromFlow()
             return
         }
 
-        // Forward packets to routing engine asynchronously.
-        // Using GCD to avoid Swift 6 strict concurrency issues with Task closures.
-        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
-            guard let self = self, let engine = self.routingEngine else {
-                DispatchQueue.main.async { [weak self] in
-                    self?.readPacketsFromFlow()
-                }
-                return
-            }
+        Task { [weak self] in
+            guard let self else { return }
+            var responsePackets: [Data] = []
 
-            for (index, packet) in packets.enumerated() {
+            for packet in packets {
                 do {
-                    // Note: handlePacket is async. For a proper implementation, this would
-                    // be called on an actor. For now, queue the processing.
-                    _ = (index, engine, packet, flow)
+                    let responses = try await engine.handlePacket(packet)
+                    responsePackets.append(contentsOf: responses)
                 } catch {
-                    _ = error
+                    // Drop malformed packet, continue processing
                 }
             }
 
-            // Continue reading on main thread
-            DispatchQueue.main.async { [weak self] in
+            if !responsePackets.isEmpty {
+                flow.writePackets(responsePackets, withProtocols: [NSNumber(value: AF_INET)])
+            }
+
+            await MainActor.run { [weak self] in
                 self?.readPacketsFromFlow()
             }
         }

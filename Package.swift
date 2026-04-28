@@ -58,6 +58,16 @@ let package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .target(
+            name: "RiptideTunnel",
+            dependencies: [
+                "Riptide",
+            ],
+            path: "Sources/RiptideTunnel",
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
+        ),
         .testTarget(
             name: "RiptideTests",
             dependencies: [

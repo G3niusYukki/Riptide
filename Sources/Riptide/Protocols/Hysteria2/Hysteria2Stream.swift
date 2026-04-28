@@ -67,6 +67,11 @@ public actor Hysteria2Stream: Sendable {
         request.append(contentsOf: authCode) // 32 bytes auth code
         request.append(try encodeTarget(target))
 
+        // Apply salamander obfuscation if enabled
+        if obfuscated {
+            request = applyObfuscation(request, password: password)
+        }
+
         try await session.send(request)
 
         // Read response (1 byte: status)
@@ -75,7 +80,11 @@ public actor Hysteria2Stream: Sendable {
             throw Hysteria2Error.handshakeFailed("empty response from server")
         }
 
-        let status = response[0]
+        var statusData = response
+        if obfuscated {
+            statusData = applyObfuscation(response, password: password)
+        }
+        let status = statusData[0]
         guard status == 0x00 else {
             throw Hysteria2Error.handshakeFailed("server rejected auth: status \(status)")
         }
@@ -97,6 +106,10 @@ public actor Hysteria2Stream: Sendable {
         request.append(contentsOf: authCode)
         request.append(try encodeTarget(target))
 
+        if obfuscated {
+            request = applyObfuscation(request, password: password)
+        }
+
         try await session.send(request)
 
         let response = try await session.receive()
@@ -104,7 +117,11 @@ public actor Hysteria2Stream: Sendable {
             throw Hysteria2Error.handshakeFailed("empty response")
         }
 
-        let status = response[0]
+        var statusData = response
+        if obfuscated {
+            statusData = applyObfuscation(response, password: password)
+        }
+        let status = statusData[0]
         guard status == 0x00 else {
             throw Hysteria2Error.handshakeFailed("auth rejected: status \(status)")
         }
@@ -187,5 +204,18 @@ public actor Hysteria2Stream: Sendable {
         }
         guard result == 1 else { return nil }
         return withUnsafeBytes(of: addr) { Array($0) }
+    }
+
+    /// Apply salamander obfuscation (XOR keystream derived from password).
+    private func applyObfuscation(_ data: Data, password: String) -> Data {
+        let keyData = Data(password.utf8)
+        let hash = SHA256.hash(data: keyData)
+        var result = Data()
+        result.reserveCapacity(data.count)
+        for i in 0..<data.count {
+            let keyByte = hash[hash.index(hash.startIndex, offsetBy: i % 32)]
+            result.append(data[i] ^ keyByte)
+        }
+        return result
     }
 }

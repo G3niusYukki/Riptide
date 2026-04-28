@@ -39,6 +39,10 @@ public struct ProxyNode: Equatable, Sendable {
     public let grpcServiceName: String?
     public let chainProxyName: String?
     public let snellVersion: Int?
+    public let realityServerName: String?
+    public let realityShortId: String?
+    public let realityPublicKey: String?
+    public let realityFingerprint: String?
 
     public init(
         name: String,
@@ -59,7 +63,11 @@ public struct ProxyNode: Equatable, Sendable {
         wsHost: String? = nil,
         grpcServiceName: String? = nil,
         chainProxyName: String? = nil,
-        snellVersion: Int? = nil
+        snellVersion: Int? = nil,
+        realityServerName: String? = nil,
+        realityShortId: String? = nil,
+        realityPublicKey: String? = nil,
+        realityFingerprint: String? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -80,6 +88,10 @@ public struct ProxyNode: Equatable, Sendable {
         self.grpcServiceName = grpcServiceName
         self.chainProxyName = chainProxyName
         self.snellVersion = snellVersion
+        self.realityServerName = realityServerName
+        self.realityShortId = realityShortId
+        self.realityPublicKey = realityPublicKey
+        self.realityFingerprint = realityFingerprint
     }
 }
 

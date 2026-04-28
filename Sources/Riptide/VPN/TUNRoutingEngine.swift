@@ -39,6 +39,9 @@ public actor TUNRoutingEngine {
     private let proxyConnector: ProxyConnector
     private let dnsPipeline: DNSPipeline
     private let configuration: VPNConfiguration
+    private let ruleEngine: RuleEngine?
+    private let proxyNodes: [ProxyNode]
+    private let fakeIPPool: FakeIPPool?
 
     /// Registry mapping TCP connection 4-tuples to their logical ConnectionTarget.
     private let connectionTargetRegistry: TCPConnectionTargetRegistry
@@ -56,11 +59,17 @@ public actor TUNRoutingEngine {
     public init(
         proxyConnector: ProxyConnector,
         dnsPipeline: DNSPipeline,
-        configuration: VPNConfiguration
+        configuration: VPNConfiguration,
+        ruleEngine: RuleEngine? = nil,
+        proxyNodes: [ProxyNode] = [],
+        fakeIPPool: FakeIPPool? = nil
     ) {
         self.proxyConnector = proxyConnector
         self.dnsPipeline = dnsPipeline
         self.configuration = configuration
+        self.ruleEngine = ruleEngine
+        self.proxyNodes = proxyNodes
+        self.fakeIPPool = fakeIPPool
         self.tcpStateMachine = TCPStateMachine()
         self.udpSessionManager = UDPSessionManager()
         self.connectionTargetRegistry = TCPConnectionTargetRegistry()
@@ -263,7 +272,38 @@ public actor TUNRoutingEngine {
             ackNumber: tcpHeader.acknowledgmentNumber
         )
 
+        // Resolve routing now that the TCP handshake is complete
+        await resolveAndRegisterRoute(connectionID: connectionID)
+
         return []
+    }
+
+    /// Resolve the proxy route for a TCP connection and register it with the target registry.
+    /// Uses FakeIP reverse lookup for domain, then the rule engine for policy resolution.
+    private func resolveAndRegisterRoute(connectionID: TCPConnectionID) async {
+        guard let engine = ruleEngine, !proxyNodes.isEmpty else { return }
+
+        let dstIP = connectionID.dstIP
+        let domain = fakeIPPool?.reverseLookup(ip: dstIP) ?? dstIP
+
+        let ruleTarget = RuleTarget(
+            domain: domain,
+            ipAddress: dstIP,
+            destinationPort: Int(connectionID.dstPort)
+        )
+        let policy = engine.resolve(target: ruleTarget)
+
+        let proxyNode: ProxyNode
+        switch policy {
+        case .direct, .reject:
+            return
+        case .proxyNode(let name):
+            guard let node = proxyNodes.first(where: { $0.name == name }) else { return }
+            proxyNode = node
+        }
+
+        let connTarget = ConnectionTarget(host: domain, port: Int(connectionID.dstPort))
+        await registerConnectionTarget(id: connectionID, target: connTarget, proxyNode: proxyNode)
     }
 
     private func processExistingTCPConnection(
