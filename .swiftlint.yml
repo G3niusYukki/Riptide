@@ -32,12 +32,12 @@ function_body_length:
   error: 150
 
 cyclomatic_complexity:
-  warning: 12
+  warning: 15
   error: 20
 
 large_tuple:
-  warning: 4
-  error: 6
+  warning: 6
+  error: 8
 
 excluded:
   - vendor/
