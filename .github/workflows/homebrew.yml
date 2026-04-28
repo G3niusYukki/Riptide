@@ -10,6 +10,11 @@ on:
         description: 'Version to update to'
         required: true
 
+# Prevent duplicate runs on push — this workflow only matters on release
+concurrency:
+  group: homebrew-formula
+  cancel-in-progress: true
+
 jobs:
   update-formula:
     runs-on: ubuntu-latest

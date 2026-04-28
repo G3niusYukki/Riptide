@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-366%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-465%20passing-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/ status-beta-orange" alt="Status" />
 </p>
@@ -187,7 +187,7 @@ This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for 
 # Build everything
 swift build
 
-# Run full test suite (366 tests, 57 suites)
+# Run full test suite (465 tests, 71 suites)
 swift test
 
 # Run a specific suite
@@ -246,7 +246,7 @@ Sources/
 │
 └── RiptideCLI/              # Command-line interface
 
-Tests/RiptideTests/          # 366 tests in 57 suites
+Tests/RiptideTests/          # 465 tests in 71 suites
 ```
 
 ---
@@ -266,7 +266,7 @@ Contributions are welcome! A few guidelines:
 
 1. **Library-first** — new protocol / transport logic belongs in `Sources/Riptide/`, not the app layer
 2. **Swift 6 strict concurrency** — all code must pass `Sendable` and actor isolation checks
-3. **Test coverage** — add tests for new behavior; `swift test` must pass (366 / 366)
+3. **Test coverage** — add tests for new behavior; `swift test` must pass (465 / 465)
 4. **No force unwraps** — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading
 6. **Dependency injection** — prefer injection over hard-coded global behavior
