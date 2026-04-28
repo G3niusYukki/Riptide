@@ -94,7 +94,6 @@ public actor ModeCoordinator {
         }
     }
 
-    // swiftlint:disable:next large_tuple
     /// Gets active connections from the mihomo runtime.
     public func getConnections() async -> [(id: String, host: String, network: String, proxy: String, upload: Int, download: Int)] {
         do {
