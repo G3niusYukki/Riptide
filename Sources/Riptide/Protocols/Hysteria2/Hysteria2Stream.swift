@@ -15,7 +15,7 @@ public enum Hysteria2Error: Error, Equatable, Sendable {
 /// - Opens a bidirectional stream for each connection
 /// - Performs the Hysteria2 auth handshake (HMAC-SHA256 token)
 /// - Sends/receives data over the QUIC stream
-public actor Hysteria2Stream: Sendable {
+public actor Hysteria2Stream {
 
     /// The underlying QUIC session.
     private let quicSession: QUICTransportSession?

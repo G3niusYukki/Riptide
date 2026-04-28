@@ -42,6 +42,9 @@ public actor MultiplexTransport: TransportSession {
         guard streams[streamID] != nil else {
             throw MultiplexError.sessionNotFound
         }
+        guard data.count <= Int(UInt16.max) else {
+            throw MultiplexError.protocolError("payload exceeds max frame size (65535 bytes)")
+        }
 
         var frame = Data(capacity: 8 + data.count)
         frame.append(0x01) // version
@@ -130,9 +133,11 @@ public actor MultiplexTransport: TransportSession {
         case .data:
             streams[streamID]?.deliverData(data)
         case .fin:
-            streams[streamID]?.notifyClosed()
+            let stream = streams.removeValue(forKey: streamID)
+            stream?.notifyClosed()
         case .rst:
-            streams[streamID]?.notifyClosed()
+            let stream = streams.removeValue(forKey: streamID)
+            stream?.notifyClosed()
         case .syn:
             break // Server-initiated streams not supported yet
         }
@@ -208,6 +213,11 @@ public final class MultiplexStream: @unchecked Sendable {
                 if closed {
                     lock.unlock()
                     continuation.resume(throwing: MultiplexError.streamClosed)
+                    return
+                }
+                if waitingContinuation != nil {
+                    lock.unlock()
+                    continuation.resume(throwing: MultiplexError.protocolError("concurrent receive() calls are not supported"))
                     return
                 }
                 waitingContinuation = continuation

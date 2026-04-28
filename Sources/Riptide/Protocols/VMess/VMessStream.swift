@@ -19,7 +19,7 @@ public struct VMessRequestHeader: Sendable {
     public let checksum: UInt32
 }
 
-public actor VMessStream: Sendable {
+public actor VMessStream {
     private let session: any TransportSession
     private let uuid: UUID
     private var sendKey: SymmetricKey?
@@ -47,15 +47,15 @@ public actor VMessStream: Sendable {
         header.append(targetData)
         header.append(0) // random fill length
 
-        let _uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
+        let uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
         let timestamp = UInt64(Date().timeIntervalSince1970)
         var timestampData = Data(count: 8)
         timestampData.withUnsafeMutableBytes { ptr in
-            var t = timestamp.littleEndian
+            var value = timestamp.littleEndian
             let bytes = ptr.baseAddress!.assumingMemoryBound(to: UInt8.self)
-            for i in 0..<8 {
-                bytes[i] = UInt8(t & 0xFF)
-                t >>= 8
+            for byteIndex in 0..<8 {
+                bytes[byteIndex] = UInt8(value & 0xFF)
+                value >>= 8
             }
         }
 
@@ -123,11 +123,11 @@ public actor VMessStream: Sendable {
     private func makeNonce(counter: UInt64) -> Data {
         var nonce = Data(count: 16)
         nonce.withUnsafeMutableBytes { ptr in
-            var c = counter
+            var value = counter
             let bytes = ptr.baseAddress!.assumingMemoryBound(to: UInt8.self)
-            for i in 0..<8 {
-                bytes[i] = UInt8(c & 0xFF)
-                c >>= 8
+            for byteIndex in 0..<8 {
+                bytes[byteIndex] = UInt8(value & 0xFF)
+                value >>= 8
             }
         }
         return nonce
@@ -136,8 +136,8 @@ public actor VMessStream: Sendable {
     private func deriveAuthKey(uuid: UUID) -> SymmetricKey {
         let uuidData = withUnsafeBytes(of: uuid.uuid) { Data($0) }
         var key = Data(count: 16)
-        for i in 0..<16 {
-            key[i] = uuidData[i]
+        for byteIndex in 0..<16 {
+            key[byteIndex] = uuidData[byteIndex]
         }
         return SymmetricKey(data: key)
     }
@@ -160,7 +160,7 @@ public actor VMessStream: Sendable {
     }
 
     private func decryptAES128(_ ciphertext: Data, key: SymmetricKey, iv: Data) throws -> Data {
-        let _nonce = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
+        let nonceValue = try AES.GCM.Nonce(data: Data(iv.prefix(12)))
         let sealed = try AES.GCM.SealedBox(combined: ciphertext)
         return try AES.GCM.open(sealed, using: key)
     }

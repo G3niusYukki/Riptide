@@ -7,7 +7,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
     private var dnsPipeline: DNSPipeline?
     private var routingEngine: TUNRoutingEngine?
 
-    public override func startTunnel(
+    override public func startTunnel(
         options: [String: NSObject]?,
         completionHandler: @escaping (Error?) -> Void
     ) {
@@ -29,14 +29,14 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
                 let pipeline = DNSPipeline(dnsPolicy: profile.config.dnsPolicy)
 
                 // 4. Create runtime
-                let rt = LiveTunnelRuntime(
+                let tunnelRuntime = LiveTunnelRuntime(
                     proxyDialer: TCPTransportDialer(),
                     directDialer: TCPTransportDialer(),
                     geoIPResolver: .none,
                     dnsPipeline: pipeline
                 )
-                try await rt.start(profile: profile)
-                self.runtime = rt
+                try await tunnelRuntime.start(profile: profile)
+                self.runtime = tunnelRuntime
                 self.dnsPipeline = pipeline
 
                 // Create TUN routing engine
@@ -84,7 +84,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    public override func stopTunnel(
+    override public func stopTunnel(
         with reason: NEProviderStopReason,
         completionHandler: @escaping () -> Void
     ) {
@@ -94,7 +94,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    public override func handleAppMessage(
+    override public func handleAppMessage(
         _ messageData: Data,
         completionHandler: ((Data?) -> Void)?
     ) {
@@ -118,30 +118,36 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - Packet Flow
 
     private func startPacketFlow() {
-        packetFlow.readPackets { [weak self] packets, protocols in
-            self?.handlePackets(packets, protocols: protocols)
-            self?.startPacketFlow()
-        }
-    }
-
-    private func handlePackets(_ packets: [Data], protocols: [NSNumber]) {
-        guard let engine = routingEngine else {
-            packetFlow.writePackets(packets, withProtocols: protocols)
-            return
-        }
-
-        Task {
-            var responsePackets: [Data] = []
-            for packet in packets {
-                do {
-                    let responses = try await engine.handlePacket(packet)
-                    responsePackets.append(contentsOf: responses)
-                } catch {
-                    // Drop malformed packets
-                }
+        packetFlow.readPackets { [weak self] packets, _ in
+            guard let self else { return }
+            guard let engine = self.routingEngine else {
+                self.packetFlow.writePackets(packets, withProtocols: packets.map { _ in NSNumber(value: AF_INET) })
+                self.startPacketFlow()
+                return
             }
-            if !responsePackets.isEmpty {
-                packetFlow.writePackets(responsePackets, withProtocols: [NSNumber(value: AF_INET)])
+
+            Task { [weak self] in
+                guard let self else { return }
+                var responsePackets: [Data] = []
+                for packet in packets {
+                    do {
+                        let responses = try await engine.handlePacket(packet)
+                        responsePackets.append(contentsOf: responses)
+                    } catch {
+                        // Drop malformed packets
+                    }
+                }
+                if !responsePackets.isEmpty {
+                    let protoArray = responsePackets.map { packet -> NSNumber in
+                        if packet.count > 0, packet[0] >> 4 == 6 {
+                            return NSNumber(value: AF_INET6)
+                        }
+                        return NSNumber(value: AF_INET)
+                    }
+                    self.packetFlow.writePackets(responsePackets, withProtocols: protoArray)
+                }
+                // Sequence: only read next batch after current processing completes
+                self.startPacketFlow()
             }
         }
     }

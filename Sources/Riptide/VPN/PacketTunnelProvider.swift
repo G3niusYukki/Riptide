@@ -126,7 +126,13 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             }
 
             if !responsePackets.isEmpty {
-                flow.writePackets(responsePackets, withProtocols: [NSNumber(value: AF_INET)])
+                let protocols = responsePackets.map { packet -> NSNumber in
+                    if packet.count > 0, packet[0] >> 4 == 6 {
+                        return NSNumber(value: AF_INET6)
+                    }
+                    return NSNumber(value: AF_INET)
+                }
+                flow.writePackets(responsePackets, withProtocols: protocols)
             }
 
             await MainActor.run { [weak self] in
@@ -140,7 +146,7 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     // ============================================================
 
     /// Handle messages from the host app via `NETunnelProviderSession.sendProviderMessage`.
-    public override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+    override public func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
         // Decode the command
         guard let command = try? JSONDecoder().decode(TunnelProviderCommandMessage.self, from: messageData) else {
             completionHandler?(nil)

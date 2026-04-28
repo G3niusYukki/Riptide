@@ -23,10 +23,14 @@ public actor TUICClient {
             return TUICConnection(client: self)
         }
 
-        // Create QUIC connection
+        // Validate and create endpoint
+        guard let rawPort = UInt16(exactly: config.port),
+              let quicPort = NWEndpoint.Port(rawValue: rawPort) else {
+            throw TUICError.invalidConfiguration("invalid port: \(config.port)")
+        }
         let endpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(config.server),
-            port: NWEndpoint.Port(rawValue: UInt16(config.port))!
+            port: quicPort
         )
 
         let quicOptions = NWProtocolQUIC.Options()
@@ -232,7 +236,14 @@ public actor TUICClient {
     private func parseIPv4(_ host: String) -> [UInt8]? {
         let parts = host.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 4 else { return nil }
-        return parts.compactMap { UInt8(String($0)) }
+        var octets: [UInt8] = []
+        octets.reserveCapacity(4)
+        for part in parts {
+            guard let octet = UInt8(String(part)) else { return nil }
+            octets.append(octet)
+        }
+        guard octets.count == 4 else { return nil }
+        return octets
     }
 }
 

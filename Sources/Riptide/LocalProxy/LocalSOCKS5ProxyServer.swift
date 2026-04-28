@@ -14,6 +14,7 @@ public actor LocalSOCKS5ProxyServer {
     private let runtime: LiveTunnelRuntime
     private var listener: NWListener?
     private var endpoint: LocalProxyEndpoint?
+    private var readBuffer = Data()
 
     public init(runtime: LiveTunnelRuntime) {
         self.runtime = runtime
@@ -71,6 +72,7 @@ public actor LocalSOCKS5ProxyServer {
     private func handleAcceptedConnection(_ connection: NWConnection) async {
         connection.start(queue: .global())
         let inboundSession = NWTransportSession(connection: connection)
+        readBuffer = Data()
 
         do {
             let target = try await performHandshake(with: inboundSession)
@@ -97,7 +99,7 @@ public actor LocalSOCKS5ProxyServer {
 
     private func performHandshake(with session: any TransportSession) async throws -> ConnectionTarget {
         // Step 1: Read greeting
-        let greeting = try await readExactBytes(2, from: session)
+        let greeting = try await readBytes(2, from: session)
         guard greeting[0] == 0x05 else {
             throw SOCKS5ProxyError.invalidVersion(greeting[0])
         }
@@ -105,11 +107,9 @@ public actor LocalSOCKS5ProxyServer {
         guard nmethods > 0 else {
             throw SOCKS5ProxyError.noAcceptableAuth
         }
-        let methods = try await readExactBytes(nmethods, from: session)
+        let methods = try await readBytes(nmethods, from: session)
 
-        // Accept no-auth (0x00) if offered
         guard methods.contains(0x00) else {
-            // Tell client no acceptable auth
             try await session.send(Data([0x05, 0xFF]))
             throw SOCKS5ProxyError.noAcceptableAuth
         }
@@ -117,25 +117,19 @@ public actor LocalSOCKS5ProxyServer {
         // Step 2: Send method selection (no auth)
         try await session.send(Data([0x05, 0x00]))
 
-        // Step 3: Read connect request (first 4 bytes to get header)
-        let header = try await readExactBytes(4, from: session)
+        // Step 3: Read connect request header
+        let header = try await readBytes(4, from: session)
         guard header[0] == 0x05 else {
             throw SOCKS5ProxyError.invalidVersion(header[0])
         }
         guard header[1] == 0x01 else {
-            // Send unsupported command error
             try await sendReply(rep: 0x07, bndHost: "0.0.0.0", bndPort: 0, to: session)
             throw SOCKS5ProxyError.unsupportedCommand(header[1])
         }
 
         let atyp = header[3]
-        let (host, remainingAfterHost) = try await readAddress(atyp: atyp, from: session)
-        let portBytes: Data
-        if let remaining = remainingAfterHost {
-            portBytes = try await readWithBuffer(2, buffer: remaining, from: session)
-        } else {
-            portBytes = try await readExactBytes(2, from: session)
-        }
+        let host = try await readAddress(atyp: atyp, from: session)
+        let portBytes = try await readBytes(2, from: session)
         let port = Int(UInt16(portBytes[0]) << 8 | UInt16(portBytes[1]))
 
         // Step 4: Send success reply
@@ -144,31 +138,30 @@ public actor LocalSOCKS5ProxyServer {
         return ConnectionTarget(host: host, port: port)
     }
 
-    private func readAddress(atyp: UInt8, from session: any TransportSession) async throws -> (host: String, remainingBuffer: Data?) {
+    private func readAddress(atyp: UInt8, from session: any TransportSession) async throws -> String {
         switch atyp {
         case 0x01:  // IPv4
-            let bytes = try await readExactBytes(4, from: session)
-            let host = "\(bytes[0]).\(bytes[1]).\(bytes[2]).\(bytes[3])"
-            return (host, nil)
+            let bytes = try await readBytes(4, from: session)
+            return "\(bytes[0]).\(bytes[1]).\(bytes[2]).\(bytes[3])"
 
         case 0x04:  // IPv6
-            let bytes = try await readExactBytes(16, from: session)
+            let bytes = try await readBytes(16, from: session)
             var parts: [String] = []
-            for i in 0..<8 {
-                let hi = bytes[i * 2]
-                let lo = bytes[i * 2 + 1]
-                parts.append(String(format: "%02x%02x", hi, lo))
+            for offset in 0..<8 {
+                let high = bytes[offset * 2]
+                let low = bytes[offset * 2 + 1]
+                parts.append(String(format: "%02x%02x", high, low))
             }
-            return (parts.joined(separator: ":"), nil)
+            return parts.joined(separator: ":")
 
         case 0x03:  // Domain
-            let lenByte = try await readExactBytes(1, from: session)
+            let lenByte = try await readBytes(1, from: session)
             let domainLength = Int(lenByte[0])
-            let domainBytes = try await readExactBytes(domainLength, from: session)
+            let domainBytes = try await readBytes(domainLength, from: session)
             guard let host = String(data: domainBytes, encoding: .utf8) else {
                 throw SOCKS5ProxyError.invalidAddress
             }
-            return (host, nil)
+            return host
 
         default:
             throw SOCKS5ProxyError.invalidAddress
@@ -177,7 +170,6 @@ public actor LocalSOCKS5ProxyServer {
 
     private func sendReply(rep: UInt8, bndHost: String, bndPort: UInt16, to session: any TransportSession) async throws {
         var reply = Data([0x05, rep, 0x00])
-        // Use IPv4 bound address
         reply.append(0x01)  // ATYP = IPv4
         let parts = bndHost.split(separator: ".").compactMap { UInt8($0) }
         if parts.count == 4 {
@@ -190,29 +182,18 @@ public actor LocalSOCKS5ProxyServer {
         try await session.send(reply)
     }
 
-    // MARK: - I/O Helpers
+    // MARK: - Buffered I/O
 
-    private func readExactBytes(_ count: Int, from session: any TransportSession) async throws -> Data {
-        var buffer = Data()
-        while buffer.count < count {
+    /// Read exactly `count` bytes, consuming from the actor's read buffer first.
+    private func readBytes(_ count: Int, from session: any TransportSession) async throws -> Data {
+        while readBuffer.count < count {
             let chunk = try await session.receive()
             if chunk.isEmpty { throw SOCKS5ProxyError.clientClosed }
-            buffer.append(chunk)
+            readBuffer.append(chunk)
         }
-        return buffer.prefix(count)
-    }
-
-    private func readWithBuffer(_ count: Int, buffer: Data, from session: any TransportSession) async throws -> Data {
-        if buffer.count >= count {
-            return buffer.prefix(count)
-        }
-        var result = buffer
-        while result.count < count {
-            let chunk = try await session.receive()
-            if chunk.isEmpty { throw SOCKS5ProxyError.clientClosed }
-            result.append(chunk)
-        }
-        return result.prefix(count)
+        let result = readBuffer.prefix(count)
+        readBuffer = readBuffer.subdata(in: count..<readBuffer.count)
+        return result
     }
 
     private func validatedPort(_ value: UInt16) throws -> NWEndpoint.Port {

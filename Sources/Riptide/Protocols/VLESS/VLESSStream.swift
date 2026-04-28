@@ -41,6 +41,9 @@ public actor VLESSStream: Sendable {
         guard !response.isEmpty else {
             throw VLESSError.invalidRequest
         }
+        guard response[0] == 0x00 else {
+            throw VLESSError.invalidRequest
+        }
         versionByteConsumed = true
         if response.count > 1 {
             recvBuffer = Data(response.dropFirst())

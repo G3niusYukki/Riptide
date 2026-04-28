@@ -71,7 +71,7 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
         )
     }
 
-    public override init() {
+    override public init() {
         super.init()
     }
 

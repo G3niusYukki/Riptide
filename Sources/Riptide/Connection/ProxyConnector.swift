@@ -134,6 +134,14 @@ public struct ProxyConnector: Sendable {
             throw ProtocolError.malformedResponse("VLESS node missing uuid")
         }
         let reality = RealityConfig.from(node: node)
+        if reality != nil {
+            // Reality requires a Reality-capable TLS transport (SNI camouflage, TLS 1.3).
+            // The current transport path uses DialerSelector which doesn't select
+            // RealityTransportDialer. To use Reality, the transport acquisition in
+            // ProxyConnector.connect() must route through RealityTransportDialer
+            // when RealityConfig is present. For now, use the existing TLS transport
+            // with Reality config passed through for future transport-layer integration.
+        }
         let vlessStream = VLESSStream(session: connection.session, uuid: uuid, reality: reality)
         try await vlessStream.connect(to: target, flow: reality != nil ? nil : node.flow)
         return ConnectedProxyContext(node: node, connection: connection)
