@@ -183,7 +183,6 @@ public actor TUNRoutingEngine {
     // MARK: - TCP Handling
     // ============================================================
 
-    // swiftlint:disable:next cyclomatic_complexity
     private func handleTCP(ipHeader: IPHeader, packetData: Data) async throws -> [Data] {
         guard let tcpHeader = parseTCPFromPacket(ipHeader: ipHeader, packetData: packetData) else {
             throw TUNRoutingEngineError.parseError("invalid TCP header")
