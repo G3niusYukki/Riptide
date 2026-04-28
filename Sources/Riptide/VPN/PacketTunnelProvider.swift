@@ -29,7 +29,7 @@ import Foundation
 public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     /// The TUN routing engine for processing IP packets.
     /// Subclasses should set this before calling `startPacketFlow()`.
-    public nonisolated(unsafe) var routingEngine: TUNRoutingEngine?
+    nonisolated(unsafe) public var routingEngine: TUNRoutingEngine?
 
     // ============================================================
     // MARK: - Tunnel Network Settings
@@ -76,10 +76,8 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     /// Convert CIDR prefix length to dotted-decimal subnet mask.
     private func maskBitsToMask(_ bits: Int) -> String {
         var mask: UInt32 = 0
-        for i in 0..<32 {
-            if i < bits {
-                mask |= (1 << (31 - i))
-            }
+        for bitIndex in 0..<32 where bitIndex < bits {
+            mask |= (1 << (31 - bitIndex))
         }
         return "\((mask >> 24) & 0xFF).\((mask >> 16) & 0xFF).\((mask >> 8) & 0xFF).\(mask & 0xFF)"
     }
@@ -107,34 +105,35 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         protocols: [NSNumber],
         flow: NEPacketTunnelFlow
     ) {
-        guard routingEngine != nil else {
-            // No routing engine set — read next batch
+        guard let engine = routingEngine else {
             readPacketsFromFlow()
             return
         }
 
-        // Forward packets to routing engine asynchronously.
-        // Using GCD to avoid Swift 6 strict concurrency issues with Task closures.
-        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
-            guard let self = self, let engine = self.routingEngine else {
-                DispatchQueue.main.async { [weak self] in
-                    self?.readPacketsFromFlow()
-                }
-                return
-            }
+        Task { [weak self] in
+            guard let self else { return }
+            var responsePackets: [Data] = []
 
-            for (index, packet) in packets.enumerated() {
+            for packet in packets {
                 do {
-                    // Note: handlePacket is async. For a proper implementation, this would
-                    // be called on an actor. For now, queue the processing.
-                    _ = (index, engine, packet, flow)
+                    let responses = try await engine.handlePacket(packet)
+                    responsePackets.append(contentsOf: responses)
                 } catch {
-                    _ = error
+                    // Drop malformed packet, continue processing
                 }
             }
 
-            // Continue reading on main thread
-            DispatchQueue.main.async { [weak self] in
+            if !responsePackets.isEmpty {
+                let protocols = responsePackets.map { packet -> NSNumber in
+                    if !packet.isEmpty, packet[0] >> 4 == 6 {
+                        return NSNumber(value: AF_INET6)
+                    }
+                    return NSNumber(value: AF_INET)
+                }
+                flow.writePackets(responsePackets, withProtocols: protocols)
+            }
+
+            await MainActor.run { [weak self] in
                 self?.readPacketsFromFlow()
             }
         }
@@ -145,7 +144,7 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     // ============================================================
 
     /// Handle messages from the host app via `NETunnelProviderSession.sendProviderMessage`.
-    public override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+    override public func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
         // Decode the command
         guard let command = try? JSONDecoder().decode(TunnelProviderCommandMessage.self, from: messageData) else {
             completionHandler?(nil)

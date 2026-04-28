@@ -168,85 +168,18 @@ public actor UDPTunnelSession {
         let context = try await proxyConnector.connect(via: actualProxyNode, to: target)
         relayConnection = context.connection.session
 
-        // Build UDP ASSOCIATE request
-        var associateRequest = Data()
-        associateRequest.append(0x05)  // VER
-        associateRequest.append(0x03)  // CMD = UDP ASSOCIATE
-        associateRequest.append(0x00)  // RSV
-
-        let clientIP = sessionID.srcIP
-        let clientPort = sessionID.srcPort
-
-        if let _ = IPv4AddressParser.parse(clientIP) {
-            associateRequest.append(0x01)  // ATYP = IPv4
-            let ipBytes = clientIP.split(separator: ".").compactMap { UInt8($0, radix: 10) ?? 0 }
-            associateRequest.append(contentsOf: ipBytes)
-        } else {
-            associateRequest.append(0x01)
-            associateRequest.append(contentsOf: [0, 0, 0, 0])
+        // Build and send UDP ASSOCIATE request via SOCKS5Protocol
+        let clientAddr = ConnectionTarget(host: sessionID.srcIP, port: Int(sessionID.srcPort))
+        let associateRequests = try SOCKS5Protocol().makeUDPAssociateRequest(clientAddress: clientAddr)
+        for req in associateRequests {
+            try await relayConnection?.send(req)
         }
-        associateRequest.append(UInt8(clientPort >> 8))
-        associateRequest.append(UInt8(clientPort & 0xFF))
 
-        // Send the request
-        try await relayConnection?.send(associateRequest)
-
-        // Receive the response
+        // Receive and parse response via SOCKS5Protocol
         let response = try await relayConnection?.receive() ?? Data()
-        guard response.count >= 10 else {
-            throw SessionError.connectionFailed("invalid UDP ASSOCIATE response")
-        }
-
-        let version = response[0]
-        let replyCode = response[1]
-        guard version == 0x05 else {
-            throw SessionError.connectionFailed("invalid SOCKS5 version in response")
-        }
-        guard replyCode == 0x00 else {
-            throw SessionError.connectionFailed("UDP ASSOCIATE failed with reply code \(replyCode)")
-        }
-
-        // Parse relay address
-        let atyp = response[3]
-        var offset = 4
-
-        switch atyp {
-        case 0x01:  // IPv4
-            guard offset + 4 <= response.count else {
-                throw SessionError.connectionFailed("truncated IPv4 in response")
-            }
-            socks5UDPRelayAddress = "\(response[offset]).\(response[offset + 1]).\(response[offset + 2]).\(response[offset + 3])"
-            offset += 4
-
-        case 0x04:  // IPv6
-            guard offset + 16 <= response.count else {
-                throw SessionError.connectionFailed("truncated IPv6 in response")
-            }
-            var ipv6Parts: [String] = []
-            for i in 0..<8 {
-                let part = String(format: "%02x%02x", response[offset + i * 2], response[offset + i * 2 + 1])
-                ipv6Parts.append(part)
-            }
-            socks5UDPRelayAddress = ipv6Parts.joined(separator: ":")
-            offset += 16
-
-        case 0x03:  // Domain
-            let domainLength = Int(response[offset])
-            offset += 1
-            guard offset + domainLength <= response.count else {
-                throw SessionError.connectionFailed("truncated domain in response")
-            }
-            socks5UDPRelayAddress = String(data: response.subdata(in: offset..<offset + domainLength), encoding: .utf8)
-            offset += domainLength
-
-        default:
-            throw SessionError.connectionFailed("invalid ATYP in response")
-        }
-
-        guard offset + 2 <= response.count else {
-            throw SessionError.connectionFailed("truncated port in response")
-        }
-        socks5UDPRelayPort = UInt16(response[offset]) << 8 | UInt16(response[offset + 1])
+        let relayEndpoint = try SOCKS5Protocol().parseUDPAssociateResponse(response)
+        socks5UDPRelayAddress = relayEndpoint.host
+        socks5UDPRelayPort = UInt16(relayEndpoint.port)
 
         // Establish a separate UDP connection to the relay endpoint
         try await establishUDPRelayConnection()
@@ -297,28 +230,9 @@ public actor UDPTunnelSession {
             throw SessionError.connectionFailed("UDP relay endpoint not established")
         }
 
-        // Build the SOCKS5 UDP datagram
-        var udpDatagram = Data()
-        udpDatagram.append(contentsOf: [0x00, 0x00])  // RSV
-        udpDatagram.append(0x00)  // FRAG = 0
-
-        // Destination address (the real target)
-        let destIP = sessionID.dstIP
-        let destPort = sessionID.dstPort
-
-        if let _ = IPv4AddressParser.parse(destIP) {
-            udpDatagram.append(0x01)  // ATYP = IPv4
-            let ipBytes = destIP.split(separator: ".").compactMap { UInt8($0, radix: 10) ?? 0 }
-            udpDatagram.append(contentsOf: ipBytes)
-        } else {
-            udpDatagram.append(0x01)
-            udpDatagram.append(contentsOf: [0, 0, 0, 0])
-        }
-        udpDatagram.append(UInt8(destPort >> 8))
-        udpDatagram.append(UInt8(destPort & 0xFF))
-
-        // Payload
-        udpDatagram.append(data)
+        // Build SOCKS5 UDP datagram via SOCKS5Protocol
+        let destTarget = ConnectionTarget(host: sessionID.dstIP, port: Int(sessionID.dstPort))
+        let udpDatagram = try SOCKS5Protocol().encodeUDPDatagram(data: data, target: destTarget)
 
         // Send via the UDP relay connection (not the TCP control connection)
         return try await withCheckedThrowingContinuation { continuation in
@@ -344,30 +258,8 @@ public actor UDPTunnelSession {
         }
     }
 
-    /// Parse a SOCKS5 UDP datagram response.
+    /// Parse a SOCKS5 UDP datagram response via SOCKS5Protocol.
     private func parseSocks5UDPDatagram(_ data: Data) -> Data {
-        guard data.count >= 7 else { return data }
-
-        var offset = 3  // Skip RSV + FRAG
-        let atyp = data[offset]
-        offset += 1
-
-        switch atyp {
-        case 0x01:  // IPv4
-            offset += 4
-        case 0x04:  // IPv6
-            offset += 16
-        case 0x03:  // Domain
-            if offset < data.count {
-                offset += 1 + Int(data[offset])
-            }
-        default:
-            break
-        }
-
-        offset += 2  // Skip port
-
-        guard offset < data.count else { return data }
-        return data.subdata(in: offset..<data.count)
+        (try? SOCKS5Protocol().decodeUDPDatagram(data)) ?? data
     }
 }

@@ -5,8 +5,9 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
 
     private var runtime: LiveTunnelRuntime?
     private var dnsPipeline: DNSPipeline?
+    private var routingEngine: TUNRoutingEngine?
 
-    public override func startTunnel(
+    override public func startTunnel(
         options: [String: NSObject]?,
         completionHandler: @escaping (Error?) -> Void
     ) {
@@ -28,15 +29,36 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
                 let pipeline = DNSPipeline(dnsPolicy: profile.config.dnsPolicy)
 
                 // 4. Create runtime
-                let rt = LiveTunnelRuntime(
+                let tunnelRuntime = LiveTunnelRuntime(
                     proxyDialer: TCPTransportDialer(),
                     directDialer: TCPTransportDialer(),
                     geoIPResolver: .none,
                     dnsPipeline: pipeline
                 )
-                try await rt.start(profile: profile)
-                self.runtime = rt
+                try await tunnelRuntime.start(profile: profile)
+                self.runtime = tunnelRuntime
                 self.dnsPipeline = pipeline
+
+                // Create TUN routing engine
+                let connector = ProxyConnector(pool: TransportConnectionPool(
+                    dialer: TCPTransportDialer(),
+                    dialerSelector: .defaultSelector
+                ))
+                let vpnConfig = VPNConfiguration()
+                var ruleSets: [String: [ProxyRule]] = [:]
+                for (name, provider) in ruleSetProviders {
+                    ruleSets[name] = await provider.rules()
+                }
+                self.routingEngine = TUNRoutingEngine(
+                    proxyConnector: connector,
+                    dnsPipeline: pipeline,
+                    configuration: vpnConfig,
+                    ruleEngine: RuleEngine(
+                        rules: config.rules,
+                        ruleSets: ruleSets
+                    ),
+                    proxyNodes: config.proxies
+                )
 
                 // 5. Configure tunnel network settings
                 let settings = NEPacketTunnelNetworkSettings(
@@ -66,7 +88,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    public override func stopTunnel(
+    override public func stopTunnel(
         with reason: NEProviderStopReason,
         completionHandler: @escaping () -> Void
     ) {
@@ -76,7 +98,7 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    public override func handleAppMessage(
+    override public func handleAppMessage(
         _ messageData: Data,
         completionHandler: ((Data?) -> Void)?
     ) {
@@ -100,44 +122,37 @@ public class RiptidePacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - Packet Flow
 
     private func startPacketFlow() {
-        packetFlow.readPackets { [weak self] packets, protocols in
-            self?.handlePackets(packets, protocols: protocols)
-            self?.startPacketFlow()
-        }
-    }
-
-    private func handlePackets(_ packets: [Data], protocols: [NSNumber]) {
-        for (packet, _) in zip(packets, protocols) {
-            guard let result = PacketHandler.parseIPPacket(packet) else { continue }
-            Task {
-                await routePacket(result.ip, packetData: packet)
+        packetFlow.readPackets { [weak self] packets, _ in
+            guard let self else { return }
+            guard let engine = self.routingEngine else {
+                self.packetFlow.writePackets(packets, withProtocols: packets.map { _ in NSNumber(value: AF_INET) })
+                self.startPacketFlow()
+                return
             }
-        }
-    }
 
-    private func routePacket(_ ip: IPHeader, packetData: Data) async {
-        // Routing logic:
-        //   - TCP (protocol 6): hand off to UserSpaceTCP for userspace stack processing
-        //   - UDP port 53 (DNS): intercept and resolve via fake-IP or forward to upstream
-        //   - Other UDP: forward directly or via proxy
-        //
-        // Full implementation lives in Task 13 (UserSpaceTCP / VPN routing engine).
-        switch ip.ipProtocol {
-        case 6:  // TCP
-            // Hand off to UserSpaceTCP for userspace TCP/IP processing
-            // UserSpaceTCP will terminate the connection locally and proxy the data
-            break
-        case 17: // UDP
-            if let udp = UDPHeader(ip.payload), udp.destinationPort == 53 {
-                // DNS query — extract from the original packet (which includes
-                // IP+UDP headers that extractDNSQuery expects to strip).
-                if let query = PacketHandler.extractDNSQuery(packetData) {
-                    _ = dnsPipeline?.resolve(query: query)
+            Task { [weak self] in
+                guard let self else { return }
+                var responsePackets: [Data] = []
+                for packet in packets {
+                    do {
+                        let responses = try await engine.handlePacket(packet)
+                        responsePackets.append(contentsOf: responses)
+                    } catch {
+                        // Drop malformed packets
+                    }
                 }
+                if !responsePackets.isEmpty {
+                    let protoArray = responsePackets.map { packet -> NSNumber in
+                        if !packet.isEmpty, packet[0] >> 4 == 6 {
+                            return NSNumber(value: AF_INET6)
+                        }
+                        return NSNumber(value: AF_INET)
+                    }
+                    self.packetFlow.writePackets(responsePackets, withProtocols: protoArray)
+                }
+                // Sequence: only read next batch after current processing completes
+                self.startPacketFlow()
             }
-            // Other UDP packets: forward directly or through proxy (stubbed)
-        default:
-            break
         }
     }
 }

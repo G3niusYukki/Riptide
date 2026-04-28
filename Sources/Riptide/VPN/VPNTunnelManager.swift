@@ -56,7 +56,22 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
     /// Set this before calling `start()` to enable packet routing.
     public var routingEngine: TUNRoutingEngine?
 
-    public override init() {
+    /// Configures the routing engine with all required dependencies.
+    /// Call this before `start()` if you want the VPNTunnelManager to create
+    /// the TUNRoutingEngine itself. Alternatively, set `routingEngine` directly.
+    public func configureRoutingEngine(
+        proxyConnector: ProxyConnector,
+        dnsPipeline: DNSPipeline,
+        configuration: VPNConfiguration
+    ) {
+        routingEngine = TUNRoutingEngine(
+            proxyConnector: proxyConnector,
+            dnsPipeline: dnsPipeline,
+            configuration: configuration
+        )
+    }
+
+    override public init() {
         super.init()
     }
 
@@ -79,9 +94,17 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
     }
 
     /// Handle packets received from the tunnel interface.
+    /// Forwards packets to the routing engine if configured.
     public func handlePackets(_ packets: [Data]) {
         packetBuffer.append(contentsOf: packets)
         delegate?.tunnelDidReceivePackets(packets)
+
+        guard let engine = routingEngine else { return }
+        Task {
+            for packet in packets {
+                _ = try? await engine.handlePacket(packet)
+            }
+        }
     }
 
     public func setDelegate(_ delegate: VPNTunnelDelegate) {
@@ -210,10 +233,8 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
     /// Convert CIDR prefix length to dotted-decimal subnet mask.
     private func maskBitsToMask(_ bits: Int) -> String {
         var mask: UInt32 = 0
-        for i in 0..<32 {
-            if i < bits {
-                mask |= (1 << (31 - i))
-            }
+        for bitIndex in 0..<32 where bitIndex < bits {
+            mask |= (1 << (31 - bitIndex))
         }
         return "\((mask >> 24) & 0xFF).\((mask >> 16) & 0xFF).\((mask >> 8) & 0xFF).\(mask & 0xFF)"
     }
@@ -290,10 +311,34 @@ public final class VPNTunnelManager: VPNTunnelManagerProtocol {
     public var routingEngine: TUNRoutingEngine?
 
     public init() {}
+    public func configureRoutingEngine(
+        proxyConnector: ProxyConnector,
+        dnsPipeline: DNSPipeline,
+        configuration: VPNConfiguration
+    ) {
+        routingEngine = TUNRoutingEngine(
+            proxyConnector: proxyConnector,
+            dnsPipeline: dnsPipeline,
+            configuration: configuration
+        )
+    }
     public func setDelegate(_: VPNTunnelDelegate) {}
-    public func start(configuration: VPNConfiguration) {}
-    public func stop() {}
-    public func handlePackets(_: [Data]) {}
+    public func start(configuration: VPNConfiguration) {
+        _ = configuration
+    }
+    public func stop() {
+        Task { [routingEngine] in
+            await routingEngine?.shutdown()
+        }
+    }
+    public func handlePackets(_ packets: [Data]) {
+        guard let engine = routingEngine else { return }
+        Task {
+            for packet in packets {
+                _ = try? await engine.handlePacket(packet)
+            }
+        }
+    }
     public func installConfiguration() async throws {}
     public func connect() async throws {}
     public func disconnect() {}

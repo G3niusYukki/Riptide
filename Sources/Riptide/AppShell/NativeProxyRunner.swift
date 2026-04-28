@@ -17,7 +17,7 @@ public actor NativeProxyRunner {
     public enum State: Sendable {
         case stopped
         case starting
-        case running(endpoint: LocalProxyEndpoint, apiEndpoint: String, wsEndpoint: String)
+        case running(httpEndpoint: LocalProxyEndpoint, socksEndpoint: LocalProxyEndpoint, apiEndpoint: String, wsEndpoint: String)
         case stopping
         case failed(String)
     }
@@ -29,6 +29,7 @@ public actor NativeProxyRunner {
 
     private var runtime: LiveTunnelRuntime?
     private var localProxy: LocalHTTPConnectProxyServer?
+    private var localSOCKS5Proxy: LocalSOCKS5ProxyServer?
     private var externalController: ExternalController?
     private var webSocketController: WebSocketExternalController?
     private var healthChecker: HealthChecker
@@ -58,12 +59,14 @@ public actor NativeProxyRunner {
     ///
     /// - Parameters:
     ///   - proxyPort: The local HTTP CONNECT proxy port (default 7890)
+    ///   - socksPort: The local SOCKS5 proxy port (default 7891)
     ///   - apiPort: The REST API port (default 9090)
     ///   - wsPort: The WebSocket API port (default 9091)
     ///   - enableHealthCheck: Whether to enable periodic health checks
     ///   - healthCheckInterval: Interval between health checks (default 30 seconds)
     public func start(
         proxyPort: UInt16 = 7890,
+        socksPort: UInt16 = 7891,
         apiPort: UInt16 = 9090,
         wsPort: UInt16 = 9091,
         enableHealthCheck: Bool = true,
@@ -109,17 +112,22 @@ public actor NativeProxyRunner {
                 }
             }
 
-            // 5. Start the local HTTP CONNECT proxy server (local ingress)
+            // 5. Start the local HTTP CONNECT proxy server
             let localProxy = LocalHTTPConnectProxyServer(runtime: runtime)
             let endpoint = try await localProxy.start(host: "127.0.0.1", port: proxyPort)
             self.localProxy = localProxy
 
-            // 6. Start the REST API controller
+            // 6. Start the local SOCKS5 proxy server
+            let localSOCKS5Proxy = LocalSOCKS5ProxyServer(runtime: runtime)
+            let socksEndpoint = try await localSOCKS5Proxy.start(host: "127.0.0.1", port: socksPort)
+            self.localSOCKS5Proxy = localSOCKS5Proxy
+
+            // 7. Start the REST API controller
             let externalController = ExternalController(runtime: runtime, config: config)
             let apiEndpoint = try await externalController.start(host: "127.0.0.1", port: apiPort)
             self.externalController = externalController
 
-            // 7. Start the WebSocket controller
+            // 8. Start the WebSocket controller
             let wsController = WebSocketExternalController(
                 runtime: runtime,
                 config: config
@@ -127,8 +135,8 @@ public actor NativeProxyRunner {
             let wsEndpoint = try await wsController.start(host: "127.0.0.1", port: wsPort)
             self.webSocketController = wsController
 
-            // 8. Update state to running
-            state = .running(endpoint: endpoint, apiEndpoint: apiEndpoint, wsEndpoint: wsEndpoint)
+            // 9. Update state to running
+            state = .running(httpEndpoint: endpoint, socksEndpoint: socksEndpoint, apiEndpoint: apiEndpoint, wsEndpoint: wsEndpoint)
             onStateChanged?(state)
 
         } catch {
@@ -146,9 +154,12 @@ public actor NativeProxyRunner {
         // Stop health checker
         await healthChecker.stop()
 
-        // Stop local proxy server
+        // Stop local proxy servers
         if let localProxy {
             await localProxy.stop()
+        }
+        if let localSOCKS5Proxy {
+            await localSOCKS5Proxy.stop()
         }
 
         // Stop external controllers

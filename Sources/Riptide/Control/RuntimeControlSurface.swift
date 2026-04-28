@@ -5,7 +5,7 @@ public enum RuntimeMode: String, Sendable, Codable, Equatable, CaseIterable {
     case systemProxy
     case tun
 
-    public static var productAvailableModes: [RuntimeMode] { [.systemProxy] }
+    public static var productAvailableModes: [RuntimeMode] { [.systemProxy, .tun] }
 }
 
 /// A snapshot of a single active connection passing through the runtime.

@@ -109,13 +109,13 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     private var apiClientWrapper: SendableAPIClient?
 
     /// Whether the runtime is currently running.
-    private(set) public var isRunning: Bool = false
+    public private(set) var isRunning: Bool = false
 
     /// Current runtime mode (system proxy or TUN).
-    private(set) public var currentMode: RuntimeMode?
+    public private(set) var currentMode: RuntimeMode?
 
     /// Current active profile.
-    private(set) public var currentProfile: TunnelProfile?
+    public private(set) var currentProfile: TunnelProfile?
 
     /// Default API port used by mihomo.
     private let defaultAPIPort = 9090
@@ -306,7 +306,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
                 if let proxyError = await helperConnection.enableSystemProxy(
                     service: service,
                     httpPort: defaultMixedPort,
-                    socksPort: 0
+                    socksPort: defaultMixedPort
                 ) {
                     print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
                 }
@@ -524,6 +524,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         try await runSudoCommand("/usr/sbin/networksetup", "-setwebproxy", service, "127.0.0.1", port)
         try await runSudoCommand("/usr/sbin/networksetup", "-setsecurewebproxy", service, "127.0.0.1", port)
+        try await runSudoCommand("/usr/sbin/networksetup", "-setsocksfirewallproxy", service, "127.0.0.1", port)
     }
 
     /// Disables system proxy via sudo networksetup (fallback when helper is not installed).
@@ -571,18 +572,15 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// - Parameter yaml: The YAML configuration string.
     /// - Throws: FileManager errors if write fails.
     private func writeConfigWithBackup(yaml: String) throws {
-        let fm = FileManager.default
+        let fileManager = FileManager.default
         let configPath = paths.configFileURL.path
         let backupPath = paths.configBackupURL.path
 
-        // Backup existing config if present
-        if fm.fileExists(atPath: configPath) {
-            // Remove old backup if exists
-            if fm.fileExists(atPath: backupPath) {
-                try fm.removeItem(atPath: backupPath)
+        if fileManager.fileExists(atPath: configPath) {
+            if fileManager.fileExists(atPath: backupPath) {
+                try fileManager.removeItem(atPath: backupPath)
             }
-            // Move current to backup
-            try fm.moveItem(atPath: configPath, toPath: backupPath)
+            try fileManager.moveItem(atPath: configPath, toPath: backupPath)
         }
 
         // Write new config

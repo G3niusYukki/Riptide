@@ -53,12 +53,14 @@ public actor SubscriptionUpdateScheduler {
     private func checkAndUpdateSubscriptions() async -> Int {
         let needingUpdate = await manager.subscriptionsNeedingUpdate()
 
+        var updatedCount = 0
         for subscription in needingUpdate where subscription.autoUpdate {
-            // Note: Actual fetch and parse would happen here
-            // For now, just mark as updated
-            await manager.recordUpdateSuccess(id: subscription.id)
+            let result = await manager.updateSubscription(id: subscription.id)
+            if case .success = result {
+                updatedCount += 1
+            }
         }
 
-        return needingUpdate.filter { $0.autoUpdate }.count
+        return updatedCount
     }
 }

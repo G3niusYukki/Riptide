@@ -39,6 +39,9 @@ public actor TUNRoutingEngine {
     private let proxyConnector: ProxyConnector
     private let dnsPipeline: DNSPipeline
     private let configuration: VPNConfiguration
+    private let ruleEngine: RuleEngine?
+    private let proxyNodes: [ProxyNode]
+    private let fakeIPPool: FakeIPPool?
 
     /// Registry mapping TCP connection 4-tuples to their logical ConnectionTarget.
     private let connectionTargetRegistry: TCPConnectionTargetRegistry
@@ -47,20 +50,26 @@ public actor TUNRoutingEngine {
     private var tcpForwarders: [TCPConnectionID: TCPTunnelForwarder] = [:]
 
     /// Stats counters.
-    private nonisolated(unsafe) var packetsHandled: Int = 0
-    private nonisolated(unsafe) var tcpPacketsHandled: Int = 0
-    private nonisolated(unsafe) var udpPacketsHandled: Int = 0
-    private nonisolated(unsafe) var dnsPacketsHandled: Int = 0
-    private nonisolated(unsafe) var bytesProcessed: Int = 0
+    nonisolated(unsafe) private var packetsHandled: Int = 0
+    nonisolated(unsafe) private var tcpPacketsHandled: Int = 0
+    nonisolated(unsafe) private var udpPacketsHandled: Int = 0
+    nonisolated(unsafe) private var dnsPacketsHandled: Int = 0
+    nonisolated(unsafe) private var bytesProcessed: Int = 0
 
     public init(
         proxyConnector: ProxyConnector,
         dnsPipeline: DNSPipeline,
-        configuration: VPNConfiguration
+        configuration: VPNConfiguration,
+        ruleEngine: RuleEngine? = nil,
+        proxyNodes: [ProxyNode] = [],
+        fakeIPPool: FakeIPPool? = nil
     ) {
         self.proxyConnector = proxyConnector
         self.dnsPipeline = dnsPipeline
         self.configuration = configuration
+        self.ruleEngine = ruleEngine
+        self.proxyNodes = proxyNodes
+        self.fakeIPPool = fakeIPPool
         self.tcpStateMachine = TCPStateMachine()
         self.udpSessionManager = UDPSessionManager()
         self.connectionTargetRegistry = TCPConnectionTargetRegistry()
@@ -80,19 +89,19 @@ public actor TUNRoutingEngine {
             throw TUNRoutingEngineError.parseError("invalid IP packet")
         }
 
-        let ip = result.ip
+        let ipHeader = result.ip
 
-        switch ip.ipProtocol {
+        switch ipHeader.ipProtocol {
         case 6:  // TCP
             tcpPacketsHandled += 1
-            return try await handleTCP(ip: ip, packetData: packetData)
+            return try await handleTCP(ipHeader: ipHeader, packetData: packetData)
 
         case 17: // UDP
             udpPacketsHandled += 1
-            return try await handleUDP(ip: ip, packetData: packetData)
+            return try await handleUDP(ipHeader: ipHeader, packetData: packetData)
 
         case 1:  // ICMP
-            return try await handleICMP(ip: ip, packetData: packetData)
+            return try await handleICMP(ipHeader: ipHeader, packetData: packetData)
 
         case 58: // ICMPv6
             return []
@@ -114,7 +123,7 @@ public actor TUNRoutingEngine {
     }
 
     /// Get routing stats.
-    public nonisolated func getStats() -> TUNRoutingStats {
+    nonisolated public func getStats() -> TUNRoutingStats {
         TUNRoutingStats(
             packetsHandled: 0,
             tcpPacketsHandled: 0,
@@ -174,15 +183,15 @@ public actor TUNRoutingEngine {
     // MARK: - TCP Handling
     // ============================================================
 
-    private func handleTCP(ip: IPHeader, packetData: Data) async throws -> [Data] {
-        guard let tcpHeader = parseTCPFromPacket(ip: ip, packetData: packetData) else {
+    private func handleTCP(ipHeader: IPHeader, packetData: Data) async throws -> [Data] {
+        guard let tcpHeader = parseTCPFromPacket(ipHeader: ipHeader, packetData: packetData) else {
             throw TUNRoutingEngineError.parseError("invalid TCP header")
         }
 
         let connectionID = TCPConnectionID(
-            srcIP: ip.sourceAddress,
+            srcIP: ipHeader.sourceAddress,
             srcPort: tcpHeader.sourcePort,
-            dstIP: ip.destinationAddress,
+            dstIP: ipHeader.destinationAddress,
             dstPort: tcpHeader.destinationPort
         )
 
@@ -263,7 +272,46 @@ public actor TUNRoutingEngine {
             ackNumber: tcpHeader.acknowledgmentNumber
         )
 
+        // Resolve routing now that the TCP handshake is complete
+        await resolveAndRegisterRoute(connectionID: connectionID)
+
         return []
+    }
+
+    /// Resolve the proxy route for a TCP connection and register it with the target registry.
+    /// Uses FakeIP reverse lookup for domain, then the rule engine for policy resolution.
+    private func resolveAndRegisterRoute(connectionID: TCPConnectionID) async {
+        guard let engine = ruleEngine, !proxyNodes.isEmpty else { return }
+
+        let dstIP = connectionID.dstIP
+        let domain = await dnsPipeline.reverseLookup(dstIP) ?? fakeIPPool?.reverseLookup(ip: dstIP) ?? dstIP
+
+        let ruleTarget = RuleTarget(
+            domain: domain,
+            ipAddress: dstIP,
+            destinationPort: Int(connectionID.dstPort)
+        )
+        let policy = engine.resolve(target: ruleTarget)
+
+        let proxyNode: ProxyNode
+        switch policy {
+        case .direct:
+            // Register a direct-route entry (the connection will pass through
+            // the direct dialer rather than a proxy). Without this registration,
+            // forwardTCPData would return nil and the connection would stall.
+            let directNode = ProxyNode(name: "DIRECT", kind: .http, server: dstIP, port: Int(connectionID.dstPort))
+            let connTarget = ConnectionTarget(host: domain, port: Int(connectionID.dstPort))
+            await registerConnectionTarget(id: connectionID, target: connTarget, proxyNode: directNode)
+            return
+        case .reject:
+            return
+        case .proxyNode(let name):
+            guard let node = proxyNodes.first(where: { $0.name == name }) else { return }
+            proxyNode = node
+        }
+
+        let connTarget = ConnectionTarget(host: domain, port: Int(connectionID.dstPort))
+        await registerConnectionTarget(id: connectionID, target: connTarget, proxyNode: proxyNode)
     }
 
     private func processExistingTCPConnection(
@@ -381,22 +429,22 @@ public actor TUNRoutingEngine {
     // MARK: - UDP Handling
     // ============================================================
 
-    private func handleUDP(ip: IPHeader, packetData: Data) async throws -> [Data] {
-        guard let udpHeader = parseUDPFromPacket(ip: ip, packetData: packetData) else {
+    private func handleUDP(ipHeader: IPHeader, packetData: Data) async throws -> [Data] {
+        guard let udpHeader = parseUDPFromPacket(ipHeader: ipHeader, packetData: packetData) else {
             throw TUNRoutingEngineError.parseError("invalid UDP header")
         }
 
         // DNS packet (port 53)?
         if udpHeader.destinationPort == 53 {
             dnsPacketsHandled += 1
-            return try await handleDNS(ip: ip, udpHeader: udpHeader, packetData: packetData)
+            return try await handleDNS(ipHeader: ipHeader, udpHeader: udpHeader, packetData: packetData)
         }
 
         // Other UDP — create session
         let sessionID = UDPSessionID(
-            srcIP: ip.sourceAddress,
+            srcIP: ipHeader.sourceAddress,
             srcPort: udpHeader.sourcePort,
-            dstIP: ip.destinationAddress,
+            dstIP: ipHeader.destinationAddress,
             dstPort: udpHeader.destinationPort
         )
 
@@ -417,7 +465,7 @@ public actor TUNRoutingEngine {
     // MARK: - DNS Handling
     // ============================================================
 
-    private func handleDNS(ip: IPHeader, udpHeader: UDPHeader, packetData: Data) async throws -> [Data] {
+    private func handleDNS(ipHeader: IPHeader, udpHeader: UDPHeader, packetData: Data) async throws -> [Data] {
         // Extract DNS payload (after IP + UDP headers)
         let dnsPayloadOffset = 28  // 20 (IP) + 8 (UDP)
         guard packetData.count > dnsPayloadOffset else {
@@ -513,10 +561,8 @@ public actor TUNRoutingEngine {
     // MARK: - ICMP Handling
     // ============================================================
 
-    private func handleICMP(ip: IPHeader, packetData: Data) async throws -> [Data] {
-        // For ICMP echo requests, we could send a response
-        // For now, just pass through
-        _ = ip
+    private func handleICMP(ipHeader: IPHeader, packetData: Data) async throws -> [Data] {
+        _ = ipHeader
         _ = packetData
         return []
     }
@@ -525,11 +571,11 @@ public actor TUNRoutingEngine {
     // MARK: - Helper Methods
     // ============================================================
 
-    private func parseTCPFromPacket(ip: IPHeader, packetData: Data) -> TCPHeader? {
-        let ipHeaderLength = 20
-        guard packetData.count > ipHeaderLength + 20 else { return nil }
+    private func parseTCPFromPacket(ipHeader: IPHeader, packetData: Data) -> TCPHeader? {
+        let headerOffset = 20
+        guard packetData.count > headerOffset + 20 else { return nil }
 
-        let offset = ipHeaderLength
+        let offset = headerOffset
         let srcPort = UInt16(packetData[offset]) << 8 | UInt16(packetData[offset + 1])
         let dstPort = UInt16(packetData[offset + 2]) << 8 | UInt16(packetData[offset + 3])
         let seqNum = UInt32(packetData[offset + 4]) << 24 | UInt32(packetData[offset + 5]) << 16 |
@@ -556,7 +602,7 @@ public actor TUNRoutingEngine {
         )
     }
 
-    private func parseUDPFromPacket(ip: IPHeader, packetData: Data) -> UDPHeader? {
+    private func parseUDPFromPacket(ipHeader: IPHeader, packetData: Data) -> UDPHeader? {
         let ipHeaderLength = 20
         guard packetData.count > ipHeaderLength + 8 else { return nil }
 
@@ -607,8 +653,8 @@ public actor TUNRoutingEngine {
         return response
     }
 
-    private func ipStringToData(_ ip: String) -> Data {
-        let parts = ip.split(separator: ".").compactMap { UInt8($0) }
+    private func ipStringToData(_ ipAddress: String) -> Data {
+        let parts = ipAddress.split(separator: ".").compactMap { UInt8($0) }
         return Data(parts)
     }
 }
