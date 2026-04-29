@@ -146,13 +146,53 @@ struct MihomoConfigGeneratorTests {
 
         let yaml = MihomoConfigGenerator.generate(config: config, options: options)
 
-        // TUN should be enabled
+        // TUN should be enabled with all required fields
         #expect(yaml.contains("tun:"))
         #expect(yaml.contains("enable: true"))
+        #expect(yaml.contains("device: utun120"))
         #expect(yaml.contains("stack: gvisor"))
         #expect(yaml.contains("auto-route: true"))
         #expect(yaml.contains("strict-route: true"))
+        #expect(yaml.contains("auto-detect-interface: true"))
         #expect(yaml.contains("dns-hijack:"))
+        #expect(yaml.contains("any:53"))
+    }
+
+    @Test("generates TUN mode config with custom device name")
+    func testGenerateTUNModeCustomDevice() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .tun,
+            tunDeviceName: "utun200"
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        #expect(yaml.contains("device: utun200"))
+        #expect(yaml.contains("enable: true"))
+    }
+
+    @Test("TUN device field omitted in system proxy mode")
+    func testTUNDeviceOmittedInSystemProxy() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .systemProxy
+        )
+
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        #expect(yaml.contains("enable: false"))
+        #expect(!yaml.contains("device:"))
+        #expect(yaml.contains("auto-route: false"))
+        #expect(yaml.contains("auto-detect-interface: false"))
     }
 
     @Test("generates proxy groups correctly")

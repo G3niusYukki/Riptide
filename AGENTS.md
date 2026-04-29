@@ -4,7 +4,7 @@
 
 Riptide is a native macOS proxy client built entirely in Swift 6. It has a **library-first architecture** with a pure Swift proxy engine (`Riptide` library), a SwiftUI client (`RiptideApp`), and a CLI tool (`RiptideCLI`). The app integrates with the [mihomo](https://github.com/MetaCubeX/mihomo) sidecar for production-grade runtime mode (System Proxy / TUN), while the library independently implements protocol framing, DNS resolution, rule matching, and connection orchestration.
 
-**Current state**: Beta — 366 tests in 57 suites, all passing.
+**Current state**: Beta — 467 tests in 71 suites, all passing.
 
 ## Environment
 
@@ -62,7 +62,7 @@ Command-line interface for tunnel management and configuration testing.
 
 ### Tests — `Tests/RiptideTests/`
 
-366 tests in 57 suites covering: config parsing, rule engine, DNS, protocols, transports, tunnel runtime, mihomo API, subscriptions, MITM config, localization, and more.
+467 tests in 71 suites covering: config parsing, rule engine, DNS, protocols, transports, tunnel runtime, mihomo API, subscriptions, MITM config, localization, and more.
 
 ## Build And Test
 
@@ -128,7 +128,7 @@ LocalHTTPConnectProxyServer / TUN packet
 ## Validation Expectations
 
 - Run targeted tests first when changing a focused area
-- Run `swift test` before claiming the work is complete (366/366 must pass)
+- Run `swift test` before claiming the work is complete (467/467 must pass)
 - If changing CLI behavior, verify with `swift run riptide ...`
 - If changing app-facing state or workflow code, sanity-check `RiptideApp` buildability
 

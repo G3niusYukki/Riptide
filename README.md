@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-465%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-467%20passing-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/ status-beta-orange" alt="Status" />
 </p>
@@ -133,7 +133,7 @@ Local Proxy / TUN packet
 | Mode | Status | Description |
 |------|--------|-------------|
 | **System Proxy** | Beta | Primary path — mihomo sidecar + macOS system proxy configuration |
-| **TUN Mode** | Gated | Disabled until mihomo TUN + signing + entitlements are verified end-to-end |
+| **TUN Mode** | Beta | mihomo TUN with gvisor stack — requires sudo (no Apple Developer account needed) |
 
 ---
 
@@ -187,7 +187,7 @@ This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for 
 # Build everything
 swift build
 
-# Run full test suite (465 tests, 71 suites)
+# Run full test suite (467 tests, 71 suites)
 swift test
 
 # Run a specific suite
@@ -246,7 +246,7 @@ Sources/
 │
 └── RiptideCLI/              # Command-line interface
 
-Tests/RiptideTests/          # 465 tests in 71 suites
+Tests/RiptideTests/          # 467 tests in 71 suites
 ```
 
 ---
@@ -256,7 +256,7 @@ Tests/RiptideTests/          # 465 tests in 71 suites
 - **TLS verification** enforced by Network.framework — no `skip-cert-verify` by default
 - **Proxy credentials** are never logged
 - **Privileged helper** boundary: launches mihomo only from `/Library/Application Support/Riptide/mihomo/`, validates all config paths, no arbitrary command execution
-- TUN / helper flows are **gated** until code signing, entitlements, and system-proxy recovery are verified end-to-end
+- TUN mode uses mihomo's built-in gvisor stack via sudo — no Network Extension or Apple Developer account required
 
 ---
 
@@ -266,7 +266,7 @@ Contributions are welcome! A few guidelines:
 
 1. **Library-first** — new protocol / transport logic belongs in `Sources/Riptide/`, not the app layer
 2. **Swift 6 strict concurrency** — all code must pass `Sendable` and actor isolation checks
-3. **Test coverage** — add tests for new behavior; `swift test` must pass (465 / 465)
+3. **Test coverage** — add tests for new behavior; `swift test` must pass (467 / 467)
 4. **No force unwraps** — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading
 6. **Dependency injection** — prefer injection over hard-coded global behavior

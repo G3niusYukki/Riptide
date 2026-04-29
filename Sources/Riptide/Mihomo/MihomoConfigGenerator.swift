@@ -35,6 +35,8 @@ public enum MihomoConfigGenerator {
         public let allowLAN: Bool
         /// Enable IPv6 (default: true).
         public let ipv6: Bool
+        /// TUN device name (default: "utun120"). Only used when mode is .tun.
+        public let tunDeviceName: String
 
         public init(
             mode: RuntimeMode,
@@ -42,7 +44,8 @@ public enum MihomoConfigGenerator {
             apiPort: Int = 9090,
             logLevel: String = "info",
             allowLAN: Bool = false,
-            ipv6: Bool = true
+            ipv6: Bool = true,
+            tunDeviceName: String = "utun120"
         ) {
             self.mode = mode
             self.mixedPort = mixedPort
@@ -50,6 +53,7 @@ public enum MihomoConfigGenerator {
             self.logLevel = logLevel
             self.allowLAN = allowLAN
             self.ipv6 = ipv6
+            self.tunDeviceName = tunDeviceName
         }
     }
 
@@ -73,11 +77,15 @@ public enum MihomoConfigGenerator {
         // TUN section
         lines.append("tun:")
         lines.append("  enable: \(options.mode == .tun)")
+        if options.mode == .tun {
+            lines.append("  device: \(options.tunDeviceName)")
+        }
         lines.append("  stack: gvisor")
         lines.append("  dns-hijack:")
-        lines.append("    - 0.0.0.0:53")
+        lines.append("    - any:53")
         lines.append("  auto-route: \(options.mode == .tun)")
         lines.append("  strict-route: \(options.mode == .tun)")
+        lines.append("  auto-detect-interface: \(options.mode == .tun)")
         lines.append("")
 
         // Proxies section
