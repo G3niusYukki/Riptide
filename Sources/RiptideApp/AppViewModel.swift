@@ -256,12 +256,17 @@ public final class AppViewModel: @unchecked Sendable {
 
         let runtimeMode: RuntimeMode = connectionMode == .tun ? .tun : .systemProxy
 
+        // TUN mode pre-check: mihomo binary must exist
+        if runtimeMode == .tun && !FileManager.default.isExecutableFile(atPath: MihomoPaths().executable) {
+            lastError = "TUN 模式需要 mihomo 二进制，请先下载"
+            return
+        }
+
         do {
             try await modeCoordinator.start(mode: runtimeMode, profile: profile.tunnelProfile)
             tunnelState = .running
             startStatsPolling()
-            // Fetch initial logs
-            Task { await fetchLogs() }
+            Task { await fetchLogs() } // Fetch initial logs
             lastError = nil
         } catch {
             lastError = String(describing: error)

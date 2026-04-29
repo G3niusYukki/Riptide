@@ -79,7 +79,7 @@ public struct RiptideMenuBar: View {
             Section("模式") {
                 Picker("模式", selection: $viewModel.selectedMode) {
                     Text("系统代理").tag(RuntimeMode.systemProxy)
-                    Text("TUN（暂不可用）").tag(RuntimeMode.tun).disabled(true)
+                    Text("TUN模式").tag(RuntimeMode.tun)
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
@@ -192,8 +192,8 @@ public final class MenuBarViewModel: ObservableObject {
     }
 
     private func updateProfiles() {
-        profiles = appViewModel.profiles.map { p in
-            (id: p.id, name: p.name, isActive: p.id == appViewModel.activeProfile?.id)
+        profiles = appViewModel.profiles.map { prof in
+            (id: prof.id, name: prof.name, isActive: prof.id == appViewModel.activeProfile?.id)
         }
     }
 
