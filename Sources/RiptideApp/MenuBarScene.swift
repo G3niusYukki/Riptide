@@ -192,8 +192,8 @@ public final class MenuBarViewModel: ObservableObject {
     }
 
     private func updateProfiles() {
-        profiles = appViewModel.profiles.map { p in
-            (id: p.id, name: p.name, isActive: p.id == appViewModel.activeProfile?.id)
+        profiles = appViewModel.profiles.map { prof in
+            (id: prof.id, name: prof.name, isActive: prof.id == appViewModel.activeProfile?.id)
         }
     }
 

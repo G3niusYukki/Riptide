@@ -305,7 +305,17 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.apiNotAvailable
         }
 
-        // 9. Set system proxy if in systemProxy mode
+        // 9. Apply mode-specific post-start configuration
+        await applyPostStartConfiguration(mode: mode, helperInstalled: helperInstalled)
+
+        // 10. Set isRunning = true
+        isRunning = true
+        currentMode = mode
+        currentProfile = profile
+    }
+
+    /// Applies mode-specific configuration after mihomo is confirmed running.
+    private func applyPostStartConfiguration(mode: RuntimeMode, helperInstalled: Bool) async {
         if mode == .systemProxy {
             if helperInstalled {
                 let service = await detectPrimaryService()
@@ -321,19 +331,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             }
         }
 
-        // 9b. Verify TUN interface exists if in TUN mode
         if mode == .tun {
             let tunReady = await verifyTUNInterface()
             if !tunReady {
                 print("[MihomoRuntimeManager] Warning: TUN interface \(tunDeviceName) not detected after startup")
-                // Non-fatal — mihomo may still be setting up the interface
             }
         }
-
-        // 10. Set isRunning = true
-        isRunning = true
-        currentMode = mode
-        currentProfile = profile
     }
 
     /// Stops the mihomo runtime.

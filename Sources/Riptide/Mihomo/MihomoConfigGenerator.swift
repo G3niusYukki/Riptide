@@ -167,121 +167,101 @@ public enum MihomoConfigGenerator {
     private static func appendProxyFields(proxy: ProxyNode, to lines: inout [String]) {
         switch proxy.kind {
         case .shadowsocks:
-            if let cipher = proxy.cipher {
-                lines.append("    cipher: \(yamlEscape(cipher))")
-            }
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
-
+            appendCipherAndPassword(proxy: proxy, to: &lines)
         case .vmess:
-            if let uuid = proxy.uuid {
-                lines.append("    uuid: \(yamlEscape(uuid))")
-            }
-            if let alterId = proxy.alterId {
-                lines.append("    alterId: \(alterId)")
-            }
-            // security becomes cipher in mihomo
-            if let security = proxy.security {
-                lines.append("    cipher: \(yamlEscape(security))")
-            } else if proxy.security == nil && proxy.uuid != nil {
-                // Default cipher for VMess
-                lines.append("    cipher: auto")
-            }
-            if let network = proxy.network {
-                lines.append("    network: \(yamlEscape(network))")
-            }
-            if let sni = proxy.sni {
-                lines.append("    servername: \(yamlEscape(sni))")
-            }
-            if let skipCertVerify = proxy.skipCertVerify {
-                lines.append("    skip-cert-verify: \(skipCertVerify)")
-            }
-            if let wsPath = proxy.wsPath {
-                lines.append("    ws-path: \(yamlEscape(wsPath))")
-            }
-            if let wsHost = proxy.wsHost {
-                lines.append("    ws-headers:")
-                lines.append("      Host: \(yamlEscape(wsHost))")
-            }
-
+            appendVMessFields(proxy: proxy, to: &lines)
         case .vless:
-            if let uuid = proxy.uuid {
-                lines.append("    uuid: \(yamlEscape(uuid))")
-            }
-            if let flow = proxy.flow {
-                lines.append("    flow: \(yamlEscape(flow))")
-            }
-            // sni becomes servername in mihomo
-            if let sni = proxy.sni {
-                lines.append("    servername: \(yamlEscape(sni))")
-            }
-            if let network = proxy.network {
-                lines.append("    network: \(yamlEscape(network))")
-            }
-            if let skipCertVerify = proxy.skipCertVerify {
-                lines.append("    skip-cert-verify: \(skipCertVerify)")
-            }
-
+            appendVLESSFields(proxy: proxy, to: &lines)
         case .trojan:
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
-            if let sni = proxy.sni {
-                lines.append("    sni: \(yamlEscape(sni))")
-            }
-            if let skipCertVerify = proxy.skipCertVerify {
-                lines.append("    skip-cert-verify: \(skipCertVerify)")
-            }
-            if let network = proxy.network {
-                lines.append("    network: \(yamlEscape(network))")
-            }
-
+            appendPassword(proxy: proxy, to: &lines)
+            appendSNIAndCertFields(proxy: proxy, to: &lines, sniKey: "sni")
+            appendNetwork(proxy: proxy, to: &lines)
         case .hysteria2:
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
-            if let sni = proxy.sni {
-                lines.append("    sni: \(yamlEscape(sni))")
-            }
-            if let skipCertVerify = proxy.skipCertVerify {
-                lines.append("    skip-cert-verify: \(skipCertVerify)")
-            }
-
+            appendPassword(proxy: proxy, to: &lines)
+            appendSNIAndCertFields(proxy: proxy, to: &lines, sniKey: "sni")
         case .snell:
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
+            appendPassword(proxy: proxy, to: &lines)
             if let version = proxy.snellVersion {
                 lines.append("    version: \(version)")
             }
-
         case .relay:
             if let chainProxyName = proxy.chainProxyName {
                 lines.append("    relay: \(yamlEscape(chainProxyName))")
             }
-
         case .tuic:
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
-            if let sni = proxy.sni {
-                lines.append("    sni: \(yamlEscape(sni))")
-            }
-            if let skipCertVerify = proxy.skipCertVerify {
-                lines.append("    skip-cert-verify: \(skipCertVerify)")
-            }
-
-
+            appendPassword(proxy: proxy, to: &lines)
+            appendSNIAndCertFields(proxy: proxy, to: &lines, sniKey: "sni")
         case .http, .socks5:
             // For HTTP/SOCKS5, cipher is used as username
             if let cipher = proxy.cipher {
                 lines.append("    username: \(yamlEscape(cipher))")
             }
-            if let password = proxy.password {
-                lines.append("    password: \(yamlEscape(password))")
-            }
+            appendPassword(proxy: proxy, to: &lines)
         }
+    }
+
+    private static func appendPassword(proxy: ProxyNode, to lines: inout [String]) {
+        if let password = proxy.password {
+            lines.append("    password: \(yamlEscape(password))")
+        }
+    }
+
+    private static func appendCipherAndPassword(proxy: ProxyNode, to lines: inout [String]) {
+        if let cipher = proxy.cipher {
+            lines.append("    cipher: \(yamlEscape(cipher))")
+        }
+        appendPassword(proxy: proxy, to: &lines)
+    }
+
+    private static func appendSNIAndCertFields(
+        proxy: ProxyNode, to lines: inout [String], sniKey: String = "servername"
+    ) {
+        if let sni = proxy.sni {
+            lines.append("    \(sniKey): \(yamlEscape(sni))")
+        }
+        if let skipCertVerify = proxy.skipCertVerify {
+            lines.append("    skip-cert-verify: \(skipCertVerify)")
+        }
+    }
+
+    private static func appendNetwork(proxy: ProxyNode, to lines: inout [String]) {
+        if let network = proxy.network {
+            lines.append("    network: \(yamlEscape(network))")
+        }
+    }
+
+    private static func appendVMessFields(proxy: ProxyNode, to lines: inout [String]) {
+        if let uuid = proxy.uuid {
+            lines.append("    uuid: \(yamlEscape(uuid))")
+        }
+        if let alterId = proxy.alterId {
+            lines.append("    alterId: \(alterId)")
+        }
+        if let security = proxy.security {
+            lines.append("    cipher: \(yamlEscape(security))")
+        } else if proxy.security == nil && proxy.uuid != nil {
+            lines.append("    cipher: auto")
+        }
+        appendNetwork(proxy: proxy, to: &lines)
+        appendSNIAndCertFields(proxy: proxy, to: &lines)
+        if let wsPath = proxy.wsPath {
+            lines.append("    ws-path: \(yamlEscape(wsPath))")
+        }
+        if let wsHost = proxy.wsHost {
+            lines.append("    ws-headers:")
+            lines.append("      Host: \(yamlEscape(wsHost))")
+        }
+    }
+
+    private static func appendVLESSFields(proxy: ProxyNode, to lines: inout [String]) {
+        if let uuid = proxy.uuid {
+            lines.append("    uuid: \(yamlEscape(uuid))")
+        }
+        if let flow = proxy.flow {
+            lines.append("    flow: \(yamlEscape(flow))")
+        }
+        appendSNIAndCertFields(proxy: proxy, to: &lines)
+        appendNetwork(proxy: proxy, to: &lines)
     }
 
     /// Converts a Riptide ProxyRule to a mihomo rule string.
