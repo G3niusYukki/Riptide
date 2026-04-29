@@ -7,13 +7,32 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
-docs/superpowers/
+.omc/
+.claude/
 
+# Runtime state (not project source)
+/state/
+
+# AI tool configs
+.opencode/
+docs/superpowers/
 docs/stage-plans/
+docs/analysis/
+
+# Internal planning docs (not user-facing)
+docs/mihomo-tun-plan.md
+docs/COMPETITIVE-ROADMAP-*.md
+docs/IMPROVEMENT-PLAN.md
+docs/IMPROVEMENT-PLAN-*.md
+docs/WINDOWS-PORT-PLAN.md
+
+# Dev artifacts
+pr-body.md
+RELEASE-REPORT.md
+TEST-FIX-SUMMARY.md
+create-pr.sh
 
 # mihomo binary (downloaded during build)
 Resources/mihomo
 Resources/mihomo-*
 *.gz
-.omc/
-.claude/
