@@ -535,25 +535,17 @@ public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Subscription Management
 
-    /// Starts the subscription auto-update scheduler.
-    /// Checks every 5 minutes for subscriptions that need updating.
+    /// Starts the subscription auto-update scheduler (5-minute interval).
     private func startSubscriptionScheduler() {
-        let scheduler = SubscriptionUpdateScheduler(
-            manager: subscriptionManager,
-            checkInterval: 300 // 5 minutes
-        )
-        Task {
-            await scheduler.start()
-        }
+        let scheduler = SubscriptionUpdateScheduler(manager: subscriptionManager, checkInterval: 300)
+        Task { await scheduler.start() }
         subscriptionScheduler = scheduler
     }
 
     /// Stops the subscription auto-update scheduler.
     private func stopSubscriptionScheduler() {
         guard let scheduler = subscriptionScheduler else { return }
-        Task {
-            await scheduler.stop()
-        }
+        Task { await scheduler.stop() }
         subscriptionScheduler = nil
     }
 

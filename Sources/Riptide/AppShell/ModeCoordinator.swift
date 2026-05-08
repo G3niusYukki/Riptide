@@ -228,12 +228,12 @@ public actor ModeCoordinator {
     /// Starts the system proxy guard and monitor for system proxy mode.
     private func startSystemProxyGuard() async {
         guard let controller = await resolveSystemProxyController() else { return }
-        let guard_ = SystemProxyGuard(controller: controller)
+        let proxyGuard = SystemProxyGuard(controller: controller)
         do {
-            try await guard_.enable(expectedHTTPPort: ModeCoordinator.defaultHTTPPort, expectedSOCKSPort: nil)
+            try await proxyGuard.enable(expectedHTTPPort: ModeCoordinator.defaultHTTPPort, expectedSOCKSPort: nil)
             let monitor = SystemProxyMonitor(controller: controller)
-            await monitor.start(interval: 5.0, guard: guard_)
-            self.systemProxyGuard = guard_
+            await monitor.start(interval: 5.0, guard: proxyGuard)
+            self.systemProxyGuard = proxyGuard
             self.systemProxyMonitor = monitor
         } catch {
             // Guard setup failure is non-fatal — log and continue

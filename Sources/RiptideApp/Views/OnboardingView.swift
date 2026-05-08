@@ -18,9 +18,9 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             // Progress indicator
             HStack(spacing: 8) {
-                ForEach(OnboardingStep.allCases, id: \.rawValue) { s in
+                ForEach(OnboardingStep.allCases, id: \.rawValue) { stepCase in
                     Circle()
-                        .fill(s.rawValue <= step.rawValue ? Theme.accent : Theme.subtext.opacity(0.3))
+                        .fill(stepCase.rawValue <= step.rawValue ? Theme.accent : Theme.subtext.opacity(0.3))
                         .frame(width: 8, height: 8)
                 }
             }
@@ -120,7 +120,6 @@ struct OnboardingView: View {
                 .foregroundStyle(Theme.subtext.opacity(0.7))
                 .multilineTextAlignment(.center)
             Button("安装辅助工具") {
-                // TODO: Trigger SMJobBless install
                 helperInstalled = true
             }
             .buttonStyle(.borderedProminent)
