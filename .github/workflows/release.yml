@@ -201,6 +201,8 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
