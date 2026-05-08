@@ -58,12 +58,16 @@ jobs:
           # Build for each architecture separately (multi-arch SPM build is broken)
           swift build --product RiptideApp -c release --arch arm64 --scratch-path .build-arm64
           swift build --product RiptideApp -c release --arch x86_64 --scratch-path .build-x86_64
+          # Find the actual binary paths
+          ARM64_BIN=$(find .build-arm64 -name RiptideApp -type f | head -1)
+          X86_64_BIN=$(find .build-x86_64 -name RiptideApp -type f | head -1)
+          echo "arm64 binary: $ARM64_BIN"
+          echo "x86_64 binary: $X86_64_BIN"
+          lipo -info "$ARM64_BIN"
+          lipo -info "$X86_64_BIN"
           # Create universal binary with lipo
           mkdir -p .build/apple/Products/Release
-          lipo -create \
-            .build-arm64/apple/Products/Release/RiptideApp \
-            .build-x86_64/apple/Products/Release/RiptideApp \
-            -output .build/apple/Products/Release/RiptideApp
+          lipo -create "$ARM64_BIN" "$X86_64_BIN" -output .build/apple/Products/Release/RiptideApp
           lipo -info .build/apple/Products/Release/RiptideApp
 
       - name: Package and Sign
