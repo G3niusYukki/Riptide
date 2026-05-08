@@ -130,6 +130,9 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     private let healthCheckRetries = 10
     private let healthCheckRetryInterval: UInt64 = 500_000_000  // 500ms in nanoseconds
 
+    /// TUN monitoring task for continuous interface health checking.
+    private var tunMonitorTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     /// Creates a new MihomoRuntimeManager with the specified dependencies.
@@ -336,12 +339,67 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             if !tunReady {
                 print("[MihomoRuntimeManager] Warning: TUN interface \(tunDeviceName) not detected after startup")
             }
+            startTUNMonitoring()
+        }
+    }
+
+    // MARK: - TUN Monitoring
+
+    /// Whether TUN interface monitoring is currently active.
+    public var isTUNMonitoringActive: Bool {
+        tunMonitorTask != nil
+    }
+
+    /// Starts continuous TUN interface health monitoring.
+    /// Checks the TUN interface every 10 seconds and attempts recovery if it goes down.
+    private func startTUNMonitoring() {
+        tunMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                let shouldContinue = await self.isTUNMonitoringHealthy()
+                guard shouldContinue else { break }
+                let healthy = await self.verifyTUNInterface()
+                if !healthy {
+                    print("[MihomoRuntimeManager] TUN interface down — attempting recovery")
+                    await self.attemptTUNRecovery()
+                }
+            }
+        }
+    }
+
+    /// Checks if TUN monitoring should continue (runtime is running and in TUN mode).
+    private func isTUNMonitoringHealthy() -> Bool {
+        isRunning && currentMode == .tun
+    }
+
+    /// Stops TUN interface monitoring.
+    private func stopTUNMonitoring() {
+        tunMonitorTask?.cancel()
+        tunMonitorTask = nil
+    }
+
+    /// Attempts to recover TUN mode by restarting mihomo.
+    private func attemptTUNRecovery() async {
+        guard let profile = currentProfile else { return }
+        print("[MihomoRuntimeManager] Stopping mihomo for TUN recovery")
+        try? await stop()
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds cooldown
+        print("[MihomoRuntimeManager] Restarting mihomo for TUN recovery")
+        do {
+            try await start(mode: .tun, profile: profile)
+            print("[MihomoRuntimeManager] TUN recovery succeeded")
+        } catch {
+            print("[MihomoRuntimeManager] TUN recovery failed: \(error)")
         }
     }
 
     /// Stops the mihomo runtime.
     /// - Throws: RuntimeError if shutdown fails or runtime is not running.
     public func stop() async throws {
+        // 0. Stop TUN monitoring
+        stopTUNMonitoring()
+
         // 1. Verify running
         guard isRunning else {
             throw RuntimeError.notRunning
