@@ -86,6 +86,16 @@ public enum MihomoConfigGenerator {
         lines.append("  auto-route: \(options.mode == .tun)")
         lines.append("  strict-route: \(options.mode == .tun)")
         lines.append("  auto-detect-interface: \(options.mode == .tun)")
+        if options.mode == .tun {
+            lines.append("  route-address-exclude:")
+            lines.append("    - 192.168.0.0/16")
+            lines.append("    - 10.0.0.0/8")
+            lines.append("    - 172.16.0.0/12")
+            lines.append("    - 127.0.0.0/8")
+            lines.append("    - 169.254.0.0/16")
+            lines.append("    - 224.0.0.0/4")
+            lines.append("    - 255.255.255.255/32")
+        }
         lines.append("")
 
         // Proxies section

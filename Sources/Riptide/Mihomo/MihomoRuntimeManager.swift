@@ -431,7 +431,10 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         // 4. TUN cleanup — mihomo exits and auto-destroys the utun interface,
         //    but DNS cache may still contain hijacked entries. Flush it.
         if wasTunMode {
-            await flushDNSCache()
+            let flushed = await flushDNSCache()
+            if !flushed {
+                print("[MihomoRuntimeManager] Warning: DNS cache flush failed, stale entries may persist")
+            }
         }
 
         // 5. Cleanup
@@ -721,19 +724,25 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// Flushes the macOS DNS cache after TUN mode stops.
     /// mihomo's TUN mode hijacks all DNS (port 53), and while the utun interface
     /// is destroyed on exit, cached DNS entries may still point through the old path.
-    private func flushDNSCache() async {
+    /// Flushes the macOS DNS cache after TUN mode stops.
+    /// Returns true if both commands succeeded.
+    @discardableResult
+    private func flushDNSCache() async -> Bool {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         proc.arguments = ["dscacheutil", "-flushcache"]
-        // Suppress output
         proc.standardOutput = FileHandle.nullDevice
         proc.standardError = FileHandle.nullDevice
         do {
             try proc.run()
             proc.waitUntilExit()
+            guard proc.terminationStatus == 0 else {
+                print("[MihomoRuntimeManager] Warning: dscacheutil -flushcache exited with \(proc.terminationStatus)")
+                return false
+            }
         } catch {
-            // Non-critical — DNS will eventually expire naturally
             print("[MihomoRuntimeManager] Warning: DNS cache flush failed: \(error)")
+            return false
         }
 
         // Also signal mDNSResponder to reload
@@ -746,7 +755,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             try mDNSProc.run()
             mDNSProc.waitUntilExit()
         } catch {
-            // Non-critical
+            // Non-critical — mDNSResponder will eventually refresh
         }
+        return true
     }
 }

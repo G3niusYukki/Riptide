@@ -897,4 +897,39 @@ struct MihomoConfigGeneratorTests {
         #expect(yaml.contains("name: my-proxy:name"))
         #expect(yaml.contains("- my-proxy:name"))
     }
+
+    // MARK: - TUN Route Exclusions
+
+    @Test("TUN config includes route-address-exclude for LAN ranges")
+    func testTUNRouteAddressExclude() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .tun)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        #expect(yaml.contains("route-address-exclude:"))
+        #expect(yaml.contains("192.168.0.0/16"))
+        #expect(yaml.contains("10.0.0.0/8"))
+        #expect(yaml.contains("172.16.0.0/12"))
+        #expect(yaml.contains("127.0.0.0/8"))
+        #expect(yaml.contains("169.254.0.0/16"))
+        #expect(yaml.contains("224.0.0.0/4"))
+        #expect(yaml.contains("255.255.255.255/32"))
+    }
+
+    @Test("System proxy config does not include route-address-exclude")
+    func testSystemProxyNoRouteExclude() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+
+        #expect(!yaml.contains("route-address-exclude:"))
+    }
 }
