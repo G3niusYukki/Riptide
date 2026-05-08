@@ -36,10 +36,12 @@ jobs:
       - name: Cache Swift Build
         uses: actions/cache@v4
         with:
-          path: .build
-          key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
+          path: |
+            .build-arm64
+            .build-x86_64
+          key: ${{ runner.os }}-swift-universal-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swift-
+            ${{ runner.os }}-swift-universal-
 
       - name: Setup signing
         if: env.MACOS_CERTIFICATE != ''
@@ -52,7 +54,17 @@ jobs:
           ./Scripts/setup-signing.sh
 
       - name: Build Universal Binary
-        run: xcrun swift build --product RiptideApp -c release --arch x86_64 --arch arm64
+        run: |
+          # Build for each architecture separately (multi-arch SPM build is broken)
+          swift build --product RiptideApp -c release --arch arm64 --scratch-path .build-arm64
+          swift build --product RiptideApp -c release --arch x86_64 --scratch-path .build-x86_64
+          # Create universal binary with lipo
+          mkdir -p .build/apple/Products/Release
+          lipo -create \
+            .build-arm64/apple/Products/Release/RiptideApp \
+            .build-x86_64/apple/Products/Release/RiptideApp \
+            -output .build/apple/Products/Release/RiptideApp
+          lipo -info .build/apple/Products/Release/RiptideApp
 
       - name: Package and Sign
         env:
