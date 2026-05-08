@@ -130,6 +130,9 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     private let healthCheckRetries = 10
     private let healthCheckRetryInterval: UInt64 = 500_000_000  // 500ms in nanoseconds
 
+    /// TUN monitoring task for continuous interface health checking.
+    private var tunMonitorTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     /// Creates a new MihomoRuntimeManager with the specified dependencies.
@@ -336,12 +339,67 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             if !tunReady {
                 print("[MihomoRuntimeManager] Warning: TUN interface \(tunDeviceName) not detected after startup")
             }
+            startTUNMonitoring()
+        }
+    }
+
+    // MARK: - TUN Monitoring
+
+    /// Whether TUN interface monitoring is currently active.
+    public var isTUNMonitoringActive: Bool {
+        tunMonitorTask != nil
+    }
+
+    /// Starts continuous TUN interface health monitoring.
+    /// Checks the TUN interface every 10 seconds and attempts recovery if it goes down.
+    private func startTUNMonitoring() {
+        tunMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+                let shouldContinue = await self.isTUNMonitoringHealthy()
+                guard shouldContinue else { break }
+                let healthy = await self.verifyTUNInterface()
+                if !healthy {
+                    print("[MihomoRuntimeManager] TUN interface down — attempting recovery")
+                    await self.attemptTUNRecovery()
+                }
+            }
+        }
+    }
+
+    /// Checks if TUN monitoring should continue (runtime is running and in TUN mode).
+    private func isTUNMonitoringHealthy() -> Bool {
+        isRunning && currentMode == .tun
+    }
+
+    /// Stops TUN interface monitoring.
+    private func stopTUNMonitoring() {
+        tunMonitorTask?.cancel()
+        tunMonitorTask = nil
+    }
+
+    /// Attempts to recover TUN mode by restarting mihomo.
+    private func attemptTUNRecovery() async {
+        guard let profile = currentProfile else { return }
+        print("[MihomoRuntimeManager] Stopping mihomo for TUN recovery")
+        try? await stop()
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds cooldown
+        print("[MihomoRuntimeManager] Restarting mihomo for TUN recovery")
+        do {
+            try await start(mode: .tun, profile: profile)
+            print("[MihomoRuntimeManager] TUN recovery succeeded")
+        } catch {
+            print("[MihomoRuntimeManager] TUN recovery failed: \(error)")
         }
     }
 
     /// Stops the mihomo runtime.
     /// - Throws: RuntimeError if shutdown fails or runtime is not running.
     public func stop() async throws {
+        // 0. Stop TUN monitoring
+        stopTUNMonitoring()
+
         // 1. Verify running
         guard isRunning else {
             throw RuntimeError.notRunning
@@ -373,7 +431,10 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         // 4. TUN cleanup — mihomo exits and auto-destroys the utun interface,
         //    but DNS cache may still contain hijacked entries. Flush it.
         if wasTunMode {
-            await flushDNSCache()
+            let flushed = await flushDNSCache()
+            if !flushed {
+                print("[MihomoRuntimeManager] Warning: DNS cache flush failed, stale entries may persist")
+            }
         }
 
         // 5. Cleanup
@@ -663,19 +724,25 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// Flushes the macOS DNS cache after TUN mode stops.
     /// mihomo's TUN mode hijacks all DNS (port 53), and while the utun interface
     /// is destroyed on exit, cached DNS entries may still point through the old path.
-    private func flushDNSCache() async {
+    /// Flushes the macOS DNS cache after TUN mode stops.
+    /// Returns true if both commands succeeded.
+    @discardableResult
+    private func flushDNSCache() async -> Bool {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         proc.arguments = ["dscacheutil", "-flushcache"]
-        // Suppress output
         proc.standardOutput = FileHandle.nullDevice
         proc.standardError = FileHandle.nullDevice
         do {
             try proc.run()
             proc.waitUntilExit()
+            guard proc.terminationStatus == 0 else {
+                print("[MihomoRuntimeManager] Warning: dscacheutil -flushcache exited with \(proc.terminationStatus)")
+                return false
+            }
         } catch {
-            // Non-critical — DNS will eventually expire naturally
             print("[MihomoRuntimeManager] Warning: DNS cache flush failed: \(error)")
+            return false
         }
 
         // Also signal mDNSResponder to reload
@@ -688,7 +755,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             try mDNSProc.run()
             mDNSProc.waitUntilExit()
         } catch {
-            // Non-critical
+            // Non-critical — mDNSResponder will eventually refresh
         }
+        return true
     }
 }

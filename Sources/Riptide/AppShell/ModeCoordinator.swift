@@ -5,17 +5,23 @@ import Foundation
 /// Surfaces degraded-state recommendations when a mode fails to start.
 public actor ModeCoordinator {
     private let mihomoManager: any MihomoRuntimeManaging
+    private let systemProxyController: (any SystemProxyControlling)?
     private var activeMode: RuntimeMode
     private var eventBuffer: [RuntimeEvent]
     private var providerScheduler: ProviderUpdateScheduler?
     private var registeredProviders: [UUID: ProxyProviderConfig] = [:]
+    private var systemProxyGuard: SystemProxyGuard?
+    private var systemProxyMonitor: SystemProxyMonitor?
+    private var healthCheckTask: Task<Void, Never>?
+    private var healthResults: [String: HealthResult] = [:]
 
     private let maxEvents = 100
 
     public static let defaultHTTPPort: Int = 6152
 
-    public init(mihomoManager: any MihomoRuntimeManaging) {
+    public init(mihomoManager: any MihomoRuntimeManaging, systemProxyController: (any SystemProxyControlling)? = nil) {
         self.mihomoManager = mihomoManager
+        self.systemProxyController = systemProxyController
         self.activeMode = .systemProxy
         self.eventBuffer = []
     }
@@ -33,6 +39,14 @@ public actor ModeCoordinator {
             activeMode = mode
             emit(.modeChanged(mode))
             emit(.stateChanged(.running))
+
+            // Start system proxy guard if in system proxy mode
+            if mode == .systemProxy {
+                await startSystemProxyGuard()
+            }
+
+            // Start periodic health checks for proxies
+            startHealthChecks(proxies: profile.config.proxies)
 
             // Initialize Provider scheduler
             providerScheduler = ProviderUpdateScheduler { [weak self] providerID in
@@ -52,6 +66,12 @@ public actor ModeCoordinator {
     }
 
     public func stop() async throws {
+        // Stop health checks
+        stopHealthChecks()
+
+        // Stop system proxy guard first
+        await stopSystemProxyGuard()
+
         // Stop Provider scheduler
         await providerScheduler?.stopAll()
         providerScheduler = nil
@@ -67,6 +87,21 @@ public actor ModeCoordinator {
             )))
             throw error
         }
+    }
+
+    /// Atomically switches from the current mode to a new mode.
+    /// Ensures the previous mode is fully stopped before starting the new one.
+    public func switchMode(to newMode: RuntimeMode, profile: TunnelProfile?) async throws {
+        // 1. Stop current mode completely
+        if await mihomoManager.isRunning {
+            try await stop()
+        }
+
+        // 2. Brief pause to let OS clean up network interfaces
+        try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+
+        // 3. Start new mode
+        try await start(mode: newMode, profile: profile)
     }
 
     /// The current runtime mode.
@@ -181,6 +216,106 @@ public actor ModeCoordinator {
         // Create a temporary provider to refresh
         let provider = ProxyProvider(config: config)
         try? await provider.refresh()
+    }
+
+    // MARK: - System Proxy Guard
+
+    /// Whether the system proxy guard is currently active.
+    public func isSystemProxyGuarded() -> Bool {
+        systemProxyGuard != nil
+    }
+
+    /// Starts the system proxy guard and monitor for system proxy mode.
+    private func startSystemProxyGuard() async {
+        guard let controller = await resolveSystemProxyController() else { return }
+        let guard_ = SystemProxyGuard(controller: controller)
+        do {
+            try await guard_.enable(expectedHTTPPort: ModeCoordinator.defaultHTTPPort, expectedSOCKSPort: nil)
+            let monitor = SystemProxyMonitor(controller: controller)
+            await monitor.start(interval: 5.0, guard: guard_)
+            self.systemProxyGuard = guard_
+            self.systemProxyMonitor = monitor
+        } catch {
+            // Guard setup failure is non-fatal — log and continue
+            emit(.error(RuntimeErrorSnapshot(
+                code: "E_GUARD_FAILED",
+                message: "System proxy guard setup failed: \(error.localizedDescription)"
+            )))
+        }
+    }
+
+    /// Stops the system proxy guard and monitor.
+    private func stopSystemProxyGuard() async {
+        await systemProxyMonitor?.stop()
+        systemProxyMonitor = nil
+        await systemProxyGuard?.disable()
+        systemProxyGuard = nil
+    }
+
+    /// Resolves the system proxy controller, using the injected one or creating a default.
+    /// Returns nil if no controller is available (e.g., in test environments without a helper).
+    private func resolveSystemProxyController() async -> (any SystemProxyControlling)? {
+        if let controller = systemProxyController {
+            return controller
+        }
+        // Only create a real controller if the helper is installed
+        let helperInstalled = await mihomoManager.helperConnection.isHelperInstalled()
+        guard helperInstalled else { return nil }
+        return macOSSystemProxyController(helperConnection: await mihomoManager.helperConnection)
+    }
+
+    // MARK: - Health Checks
+
+    /// Periodically tests proxy delays via the mihomo API.
+    /// Runs every 5 minutes for all proxies in the current profile.
+    private func startHealthChecks(proxies: [ProxyNode], interval: Duration = .seconds(300)) {
+        guard !proxies.isEmpty else { return }
+        healthCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                await self.testAllProxies(proxies: proxies)
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    private func stopHealthChecks() {
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
+        healthResults.removeAll()
+    }
+
+    /// Tests delay for all proxies and stores results.
+    public func testAllProxies(proxies: [ProxyNode]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for proxy in proxies {
+                group.addTask { [weak self] in
+                    guard let self else { return }
+                    let delay = await self.testProxyDelay(proxyName: proxy.name)
+                    let result = HealthResult(
+                        nodeName: proxy.name,
+                        latency: delay,
+                        alive: delay != nil
+                    )
+                    await self.storeHealthResult(result)
+                }
+            }
+        }
+    }
+
+    /// Stores a health check result.
+    private func storeHealthResult(_ result: HealthResult) {
+        healthResults[result.nodeName] = result
+    }
+
+    /// Returns the health result for a specific proxy.
+    public func healthResult(for name: String) -> HealthResult? {
+        healthResults[name]
+    }
+
+    /// Returns all health check results.
+    public func allHealthResults() -> [String: HealthResult] {
+        healthResults
     }
 
     private func emit(_ event: RuntimeEvent) {

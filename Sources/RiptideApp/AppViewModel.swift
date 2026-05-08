@@ -204,6 +204,7 @@ public final class AppViewModel: @unchecked Sendable {
     private let profileStore: ProfileStore
     private var statsTask: Task<Void, Never>?
     private let smManager: SMJobBlessManager
+    private var subscriptionScheduler: SubscriptionUpdateScheduler?
 
     // MARK: - Init
 
@@ -224,6 +225,7 @@ public final class AppViewModel: @unchecked Sendable {
             await loadProfilesFromStore()
 
             await loadSubscriptionsFromBackend()
+            startSubscriptionScheduler()
             await checkMihomoOnLaunch()
         }
     }
@@ -532,6 +534,28 @@ public final class AppViewModel: @unchecked Sendable {
     }
 
     // MARK: - Subscription Management
+
+    /// Starts the subscription auto-update scheduler.
+    /// Checks every 5 minutes for subscriptions that need updating.
+    private func startSubscriptionScheduler() {
+        let scheduler = SubscriptionUpdateScheduler(
+            manager: subscriptionManager,
+            checkInterval: 300 // 5 minutes
+        )
+        Task {
+            await scheduler.start()
+        }
+        subscriptionScheduler = scheduler
+    }
+
+    /// Stops the subscription auto-update scheduler.
+    private func stopSubscriptionScheduler() {
+        guard let scheduler = subscriptionScheduler else { return }
+        Task {
+            await scheduler.stop()
+        }
+        subscriptionScheduler = nil
+    }
 
     /// Loads subscriptions from the backend and refreshes their display profiles.
     public func loadSubscriptionsFromBackend() async {

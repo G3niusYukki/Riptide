@@ -3,41 +3,86 @@ import ServiceManagement
 import Security
 import Combine
 
-/// Manages the installation and status checking of the privileged helper tool via SMJobBless.
-/// This is required for TUN mode which needs root privileges to configure network interfaces.
+/// Manages the installation and status checking of the privileged helper tool.
+///
+/// Uses `SMAppService.daemon()` on macOS 13+ for a modern, system-managed experience.
+/// Falls back to `SMJobBless` on older systems.
 final class SMJobBlessManager: ObservableObject {
     @Published var isHelperInstalled: Bool = false
     @Published var installationError: String?
     @Published var isInstalling: Bool = false
 
     private let helperLabel = "com.riptide.helper"
+    private let plistName = "com.riptide.helper.plist"
 
     init() {
         checkHelperStatus()
     }
 
-    /// Checks whether the privileged helper tool is currently registered with launchd.
+    // MARK: - Status Check
+
+    /// Checks whether the privileged helper tool is currently registered.
     func checkHelperStatus() {
+        if #available(macOS 13.0, *) {
+            checkHelperStatusModern()
+        } else {
+            checkHelperStatusLegacy()
+        }
+    }
+
+    @available(macOS 13.0, *)
+    private func checkHelperStatusModern() {
+        let service = SMAppService.daemon(plistName: plistName)
+        isHelperInstalled = service.status == .enabled
+    }
+
+    private func checkHelperStatusLegacy() {
         guard let jobDict = SMJobCopyDictionary(kSMDomainSystemLaunchd, helperLabel as CFString)?.takeRetainedValue() as? [String: Any] else {
             isHelperInstalled = false
             return
         }
-
-        // Check if the job is enabled
         let enabled = jobDict["Enabled"] as? Bool ?? true
         isHelperInstalled = enabled
     }
 
-    /// Installs the privileged helper tool using SMJobBless.
-    /// This requires admin privileges and will prompt the user for authentication.
+    // MARK: - Installation
+
+    /// Installs the privileged helper tool.
+    /// On macOS 13+, uses `SMAppService.daemon()` for system-managed installation.
+    /// Falls back to `SMJobBless` on older systems.
     func installHelper() {
         guard !isInstalling else { return }
 
         isInstalling = true
         installationError = nil
 
+        if #available(macOS 13.0, *) {
+            installHelperModern()
+        } else {
+            installHelperLegacy()
+        }
+    }
+
+    @available(macOS 13.0, *)
+    private func installHelperModern() {
+        let service = SMAppService.daemon(plistName: plistName)
+
         do {
-            // Create authorization reference
+            try service.register()
+            checkHelperStatus()
+
+            if !isHelperInstalled {
+                installationError = "Registration appeared to succeed but helper is not enabled. Please try again."
+            }
+        } catch {
+            installationError = "Failed to install helper: \(error.localizedDescription)"
+        }
+
+        isInstalling = false
+    }
+
+    private func installHelperLegacy() {
+        do {
             var authRef: AuthorizationRef?
             let authStatus = AuthorizationCreate(nil, nil, [], &authRef)
 
@@ -47,7 +92,6 @@ final class SMJobBlessManager: ObservableObject {
 
             defer { AuthorizationFree(authorization, []) }
 
-            // Set up authorization rights for bless
             let success = kSMRightBlessPrivilegedHelper.withCString { rightPointer in
                 let authItem = AuthorizationItem(name: rightPointer, valueLength: 0, value: nil, flags: 0)
                 var authItems = [authItem]
@@ -67,7 +111,6 @@ final class SMJobBlessManager: ObservableObject {
                         return false
                     }
 
-                    // Perform the bless operation
                     var cfError: Unmanaged<CFError>?
                     let blessSuccess = SMJobBless(kSMDomainSystemLaunchd, helperLabel as CFString, authorization, &cfError)
 
@@ -87,7 +130,6 @@ final class SMJobBlessManager: ObservableObject {
                 return
             }
 
-            // Verify installation succeeded
             checkHelperStatus()
 
             if !isHelperInstalled {
@@ -103,6 +145,8 @@ final class SMJobBlessManager: ObservableObject {
         isInstalling = false
     }
 
+    // MARK: - Removal
+
     /// Removes the privileged helper tool (for testing/debugging purposes).
     func removeHelper() {
         guard !isInstalling else { return }
@@ -110,6 +154,28 @@ final class SMJobBlessManager: ObservableObject {
         isInstalling = true
         installationError = nil
 
+        if #available(macOS 13.0, *) {
+            removeHelperModern()
+        } else {
+            removeHelperLegacy()
+        }
+    }
+
+    @available(macOS 13.0, *)
+    private func removeHelperModern() {
+        let service = SMAppService.daemon(plistName: plistName)
+
+        do {
+            try service.unregister()
+            checkHelperStatus()
+        } catch {
+            installationError = "Failed to remove helper: \(error.localizedDescription)"
+        }
+
+        isInstalling = false
+    }
+
+    private func removeHelperLegacy() {
         do {
             var authRef: AuthorizationRef?
             let authStatus = AuthorizationCreate(nil, nil, [], &authRef)
