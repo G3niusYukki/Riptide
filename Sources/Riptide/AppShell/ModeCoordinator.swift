@@ -89,6 +89,21 @@ public actor ModeCoordinator {
         }
     }
 
+    /// Atomically switches from the current mode to a new mode.
+    /// Ensures the previous mode is fully stopped before starting the new one.
+    public func switchMode(to newMode: RuntimeMode, profile: TunnelProfile?) async throws {
+        // 1. Stop current mode completely
+        if await mihomoManager.isRunning {
+            try await stop()
+        }
+
+        // 2. Brief pause to let OS clean up network interfaces
+        try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+
+        // 3. Start new mode
+        try await start(mode: newMode, profile: profile)
+    }
+
     /// The current runtime mode.
     public func currentMode() -> RuntimeMode {
         activeMode
