@@ -228,6 +228,18 @@ jobs:
           name: windows-build
           path: ./artifacts/windows
 
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-files
+          # Copy macOS artifacts (find handles nested paths from download-artifact)
+          find ./artifacts/macos -name '*.zip' -exec cp {} release-files/ \;
+          find ./artifacts/macos -name '*.dmg' -exec cp {} release-files/ \;
+          # Copy Windows artifacts
+          find ./artifacts/windows -name '*.msi' -exec cp {} release-files/ \;
+          find ./artifacts/windows -name '*.exe' -exec cp {} release-files/ \;
+          echo "Release files:"
+          ls -la release-files/
+
       - name: Compute checksums
         run: |
           echo "## 🔐 Checksums" >> RELEASE_NOTES.md
@@ -235,15 +247,7 @@ jobs:
           echo "| File | SHA256 |" >> RELEASE_NOTES.md
           echo "|------|--------|" >> RELEASE_NOTES.md
           
-          for file in ./artifacts/macos/*; do
-            if [ -f "$file" ]; then
-              filename=$(basename "$file")
-              sha256=$(sha256sum "$file" | cut -d' ' -f1)
-              echo "| $filename | \`$sha256\` |" >> RELEASE_NOTES.md
-            fi
-          done
-          
-          for file in ./artifacts/windows/*.msi ./artifacts/windows/*.exe; do
+          for file in release-files/*; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
               sha256=$(sha256sum "$file" | cut -d' ' -f1)
@@ -256,11 +260,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ./artifacts/macos/*.zip
-            ./artifacts/macos/*.dmg
-            ./artifacts/windows/*.msi
-            ./artifacts/windows/*.exe
+          files: release-files/*
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
