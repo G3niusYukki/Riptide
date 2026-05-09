@@ -1,9 +1,9 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-467%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-491%20passing-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
-  <img src="https://img.shields.io/badge/ status-beta-orange" alt="Status" />
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Status" />
 </p>
 
 <h1 align="center">⚡ Riptide</h1>
@@ -76,7 +76,10 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 - **WebDAV sync** — cross-device config synchronization
 - **External controller** — Clash-compatible REST API + WebSocket streaming (traffic & connections)
 - **CLI** — `riptide validate`, `riptide run`, `riptide smoke`
-- **Subscription auto-update** — background scheduler with configurable intervals
+- **Subscription auto-update** — background scheduler with configurable intervals (5-minute check cycle)
+- **System proxy guard** — monitors and auto-restores system proxy settings if externally modified
+- **TUN auto-recovery** — continuous interface health monitoring with automatic mihomo restart on failure
+- **First-run onboarding** — guided setup wizard with helper install and config import
 
 ---
 
@@ -132,8 +135,8 @@ Local Proxy / TUN packet
 
 | Mode | Status | Description |
 |------|--------|-------------|
-| **System Proxy** | Beta | Primary path — mihomo sidecar + macOS system proxy configuration |
-| **TUN Mode** | Beta | mihomo TUN with gvisor stack — requires sudo (no Apple Developer account needed) |
+| **System Proxy** | Stable | Primary path — mihomo sidecar + macOS system proxy configuration with auto-guard |
+| **TUN Mode** | Beta | mihomo TUN with gvisor stack + auto-recovery — requires sudo (no Apple Developer account needed) |
 
 ---
 
@@ -187,7 +190,7 @@ This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for 
 # Build everything
 swift build
 
-# Run full test suite (467 tests, 71 suites)
+# Run full test suite (491 tests, 76 suites)
 swift test
 
 # Run a specific suite
@@ -266,7 +269,7 @@ Contributions are welcome! A few guidelines:
 
 1. **Library-first** — new protocol / transport logic belongs in `Sources/Riptide/`, not the app layer
 2. **Swift 6 strict concurrency** — all code must pass `Sendable` and actor isolation checks
-3. **Test coverage** — add tests for new behavior; `swift test` must pass (467 / 467)
+3. **Test coverage** — add tests for new behavior; `swift test` must pass (491 / 491)
 4. **No force unwraps** — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading
 6. **Dependency injection** — prefer injection over hard-coded global behavior

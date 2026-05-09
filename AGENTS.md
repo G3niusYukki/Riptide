@@ -4,7 +4,7 @@
 
 Riptide is a native macOS proxy client built entirely in Swift 6. It has a **library-first architecture** with a pure Swift proxy engine (`Riptide` library), a SwiftUI client (`RiptideApp`), and a CLI tool (`RiptideCLI`). The app integrates with the [mihomo](https://github.com/MetaCubeX/mihomo) sidecar for production-grade runtime mode (System Proxy / TUN), while the library independently implements protocol framing, DNS resolution, rule matching, and connection orchestration.
 
-**Current state**: Beta — 467 tests in 71 suites, all passing.
+**Current state**: Beta — 491 tests in 76 suites, all passing.
 
 ## Environment
 
@@ -33,7 +33,7 @@ Riptide is a native macOS proxy client built entirely in Swift 6. It has a **lib
 | `Control/` | External controller surfaces: REST API, WebSocket streaming (traffic + connections) |
 | `MITM/` | MITM framework: config, manager, HTTPS interceptor, CA scaffolding |
 | `Subscription/` | `SubscriptionManager` + `SubscriptionUpdateScheduler` + URI parser |
-| `AppShell/` | App-facing coordinators: mode, profile store, system proxy, import service, stats pipeline |
+| `AppShell/` | App-facing coordinators: mode (with `switchMode`), profile store, system proxy guard + monitor, import service, stats pipeline, health checks |
 | `Mihomo/` | mihomo sidecar integration: API client, config generator, paths, runtime manager, log client |
 | `VPN/` | TUN providers: `TUNRoutingEngine`, `UserSpaceTCP`, `PacketTunnelProvider`, TCP/UDP sessions |
 | `XPC/` | Privileged helper tool communication via XPC |
@@ -54,7 +54,7 @@ Riptide is a native macOS proxy client built entirely in Swift 6. It has a **lib
 | `AppViewModel.swift` | Central application state management |
 | `RiptideApp.swift` | App entry point |
 | `MenuBarScene.swift` | Menu bar extra with status, traffic, profile switching |
-| `SMJobBlessManager.swift` | Privileged helper installation management |
+| `SMJobBlessManager.swift` | Privileged helper installation — uses `SMAppService` on macOS 13+, falls back to `SMJobBless` |
 
 ### CLI — `Sources/RiptideCLI/`
 
@@ -62,7 +62,7 @@ Command-line interface for tunnel management and configuration testing.
 
 ### Tests — `Tests/RiptideTests/`
 
-467 tests in 71 suites covering: config parsing, rule engine, DNS, protocols, transports, tunnel runtime, mihomo API, subscriptions, MITM config, localization, and more.
+491 tests in 76 suites covering: config parsing, rule engine, DNS, protocols, transports, tunnel runtime, mihomo API, subscriptions, MITM config, localization, system proxy guard integration, mode switching, health checks, TUN recovery, and more.
 
 ## Build And Test
 
@@ -128,7 +128,7 @@ LocalHTTPConnectProxyServer / TUN packet
 ## Validation Expectations
 
 - Run targeted tests first when changing a focused area
-- Run `swift test` before claiming the work is complete (467/467 must pass)
+- Run `swift test` before claiming the work is complete (491/491 must pass)
 - If changing CLI behavior, verify with `swift run riptide ...`
 - If changing app-facing state or workflow code, sanity-check `RiptideApp` buildability
 
