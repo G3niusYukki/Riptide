@@ -133,9 +133,12 @@ public actor MihomoDownloader {
         downloadDir: URL? = nil,
         progressDelegate: MihomoDownloadProgressDelegate? = nil
     ) {
-        self.downloadDir = downloadDir ?? FileManager.default
+        let defaultBase = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!
+            .first ?? URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent("Library", isDirectory: true)
+                .appendingPathComponent("Application Support")
+        self.downloadDir = downloadDir ?? defaultBase
             .appendingPathComponent("Riptide", isDirectory: true)
             .appendingPathComponent("mihomo", isDirectory: true)
             .appendingPathComponent("bin", isDirectory: true)

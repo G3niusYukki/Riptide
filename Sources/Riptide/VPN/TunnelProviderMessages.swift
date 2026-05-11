@@ -1,5 +1,4 @@
 import Foundation
-import Riptide
 
 /// Commands sent from the host app to the packet tunnel extension via NETunnelProviderSession.
 public enum TunnelProviderCommand: Sendable, Codable, Equatable {

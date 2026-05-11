@@ -1,5 +1,6 @@
 import Foundation
 import Riptide
+import Yams
 
 // MARK: - Node Editor ViewModel
 
@@ -58,8 +59,8 @@ public final class NodeEditorViewModel: @unchecked Sendable {
         defer { isSaving = false }
 
         // Re-import with new node
-        var updatedYAML = generateYAMLWithNode(node)
-        try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
+        let updatedYAML = generateYAMLWithNode(node)
+        _ = try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
 
         // Refresh
         await loadCurrentProfile()
@@ -80,8 +81,8 @@ public final class NodeEditorViewModel: @unchecked Sendable {
         defer { isSaving = false }
 
         // Re-import with updated node
-        var updatedYAML = generateUpdatedYAML(replacing: oldNode, with: newNode)
-        try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
+        let updatedYAML = generateUpdatedYAML(replacing: oldNode, with: newNode)
+        _ = try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
 
         // Refresh
         await loadCurrentProfile()
@@ -93,8 +94,8 @@ public final class NodeEditorViewModel: @unchecked Sendable {
         }
 
         // Re-import without the node
-        var updatedYAML = generateYAMLWithoutNode(node)
-        try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
+        let updatedYAML = generateYAMLWithoutNode(node)
+        _ = try await profileStore.importProfile(name: currentProfile!.name, yaml: updatedYAML)
 
         // Refresh
         await loadCurrentProfile()
@@ -138,39 +139,82 @@ public final class NodeEditorViewModel: @unchecked Sendable {
     }
 
     private func parseProxiesFromYAML(_ yaml: String) -> [ProxyNode] {
-        // Simplified parsing - production would use proper YAML parser
-        // For now, return empty array (actual implementation would parse YAML)
-        return []
+        guard let (config, _) = try? ClashConfigParser.parse(yaml: yaml) else {
+            return []
+        }
+        return config.proxies
     }
 
     private func generateYAMLWithNode(_ node: ProxyNode) -> String {
-        // Generate YAML for the new node
-        let nodeYAML = generateNodeYAML(node)
-
         guard let profile = currentProfile else { return "" }
 
-        // Find "proxies:" section and insert after it
-        if let range = profile.rawYAML.range(of: "proxies:") {
-            let insertIndex = range.upperBound
-            return profile.rawYAML[..<insertIndex] + "\n  - \(nodeYAML)" + profile.rawYAML[insertIndex...]
+        guard var raw = try? Yams.load(yaml: profile.rawYAML) as? [String: Any] else {
+            // Fallback: append to raw YAML
+            let nodeYAML = generateNodeYAML(node)
+            return profile.rawYAML + "\nproxies:\n  - \(nodeYAML)"
         }
 
-        // If no proxies section exists, add one
-        return profile.rawYAML + "\nproxies:\n  - \(nodeYAML)"
+        var proxies = (raw["proxies"] as? [[String: Any]]) ?? []
+        proxies.append(proxyNodeToDict(node))
+        raw["proxies"] = proxies
+
+        return (try? Yams.dump(object: raw)) ?? profile.rawYAML
     }
 
     private func generateUpdatedYAML(replacing oldNode: ProxyNode, with newNode: ProxyNode) -> String {
-        // Find and replace the old node YAML with new node YAML
-        // This is a simplified implementation
         guard let profile = currentProfile else { return "" }
-        return profile.rawYAML // Placeholder
+
+        guard var raw = try? Yams.load(yaml: profile.rawYAML) as? [String: Any] else {
+            return profile.rawYAML
+        }
+
+        if var proxies = raw["proxies"] as? [[String: Any]] {
+            if let idx = proxies.firstIndex(where: { ($0["name"] as? String) == oldNode.name }) {
+                proxies[idx] = proxyNodeToDict(newNode)
+            }
+            raw["proxies"] = proxies
+        }
+
+        return (try? Yams.dump(object: raw)) ?? profile.rawYAML
     }
 
     private func generateYAMLWithoutNode(_ node: ProxyNode) -> String {
-        // Find and remove the node from YAML
-        // This is a simplified implementation
         guard let profile = currentProfile else { return "" }
-        return profile.rawYAML // Placeholder
+
+        guard var raw = try? Yams.load(yaml: profile.rawYAML) as? [String: Any] else {
+            return profile.rawYAML
+        }
+
+        if var proxies = raw["proxies"] as? [[String: Any]] {
+            proxies.removeAll { ($0["name"] as? String) == node.name }
+            raw["proxies"] = proxies
+        }
+
+        return (try? Yams.dump(object: raw)) ?? profile.rawYAML
+    }
+
+    private func proxyNodeToDict(_ node: ProxyNode) -> [String: Any] {
+        var dict: [String: Any] = [
+            "name": node.name,
+            "type": node.kind.mihomoType,
+            "server": node.server,
+            "port": node.port
+        ]
+        if let cipher = node.cipher { dict["cipher"] = cipher }
+        if let password = node.password { dict["password"] = password }
+        if let uuid = node.uuid { dict["uuid"] = uuid }
+        if let flow = node.flow { dict["flow"] = flow }
+        if let alterId = node.alterId { dict["alterId"] = alterId }
+        if let security = node.security { dict["security"] = security }
+        if let sni = node.sni { dict["sni"] = sni }
+        if let alpn = node.alpn { dict["alpn"] = alpn }
+        if let skipCertVerify = node.skipCertVerify { dict["skip-cert-verify"] = skipCertVerify }
+        if let network = node.network { dict["network"] = network }
+        if let wsPath = node.wsPath { dict["ws-path"] = wsPath }
+        if let wsHost = node.wsHost { dict["ws-headers"] = wsHost }
+        if let grpcServiceName = node.grpcServiceName { dict["grpc-service-name"] = grpcServiceName }
+        if let snellVersion = node.snellVersion { dict["version"] = snellVersion }
+        return dict
     }
 
     private func generateNodeYAML(_ node: ProxyNode) -> String {

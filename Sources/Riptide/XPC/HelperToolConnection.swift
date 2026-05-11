@@ -25,7 +25,8 @@ public final class SendableHelperProxy: @unchecked Sendable {
 // MARK: - HelperToolConnection
 
 /// Actor that manages the XPC connection to the privileged helper tool.
-/// Provides connection establishment, proxy access, and lifecycle management.
+/// Provides connection establishment, proxy access, lifecycle management,
+/// automatic reconnection, and heartbeat monitoring.
 public actor HelperToolConnection {
 
     // MARK: - Types
@@ -38,18 +39,43 @@ public actor HelperToolConnection {
         case connectionFailed(String)
         /// XPC request to helper failed.
         case requestFailed(String)
+        /// Helper version is incompatible with the host app.
+        case versionMismatch(hostVersion: String, helperVersion: String)
+        /// Connection attempt timed out.
+        case timedOut(String)
     }
 
-    // MARK: - Properties
+    // MARK: - Configuration
 
     /// The Mach service name for the helper tool.
     private let machServiceName = "com.riptide.helper"
+
+    /// Maximum number of reconnection attempts before giving up.
+    private let maxReconnectAttempts = 3
+
+    /// Heartbeat check interval.
+    private let heartbeatInterval: Duration = .seconds(30)
+
+    /// Minimum helper version required by this host (semver string).
+    /// Bump this when the XPC protocol changes.
+    private let minimumHelperVersion = "1.0.0"
+
+    // MARK: - State
 
     /// The current XPC connection (if any).
     private var connectionWrapper: SendableXPCConnection?
 
     /// Cached proxy object for the helper tool.
     private var proxyWrapper: SendableHelperProxy?
+
+    /// Background heartbeat task.
+    private var heartbeatTask: Task<Void, Never>?
+
+    /// Background reconnection task (nil when not reconnecting).
+    private var reconnectTask: Task<Void, Never>?
+
+    /// The helper tool's reported version (nil until first successful connection).
+    public private(set) var helperVersion: String?
 
     // MARK: - Initialization
 
@@ -61,34 +87,29 @@ public actor HelperToolConnection {
     /// Checks if the helper tool is installed by attempting to create a connection.
     /// - Returns: true if the helper tool is installed and available.
     public func isHelperInstalled() async -> Bool {
-        // Use withCheckedContinuation for proper async handling
         return await withCheckedContinuation { continuation in
-            Task.detached {
-                let testConnection = NSXPCConnection(machServiceName: self.machServiceName)
+            Task.detached { [machServiceName] in
+                let testConnection = NSXPCConnection(machServiceName: machServiceName)
                 testConnection.remoteObjectInterface = createHelperToolInterface()
 
-                var connectionValid = false
                 var hasResponded = false
 
-                // Set up error handler
                 _ = testConnection.remoteObjectProxyWithErrorHandler { _ in
                     guard !hasResponded else { return }
                     hasResponded = true
-                    connectionValid = false
                     testConnection.invalidate()
                     continuation.resume(returning: false)
                 } as? HelperToolProtocol
 
-                // Try to get proxy and make a test call
                 if let proxy = testConnection.remoteObjectProxy as? HelperToolProtocol {
                     proxy.getMihomoStatus { _, _ in
                         guard !hasResponded else { return }
                         hasResponded = true
-                        connectionValid = true
                         testConnection.invalidate()
                         continuation.resume(returning: true)
                     }
                 } else {
+                    guard !hasResponded else { return }
                     hasResponded = true
                     testConnection.invalidate()
                     continuation.resume(returning: false)
@@ -96,9 +117,9 @@ public actor HelperToolConnection {
 
                 testConnection.resume()
 
-                // Timeout after 1 second
+                // Timeout after 2 seconds
                 Task.detached {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
                     guard !hasResponded else { return }
                     hasResponded = true
                     testConnection.invalidate()
@@ -253,17 +274,25 @@ public actor HelperToolConnection {
 
     /// Disconnects from the helper tool and cleans up resources.
     public func disconnect() async {
+        stopHeartbeat()
+        reconnectTask?.cancel()
+        reconnectTask = nil
         proxyWrapper = nil
         connectionWrapper?.connection.invalidate()
         connectionWrapper = nil
     }
 
-    // MARK: - Private Methods
+    /// Whether the connection is currently active and usable.
+    public var isConnected: Bool {
+        proxyWrapper != nil
+    }
+
+    // MARK: - Private Methods — Connection Lifecycle
 
     /// Ensures a connection to the helper tool exists.
+    /// Attempts reconnection if the connection was lost.
     private func ensureConnection() async {
         guard proxyWrapper == nil else { return }
-
         _ = try? await establishConnection()
     }
 
@@ -311,9 +340,6 @@ public actor HelperToolConnection {
             throw ConnectionError.connectionFailed("Failed to create remote object proxy")
         }
 
-        // Wrap proxy for storage
-        let proxyWrapper = SendableHelperProxy(validProxy)
-
         // Verify connection works with a status check
         let isConnected = await verifyConnection(proxy: validProxy)
         guard isConnected else {
@@ -323,31 +349,150 @@ public actor HelperToolConnection {
             throw ConnectionError.notInstalled
         }
 
+        // Fetch and validate helper version
+        let version = await fetchHelperVersion(proxy: validProxy)
+        self.helperVersion = version
+
         // Cache the proxy
-        self.proxyWrapper = proxyWrapper
+        self.proxyWrapper = SendableHelperProxy(validProxy)
+
+        // Start heartbeat monitoring
+        startHeartbeat()
     }
 
     /// Verifies that the XPC connection is working by making a status request.
     private func verifyConnection(proxy: HelperToolProtocol) async -> Bool {
-        return await withCheckedContinuation { continuation in
-            proxy.getMihomoStatus { _, _ in
-                // If we get any response (including errors about mihomo not running),
-                // the connection itself is working
-                continuation.resume(returning: true)
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    proxy.getMihomoStatus { _, _ in
+                        continuation.resume(returning: true)
+                    }
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(3))
+                return false
+            }
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// Fetches the helper tool's version string.
+    private func fetchHelperVersion(proxy: HelperToolProtocol) async -> String? {
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    proxy.getHelperVersion { version, _ in
+                        continuation.resume(returning: version)
+                    }
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(3))
+                return nil
+            }
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            return result
+        }
+    }
+
+    // MARK: - Private Methods — Reconnection
+
+    /// Handles connection invalidation (connection permanently lost).
+    private func handleConnectionInvalidated() {
+        proxyWrapper = nil
+        connectionWrapper = nil
+        stopHeartbeat()
+        triggerReconnect()
+    }
+
+    /// Handles connection interruption (connection temporarily lost, may recover).
+    private func handleConnectionInterrupted() {
+        proxyWrapper = nil
+        stopHeartbeat()
+        triggerReconnect()
+    }
+
+    /// Triggers a background reconnection attempt if one isn't already running.
+    private func triggerReconnect() {
+        guard reconnectTask == nil else { return }
+        reconnectTask = Task { await attemptReconnect() }
+    }
+
+    /// Attempts to reconnect with exponential backoff.
+    /// Stops after `maxReconnectAttempts` or if the task is cancelled.
+    private func attemptReconnect() async {
+        defer { reconnectTask = nil }
+
+        for attempt in 0..<maxReconnectAttempts {
+            guard !Task.isCancelled else { return }
+
+            // Exponential backoff: 1s, 2s, 4s
+            let delaySeconds = pow(2.0, Double(attempt))
+            try? await Task.sleep(for: .seconds(delaySeconds))
+            guard !Task.isCancelled else { return }
+
+            do {
+                try await establishConnection()
+                return // success
+            } catch {
+                // Retry
+                continue
+            }
+        }
+        // All attempts exhausted — connection remains nil.
+        // The next `ensureConnection()` call will try again.
+    }
+
+    // MARK: - Private Methods — Heartbeat
+
+    /// Starts periodic heartbeat monitoring.
+    private func startHeartbeat() {
+        stopHeartbeat()
+        heartbeatTask = Task { [weak self, heartbeatInterval] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: heartbeatInterval)
+                guard !Task.isCancelled else { return }
+                await self?.performHeartbeat()
             }
         }
     }
 
-    /// Handles connection invalidation.
-    private func handleConnectionInvalidated() {
-        proxyWrapper = nil
-        connectionWrapper = nil
+    /// Stops heartbeat monitoring.
+    private func stopHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
     }
 
-    /// Handles connection interruption.
-    private func handleConnectionInterrupted() {
-        // Clear cached proxy but keep connection reference
-        // The connection may recover on next use
-        proxyWrapper = nil
+    /// Performs a single heartbeat check.
+    /// If the check fails (timeout or connection error), triggers reconnection.
+    private func performHeartbeat() async {
+        guard let wrapper = proxyWrapper else { return }
+
+        let alive = await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    wrapper.proxy.getMihomoStatus { _, _ in
+                        // Any response means the connection is alive
+                        continuation.resume(returning: true)
+                    }
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return false
+            }
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
+
+        if !alive {
+            handleConnectionInterrupted()
+        }
     }
 }

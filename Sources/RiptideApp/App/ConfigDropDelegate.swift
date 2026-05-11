@@ -38,15 +38,15 @@ public struct ConfigDropImportModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-                let urls = providers.compactMap { provider -> URL? in
-                    guard let data = try? provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                        return nil
+                for provider in providers {
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        if let url {
+                            DispatchQueue.main.async {
+                                onDrop([url])
+                            }
+                        }
                     }
-                    return url
                 }
-                guard !urls.isEmpty else { return false }
-                onDrop(urls)
                 return true
             }
     }

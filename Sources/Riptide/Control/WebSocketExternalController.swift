@@ -15,7 +15,7 @@ import Network
 /// - GET /traffic — return traffic stats (WebSocket streaming)
 public actor WebSocketExternalController {
     private let runtime: LiveTunnelRuntime
-    private let config: RiptideConfig
+    private var config: RiptideConfig
     private var listener: NWListener?
     private var activeConnections: [UUID: WebSocketConnection] = [:]
 
@@ -179,8 +179,25 @@ public actor WebSocketExternalController {
     }
 
     private func handlePutConfigs(_ request: WebSocketRequest) async -> WebSocketResponse {
-        // Config update not implemented in this version
-        return WebSocketResponse(id: request.id, status: "ok", data: nil, error: nil)
+        // Parse and apply supported config fields
+        if let body = request.body {
+            // Update mode if provided
+            if let modeValue = body["mode"],
+               let modeString = modeValue.value as? String,
+               let newMode = ProxyMode(rawValue: modeString) {
+                config = RiptideConfig(
+                    mode: newMode,
+                    proxies: config.proxies,
+                    rules: config.rules,
+                    proxyGroups: config.proxyGroups,
+                    dnsPolicy: config.dnsPolicy,
+                    ruleProviders: config.ruleProviders,
+                    proxyProviders: config.proxyProviders
+                )
+            }
+        }
+        // Return current config
+        return await handleGetConfigs(request)
     }
 
     private func handleGetProxies(_ request: WebSocketRequest) async -> WebSocketResponse {

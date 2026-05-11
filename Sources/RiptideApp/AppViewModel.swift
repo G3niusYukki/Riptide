@@ -58,6 +58,25 @@ public struct SubscriptionDisplay: Identifiable, Equatable {
     }
 }
 
+/// Display-friendly rule set provider model for the UI layer.
+public struct RuleSetDisplay: Identifiable, Equatable {
+    public let id: String  // provider name
+    public let name: String
+    public let url: String
+    public let interval: Int
+    public let ruleCount: Int
+    public let lastUpdated: Date?
+
+    public init(id: String, name: String, url: String, interval: Int, ruleCount: Int, lastUpdated: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.interval = interval
+        self.ruleCount = ruleCount
+        self.lastUpdated = lastUpdated
+    }
+}
+
 public struct ProxyNodeDisplay: Identifiable, Equatable {
     public let id: String
     public let name: String
@@ -172,6 +191,15 @@ public final class AppViewModel: @unchecked Sendable {
     // Rules
     public private(set) var rules: [ProxyRule] = []
     public private(set) var ruleMatches: [RuleMatchLog] = []
+
+    // Rule Sets
+    private var activeRuleSetProviders: [String: RuleSetProvider] = [:]
+    private var ruleSetConfigs: [String: RuleSetProviderConfig] = [:]
+    public private(set) var ruleSetDisplays: [RuleSetDisplay] = []
+
+    // Backups
+    private let backupManager = ConfigBackupManager()
+    public private(set) var backupDisplays: [ConfigBackup] = []
 
     // Logs
     public private(set) var logEntries: [Riptide.LogEntry] = []
@@ -498,7 +526,7 @@ public final class AppViewModel: @unchecked Sendable {
             lastError = nil
 
             // Persist to ProfileStore
-            try? await profileStore.importProfile(name: profile.name, yaml: yaml)
+            _ = try? await profileStore.importProfile(name: profile.name, yaml: yaml)
         } catch {
             lastError = String(describing: error)
         }
@@ -522,11 +550,12 @@ public final class AppViewModel: @unchecked Sendable {
             }
         }
 
+        let loadedProfiles = loaded
         await MainActor.run {
-            if !loaded.isEmpty {
-                self.profiles = loaded
+            if !loadedProfiles.isEmpty {
+                self.profiles = loadedProfiles
                 if self.activeProfile == nil {
-                    self.activeProfile = loaded.first
+                    self.activeProfile = loadedProfiles.first
                     self.rebuildProxyGroupDisplays()
                 }
             }
@@ -720,15 +749,121 @@ public final class AppViewModel: @unchecked Sendable {
         return formatter.string(from: date).replacingOccurrences(of: ":", with: "-")
     }
 
+    // MARK: - Rule Set Lifecycle
+
+    private func startRuleSetProviders(from profile: Profile) {
+        stopRuleSetProviders()
+
+        for (name, config) in profile.config.ruleProviders {
+            ruleSetConfigs[name] = config
+            let provider = RuleSetProvider(config: config)
+            activeRuleSetProviders[name] = provider
+            Task { await provider.start() }
+        }
+
+        Task { await refreshRuleSetDisplays() }
+    }
+
+    private func stopRuleSetProviders() {
+        let providers = activeRuleSetProviders
+        activeRuleSetProviders.removeAll()
+        ruleSetConfigs.removeAll()
+        ruleSetDisplays = []
+
+        for provider in providers.values {
+            Task { await provider.stop() }
+        }
+    }
+
+    public func refreshRuleSetProvider(name: String) async {
+        guard let provider = activeRuleSetProviders[name] else { return }
+        await provider.refresh()
+        await refreshRuleSetDisplays()
+    }
+
+    private func refreshRuleSetDisplays() async {
+        var displays: [RuleSetDisplay] = []
+        for (name, provider) in activeRuleSetProviders {
+            let rules = await provider.rules()
+            let config = ruleSetConfigs[name]
+            displays.append(RuleSetDisplay(
+                id: name,
+                name: name,
+                url: config?.url ?? "",
+                interval: config?.interval ?? 0,
+                ruleCount: rules.count
+            ))
+        }
+        ruleSetDisplays = displays
+    }
+
+    // MARK: - Backup Management
+
+    public func loadBackups() async {
+        do {
+            backupDisplays = try await backupManager.listBackups()
+        } catch {
+            lastError = "加载备份失败: \(error.localizedDescription)"
+        }
+    }
+
+    public func createManualBackup() async {
+        guard let profile = activeProfile else { return }
+        do {
+            if let stored = await profileStore.profile(id: profile.id) {
+                try await backupManager.backup(yaml: stored.rawYAML, name: profile.name)
+                await loadBackups()
+            }
+        } catch {
+            lastError = "备份失败: \(error.localizedDescription)"
+        }
+    }
+
+    public func restoreBackup(_ backup: ConfigBackup) async {
+        do {
+            let yaml = try await backupManager.restore(from: backup)
+            let name = "恢复-\(backup.name)"
+            _ = try await profileStore.importProfile(name: name, yaml: yaml)
+            await loadProfilesFromStore()
+            await loadBackups()
+        } catch {
+            lastError = "恢复失败: \(error.localizedDescription)"
+        }
+    }
+
+    public func deleteBackup(_ backup: ConfigBackup) async {
+        do {
+            try await backupManager.delete(backup)
+            await loadBackups()
+        } catch {
+            lastError = "删除备份失败: \(error.localizedDescription)"
+        }
+    }
+
     public func activateProfile(_ profile: Profile) {
+        // Backup current config before switching
+        if let currentID = activeProfile?.id, let currentName = activeProfile?.name {
+            Task {
+                if let stored = await profileStore.profile(id: currentID) {
+                    try? await backupManager.backup(yaml: stored.rawYAML, name: currentName)
+                }
+            }
+        }
+
         activeProfile = profile
         rebuildProxyGroupDisplays()
+        startRuleSetProviders(from: profile)
     }
 
     public func removeProfile(_ profile: Profile) {
         profiles.removeAll { $0.id == profile.id }
         if activeProfile?.id == profile.id {
             activeProfile = profiles.first
+            if let newProfile = activeProfile {
+                startRuleSetProviders(from: newProfile)
+            } else {
+                stopRuleSetProviders()
+            }
         }
         rebuildProxyGroupDisplays()
     }

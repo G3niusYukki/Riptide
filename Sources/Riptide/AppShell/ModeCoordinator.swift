@@ -210,7 +210,7 @@ public actor ModeCoordinator {
 
     /// Updates a specific provider by ID.
     private func updateProvider(id: UUID) async {
-        guard let scheduler = providerScheduler,
+        guard providerScheduler != nil,
               let config = registeredProviders[id] else { return }
 
         // Create a temporary provider to refresh

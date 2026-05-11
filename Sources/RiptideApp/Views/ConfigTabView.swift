@@ -6,6 +6,10 @@ struct ConfigTabView: View {
     @State private var showHelperSetup = false
     @State private var showAddSubscription = false
     @State private var editingSubscription: SubscriptionDisplay?
+    @State private var showImportPreview = false
+    @State private var importPreviewURL: URL?
+    @State private var importPreviewYAML = ""
+    @State private var importPreviewFileName = ""
 
     var body: some View {
         ScrollView {
@@ -59,6 +63,14 @@ struct ConfigTabView: View {
                 // Subscriptions — wired to backend
                 subscriptionSection
 
+                // Rule Sets
+                if !vm.ruleSetDisplays.isEmpty {
+                    ruleSetSection
+                }
+
+                // Backups
+                backupSection
+
                 // Error display
                 if let error = vm.lastError {
                     Text(error)
@@ -81,6 +93,19 @@ struct ConfigTabView: View {
         }
         .sheet(item: $editingSubscription) { sub in
             AddSubscriptionSheet(vm: vm, editing: sub)
+        }
+        .sheet(isPresented: $showImportPreview) {
+            ConfigImportPreviewView(
+                yaml: importPreviewYAML,
+                fileName: importPreviewFileName,
+                onImport: { _ in
+                    if let url = importPreviewURL {
+                        Task { await vm.importConfig(from: url) }
+                    }
+                    showImportPreview = false
+                },
+                onCancel: { showImportPreview = false }
+            )
         }
         .onChange(of: vm.showHelperSetup) { _, newValue in
             showHelperSetup = newValue
@@ -143,6 +168,115 @@ struct ConfigTabView: View {
         .padding()
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+    }
+
+    // MARK: - Rule Set Section
+
+    private var ruleSetSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("规则集")
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                Text("共 \(vm.ruleSetDisplays.count) 个")
+                    .font(.caption)
+                    .foregroundStyle(Theme.subtext)
+            }
+
+            ForEach(vm.ruleSetDisplays) { display in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(display.name)
+                            .font(.body)
+                            .foregroundStyle(Theme.text)
+                        HStack(spacing: 8) {
+                            Text("\(display.ruleCount) 条规则")
+                                .font(.caption)
+                                .foregroundStyle(Theme.subtext)
+                            if display.interval > 0 {
+                                Text("每 \(display.interval)s 更新")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.subtext)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        Task { await vm.refreshRuleSetProvider(name: display.id) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+    }
+
+    // MARK: - Backup Section
+
+    private var backupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("配置备份")
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                Button {
+                    Task { await vm.createManualBackup() }
+                } label: {
+                    Label("创建备份", systemImage: "archivebox")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if vm.backupDisplays.isEmpty {
+                Text("暂无备份")
+                    .font(.caption)
+                    .foregroundStyle(Theme.subtext)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            } else {
+                ForEach(vm.backupDisplays) { backup in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(backup.name)
+                                .font(.body)
+                                .foregroundStyle(Theme.text)
+                            Text("\(backup.fileSizeFormatted) · \(backup.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(Theme.subtext)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            Task { await vm.restoreBackup(backup) }
+                        } label: {
+                            Text("恢复")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            Task { await vm.deleteBackup(backup) }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.danger)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .task { await vm.loadBackups() }
     }
 
     // MARK: - Mode Selector Card
@@ -221,7 +355,13 @@ struct ConfigTabView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "yaml")!, UTType(filenameExtension: "yml")!]
         if panel.runModal() == .OK, let url = panel.url {
-            Task { await vm.importConfig(from: url) }
+            if let data = try? Data(contentsOf: url),
+               let yaml = String(data: data, encoding: .utf8) {
+                importPreviewURL = url
+                importPreviewYAML = yaml
+                importPreviewFileName = url.deletingPathExtension().lastPathComponent
+                showImportPreview = true
+            }
         }
     }
 }

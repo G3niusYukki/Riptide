@@ -53,7 +53,9 @@ public struct MihomoPaths: Sendable {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first ?? URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support")
         self.init(
             baseDirectory: appSupport
                 .appendingPathComponent("Riptide", isDirectory: true)

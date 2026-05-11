@@ -54,10 +54,16 @@ public actor UDPSession {
         }
 
         updateActivity()
-        pendingPackets.append(data)
 
-        // In a full implementation, we'd forward the data through the proxy connection
-        // and return the response. For now, this is a placeholder.
+        // Forward through proxy connection if available
+        if let remoteContext {
+            try await remoteContext.connection.session.send(data)
+            let response = try await remoteContext.connection.session.receive()
+            return [response]
+        }
+
+        // Buffer until a remote context is established
+        pendingPackets.append(data)
         return []
     }
 

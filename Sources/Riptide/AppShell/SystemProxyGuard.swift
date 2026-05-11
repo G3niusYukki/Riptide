@@ -37,31 +37,25 @@ public actor SystemProxyGuard {
     public func checkForViolation() -> Bool {
         guard isGuardEnabled else { return false }
 
-        do {
-            let currentState = try controller.currentState()
+        let currentState = controller.currentState()
 
-            switch currentState {
-            case .disabled:
-                // Proxy is disabled when it should be enabled
-                violationCount += 1
-                return true
-
-            case .enabled(let httpPort, let socksPort):
-                // Check if ports match expected values
-                if let expectedHTTP = expectedHTTPPort, httpPort != expectedHTTP {
-                    violationCount += 1
-                    return true
-                }
-                if let expectedSOCKS = expectedSOCKSPort, socksPort != expectedSOCKS {
-                    violationCount += 1
-                    return true
-                }
-                return false
-            }
-        } catch {
-            // Error checking state counts as violation
+        switch currentState {
+        case .disabled:
+            // Proxy is disabled when it should be enabled
             violationCount += 1
             return true
+
+        case .enabled(let httpPort, let socksPort):
+            // Check if ports match expected values
+            if let expectedHTTP = expectedHTTPPort, httpPort != expectedHTTP {
+                violationCount += 1
+                return true
+            }
+            if let expectedSOCKS = expectedSOCKSPort, socksPort != expectedSOCKS {
+                violationCount += 1
+                return true
+            }
+            return false
         }
     }
 

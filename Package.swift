@@ -53,6 +53,7 @@ let package = Package(
             name: "RiptideApp",
             dependencies: [
                 "Riptide",
+                .product(name: "Yams", package: "Yams"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)

@@ -85,7 +85,7 @@ public final class macOSSystemProxyController: SystemProxyControlling, @unchecke
     public func disable() async throws {
         let service = try await resolveNetworkService()
 
-        await helperConnection.disableSystemProxy(service: service)
+        _ = await helperConnection.disableSystemProxy(service: service)
 
         state = .disabled
     }

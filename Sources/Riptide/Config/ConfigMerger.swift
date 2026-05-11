@@ -100,10 +100,10 @@ public struct ConfigMerger: Sendable {
 
         // Merge DNS policy (basic fields — DNSPolicy uses DNSResolverEndpoint structs)
         if let rawDNS = merge["dns"] as? [String: Any] {
-            let basePolicy = base.dnsPolicy ?? DNSPolicy()
+            let basePolicy = base.dnsPolicy
             var fakeIPEnabled = basePolicy.fakeIPEnabled
             var fakeIPCIDR = basePolicy.fakeIPCIDR
-            var respectRules = basePolicy.respectRules
+            let respectRules = basePolicy.respectRules
             var hosts = basePolicy.hosts
 
             if let enable = rawDNS["enable"] as? Bool { fakeIPEnabled = enable }

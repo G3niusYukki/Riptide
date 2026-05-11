@@ -54,6 +54,10 @@ public protocol HelperToolProtocol {
     /// Auto-detects the primary active network service.
     /// - Parameter reply: Completion handler with (serviceName, error)
     func detectNetworkService(reply: @escaping (String?, Error?) -> Void)
+
+    /// Returns the helper tool's version string.
+    /// - Parameter reply: Completion handler with (version, error)
+    func getHelperVersion(reply: @escaping (String?, Error?) -> Void)
 }
 
 // MARK: - Launch Mode

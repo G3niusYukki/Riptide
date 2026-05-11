@@ -18,10 +18,12 @@ public actor AppGroupStateStore {
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else {
             // Fallback to application support when app group is unavailable (e.g. tests)
-            let appSupport = FileManager.default.urls(
+            guard let appSupport = FileManager.default.urls(
                 for: .applicationSupportDirectory,
                 in: .userDomainMask
-            ).first!
+            ).first else {
+                throw AppGroupStateStoreError.writeFailed("Application Support directory unavailable")
+            }
             let dir = appSupport.appendingPathComponent("Riptide", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             self.fileURL = dir.appendingPathComponent("shared-state.json")

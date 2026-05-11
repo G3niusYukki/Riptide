@@ -51,7 +51,9 @@ public actor ProfileStore {
     private let fileURL: URL
 
     public init(fileName: String = "profiles.json") throws {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw ProfileStoreError.persistenceFailed("Application Support directory unavailable")
+        }
         let dir = appSupport.appendingPathComponent("Riptide", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.fileURL = dir.appendingPathComponent(fileName)

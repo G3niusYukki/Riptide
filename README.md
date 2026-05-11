@@ -1,9 +1,9 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-491%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-562%20passing-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
-  <img src="https://img.shields.io/badge/status-beta-orange" alt="Status" />
+  <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
 </p>
 
 <h1 align="center">⚡ Riptide</h1>
@@ -60,13 +60,17 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 
 ### App GUI
 
-- Config import (file picker / drag-and-drop / subscription URL)
+- Config import (file picker / drag-and-drop / subscription URL) with **import preview**
+- **Node editor** with real-time validation, protocol-specific fields, add/edit/delete/duplicate
+- **Rule editor** with drag-to-reorder, 10 rule types, policy picker
+- **Config merge UI** — add merge sources (file/manual), preview diffs, one-click apply
+- **Config backup/restore** — automatic backup on profile switch, manual backup, restore from history
+- **Rule set auto-update** — periodic refresh of remote rule sets with status display
 - Proxy group cards with latency testing and one-click switching
 - Real-time traffic monitor and connection list
 - Log viewer with level filter, search, and export
 - Menu bar extra with status icon and traffic speed
 - MITM settings with host pattern matching
-- Node editor with real-time validation
 - Theme: System / Light / Dark
 - Global hotkeys
 - **4 languages**: English · 简体中文 · 日本語 · Русский
@@ -77,8 +81,12 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 - **External controller** — Clash-compatible REST API + WebSocket streaming (traffic & connections)
 - **CLI** — `riptide validate`, `riptide run`, `riptide smoke`
 - **Subscription auto-update** — background scheduler with configurable intervals (5-minute check cycle)
+- **Rule set auto-update** — periodic refresh of remote rule sets integrated into profile lifecycle
+- **Config backup/restore** — automatic backup on profile switch, manual backup, restore from history (max 20 backups)
 - **System proxy guard** — monitors and auto-restores system proxy settings if externally modified
 - **TUN auto-recovery** — continuous interface health monitoring with automatic mihomo restart on failure
+- **XPC helper maturation** — automatic reconnection with exponential backoff, 30s heartbeat, 3s timeout protection, version validation
+- **Unified error handling** — `RiptideError` enum with `LocalizedError` conformance for 17 subsystems
 - **First-run onboarding** — guided setup wizard with helper install and config import
 
 ---
