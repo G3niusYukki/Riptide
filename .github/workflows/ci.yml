@@ -23,7 +23,7 @@ jobs:
 
       - name: Detect changed Swift files
         id: changed-swift-files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           files: |
             **/*.swift
