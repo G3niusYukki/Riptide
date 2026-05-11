@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ConfigTabView: View {
+    // swiftlint:disable:next identifier_name
     @Bindable var vm: AppViewModel
     @State private var showHelperSetup = false
     @State private var showAddSubscription = false

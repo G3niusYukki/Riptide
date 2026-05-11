@@ -64,8 +64,8 @@ public protocol HelperToolProtocol {
 
 /// Launch modes for mihomo core.
 public enum MihomoLaunchMode: String, Sendable, Codable {
-    case systemProxy = "systemProxy"
-    case tun = "tun"
+    case systemProxy
+    case tun
 }
 
 // MARK: - Status
@@ -99,7 +99,7 @@ public struct MihomoStatus: Codable, Sendable {
 public enum HelperToolError: Error, Equatable, Sendable {
     case invalidConfigPath
     case invalidBinaryPath
-    case pathNotInWhitelist
+    case pathNotInAllowlist
     case mihomoAlreadyRunning
     case mihomoNotRunning
     case processLaunchFailed(String)
@@ -116,7 +116,7 @@ extension HelperToolError: LocalizedError {
             return "Invalid configuration file path"
         case .invalidBinaryPath:
             return "Invalid binary path"
-        case .pathNotInWhitelist:
+        case .pathNotInAllowlist:
             return "Path is not in allowed whitelist"
         case .mihomoAlreadyRunning:
             return "Mihomo is already running"

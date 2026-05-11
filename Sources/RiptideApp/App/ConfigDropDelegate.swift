@@ -13,7 +13,7 @@ public final class ConfigDropDelegate: DropDelegate {
     public func performDrop(info: DropInfo) -> Bool {
         let providers = info.itemProviders(for: [.fileURL])
         for provider in providers {
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { [weak self] item, error in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { [weak self] item, _ in
                 guard let self, let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else {
                     return

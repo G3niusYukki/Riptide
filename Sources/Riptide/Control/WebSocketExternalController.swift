@@ -93,7 +93,7 @@ public actor WebSocketExternalController {
 
     private func receiveWebSocketMessage(_ connection: NWConnection) async throws -> (Data?, NWProtocolWebSocket.Metadata) {
         return try await withCheckedThrowingContinuation { continuation in
-            connection.receiveMessage { data, context, isComplete, error in
+            connection.receiveMessage { data, context, _, error in
                 if let error {
                     continuation.resume(throwing: error)
                     return
@@ -102,7 +102,9 @@ public actor WebSocketExternalController {
                     continuation.resume(throwing: TransportError.receiveFailed("No context"))
                     return
                 }
-                guard let metadata = context.protocolMetadata.first(where: { $0 is NWProtocolWebSocket.Metadata }) as? NWProtocolWebSocket.Metadata else {
+                guard let metadata = context.protocolMetadata
+                    .first(where: { $0 is NWProtocolWebSocket.Metadata })
+                    as? NWProtocolWebSocket.Metadata else {
                     continuation.resume(throwing: TransportError.receiveFailed("No WebSocket metadata"))
                     return
                 }
@@ -246,18 +248,18 @@ public actor WebSocketExternalController {
     private func handleGetRules(_ request: WebSocketRequest) async -> WebSocketResponse {
         let rulesData = config.rules.map { rule -> [String: Any] in
             switch rule {
-            case .domain(let d, let p):
-                return ["type": "DOMAIN", "payload": d, "policy": policyString(p)]
-            case .domainSuffix(let s, let p):
-                return ["type": "DOMAIN-SUFFIX", "payload": s, "policy": policyString(p)]
-            case .domainKeyword(let k, let p):
-                return ["type": "DOMAIN-KEYWORD", "payload": k, "policy": policyString(p)]
-            case .ipCIDR(let c, let p):
-                return ["type": "IP-CIDR", "payload": c, "policy": policyString(p)]
-            case .geoIP(let cc, let p):
-                return ["type": "GEOIP", "payload": cc, "policy": policyString(p)]
-            case .final(let p):
-                return ["type": "MATCH", "payload": "", "policy": policyString(p)]
+            case .domain(let domain, let policy):
+                return ["type": "DOMAIN", "payload": domain, "policy": policyString(policy)]
+            case .domainSuffix(let suffix, let policy):
+                return ["type": "DOMAIN-SUFFIX", "payload": suffix, "policy": policyString(policy)]
+            case .domainKeyword(let keyword, let policy):
+                return ["type": "DOMAIN-KEYWORD", "payload": keyword, "policy": policyString(policy)]
+            case .ipCIDR(let cidr, let policy):
+                return ["type": "IP-CIDR", "payload": cidr, "policy": policyString(policy)]
+            case .geoIP(let country, let policy):
+                return ["type": "GEOIP", "payload": country, "policy": policyString(policy)]
+            case .final(let policy):
+                return ["type": "MATCH", "payload": "", "policy": policyString(policy)]
             default:
                 return ["type": "UNKNOWN", "payload": "", "policy": "DIRECT"]
             }
@@ -361,13 +363,6 @@ private struct WebSocketResponse: Encodable {
     let status: String
     let data: [String: Any]?
     let error: String?
-
-    init(id: String?, status: String, data: [String: Any]?, error: String?) {
-        self.id = id
-        self.status = status
-        self.data = data
-        self.error = error
-    }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)

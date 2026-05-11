@@ -108,7 +108,7 @@ struct GitHubAsset: Codable, Sendable {
 // MARK: - Download Progress
 
 /// Protocol for receiving download progress updates.
-public protocol MihomoDownloadProgressDelegate: Sendable {
+public protocol MihomoDownloadProgressDelegate: AnyObject, Sendable {
     /// Called when download progress updates.
     func downloadProgress(_ bytesDownloaded: Int64, totalBytes: Int64)
 }
@@ -224,9 +224,9 @@ extension MihomoDownloader {
 
     /// Lists all locally downloaded versions.
     /// - Returns: Array of version strings (e.g., ["v1.18.0", "v1.17.0"]).
-    public nonisolated func listLocalVersions() -> [String] {
-        let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(at: downloadDir, includingPropertiesForKeys: nil) else {
+    nonisolated public func listLocalVersions() -> [String] {
+        let fileManager = FileManager.default
+        guard let contents = try? fileManager.contentsOfDirectory(at: downloadDir, includingPropertiesForKeys: nil) else {
             return []
         }
 
@@ -246,7 +246,7 @@ extension MihomoDownloader {
     /// Gets the path to a specific version if it exists locally.
     /// - Parameter version: The version string (e.g., "v1.18.0" or "1.18.0").
     /// - Returns: URL to the binary if found, nil otherwise.
-    public nonisolated func pathForVersion(_ version: String) -> URL? {
+    nonisolated public func pathForVersion(_ version: String) -> URL? {
         let normalizedVersion = version.hasPrefix("v") ? version : "v\(version)"
         let binaryPath = downloadDir
             .appendingPathComponent("mihomo-\(normalizedVersion)")
@@ -474,17 +474,17 @@ public func replaceCurrentMihomo(with newPath: URL) throws {
     let currentPath = paths.baseDirectory.appendingPathComponent("mihomo")
     let backupPath = paths.baseDirectory.appendingPathComponent("mihomo.backup")
 
-    let fm = FileManager.default
+    let fileManager = FileManager.default
 
     // Backup current version if it exists
-    if fm.fileExists(atPath: currentPath.path) {
-        try? fm.removeItem(at: backupPath)
-        try fm.moveItem(at: currentPath, to: backupPath)
+    if fileManager.fileExists(atPath: currentPath.path) {
+        try? fileManager.removeItem(at: backupPath)
+        try fileManager.moveItem(at: currentPath, to: backupPath)
     }
 
     // Copy new version to current location
-    try fm.copyItem(at: newPath, to: currentPath)
+    try fileManager.copyItem(at: newPath, to: currentPath)
 
     // Set executable permissions
-    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: currentPath.path)
+    try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: currentPath.path)
 }

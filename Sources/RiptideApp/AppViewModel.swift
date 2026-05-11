@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length
 import Foundation
 import Observation
 import AppKit
@@ -1149,3 +1150,4 @@ extension AppViewModel: MihomoDownloadProgressDelegate {
         }
     }
 }
+// swiftlint:enable file_length type_body_length

@@ -134,10 +134,10 @@ public final class RuleEditorViewModel: @unchecked Sendable {
             return "DST-PORT,\(port),\(policyString(policy))"
         case .processName(let name, let policy):
             return "PROCESS-NAME,\(name),\(policyString(policy))"
-        case .geoIP(let cc, let policy):
-            return "GEOIP,\(cc),\(policyString(policy))"
-        case .geoSite(let cc, let category, let policy):
-            return "GEOSITE,\(cc),\(category),\(policyString(policy))"
+        case .geoIP(let countryCode, let policy):
+            return "GEOIP,\(countryCode),\(policyString(policy))"
+        case .geoSite(let countryCode, let category, let policy):
+            return "GEOSITE,\(countryCode),\(category),\(policyString(policy))"
         case .ipASN(let asn, let policy):
             return "IP-ASN,\(asn),\(policyString(policy))"
         case .ruleSet(let name, let policy):

@@ -177,8 +177,8 @@ public struct ConfigMerger: Sendable {
         let interval = raw["interval"] as? Int
         let tolerance = raw["tolerance"] as? Int
         let strategy: LBStrategy? = {
-            guard let s = raw["strategy"] as? String else { return nil }
-            return LBStrategy(rawValue: s.lowercased())
+            guard let strategyStr = raw["strategy"] as? String else { return nil }
+            return LBStrategy(rawValue: strategyStr.lowercased())
         }()
         return ProxyGroup(
             id: name, kind: kind, proxies: proxies,
@@ -188,6 +188,7 @@ public struct ConfigMerger: Sendable {
 
     // MARK: - Rule Parsing (existing)
 
+    // swiftlint:disable:next cyclomatic_complexity
     private static func parseRule(parts: [String]) -> ProxyRule? {
         guard parts.count >= 3 else { return nil }
         let ruleType = parts[0].uppercased()

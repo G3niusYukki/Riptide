@@ -53,8 +53,8 @@ public actor ConfigBackupManager {
     public func listBackups() throws -> [ConfigBackup] {
         try createBackupDirectoryIfNeeded()
 
-        let fm = FileManager.default
-        let files = try fm.contentsOfDirectory(
+        let fileManager = FileManager.default
+        let files = try fileManager.contentsOfDirectory(
             at: backupDirectory,
             includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]

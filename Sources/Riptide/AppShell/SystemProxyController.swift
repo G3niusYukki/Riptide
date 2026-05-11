@@ -35,7 +35,7 @@ public protocol SystemProxyControlling: Sendable {
 /// On macOS the only reliable way to set system-wide proxy settings is through
 /// `networksetup`, which requires root.  The helper tool (installed via SMJobBless)
 /// executes these commands on our behalf.
-public final class macOSSystemProxyController: SystemProxyControlling, @unchecked Sendable {
+public final class MacOSSystemProxyController: SystemProxyControlling, @unchecked Sendable {
 
     // MARK: - Errors
 

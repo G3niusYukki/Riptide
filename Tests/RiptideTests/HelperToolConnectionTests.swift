@@ -65,7 +65,7 @@ final class HelperToolConnectionTests: XCTestCase {
         let cases: [HelperToolError] = [
             .invalidConfigPath,
             .invalidBinaryPath,
-            .pathNotInWhitelist,
+            .pathNotInAllowlist,
             .mihomoAlreadyRunning,
             .mihomoNotRunning,
             .processLaunchFailed("test"),

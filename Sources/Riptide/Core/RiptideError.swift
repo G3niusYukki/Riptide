@@ -84,41 +84,41 @@ public enum RiptideError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         // Config
-        case .config(let e):            return e.localizedDescription
-        case .configSync(let e):        return e.localizedDescription
-        case .configMerge(let e):       return "配置合并失败: \(e.localizedDescription)"
+        case .config(let error):            return error.localizedDescription
+        case .configSync(let error):        return error.localizedDescription
+        case .configMerge(let error):       return "配置合并失败: \(error.localizedDescription)"
 
         // Transport
-        case .transport(let e):         return e.localizedDescription
-        case .proxyGroup(let e):        return e.localizedDescription
+        case .transport(let error):         return error.localizedDescription
+        case .proxyGroup(let error):        return error.localizedDescription
 
         // Protocol
-        case .protocolOutbound(let e):  return e.localizedDescription
+        case .protocolOutbound(let error):  return error.localizedDescription
 
         // Runtime
-        case .runtime(let e):           return e.localizedDescription
-        case .core(let e):              return e.localizedDescription
-        case .api(let e):               return e.localizedDescription
-        case .download(let e):          return e.localizedDescription
+        case .runtime(let error):           return error.localizedDescription
+        case .core(let error):              return error.localizedDescription
+        case .api(let error):               return error.localizedDescription
+        case .download(let error):          return error.localizedDescription
 
         // VPN
-        case .vpn(let e):               return e.localizedDescription
-        case .tunnelRouting(let e):     return e.localizedDescription
-        case .tunnel(let e):            return e.localizedDescription
+        case .vpn(let error):               return error.localizedDescription
+        case .tunnelRouting(let error):     return error.localizedDescription
+        case .tunnel(let error):            return error.localizedDescription
 
         // XPC
-        case .xpc(let e):               return e.localizedDescription
-        case .xpcConnection(let e):     return e.localizedDescription
+        case .xpc(let error):               return error.localizedDescription
+        case .xpcConnection(let error):     return error.localizedDescription
 
         // App
-        case .profile(let e):           return e.localizedDescription
-        case .subscription(let e):      return e.localizedDescription
-        case .systemProxy(let e):       return e.localizedDescription
-        case .keychain(let e):          return e.localizedDescription
+        case .profile(let error):           return error.localizedDescription
+        case .subscription(let error):      return error.localizedDescription
+        case .systemProxy(let error):       return error.localizedDescription
+        case .keychain(let error):          return error.localizedDescription
 
         // Generic
         case .underlying(_, let ctx):   return ctx
-        case .timeout(let op, let dur): return "操作超时: \(op) (\(Int(dur))s)"
+        case .timeout(let operation, let duration): return "操作超时: \(operation) (\(Int(duration))s)"
         case .cancelled:                return "操作已取消"
         case .unknown(let msg):         return msg
         }

@@ -261,7 +261,7 @@ public actor ModeCoordinator {
         // Only create a real controller if the helper is installed
         let helperInstalled = await mihomoManager.helperConnection.isHelperInstalled()
         guard helperInstalled else { return nil }
-        return macOSSystemProxyController(helperConnection: await mihomoManager.helperConnection)
+        return MacOSSystemProxyController(helperConnection: await mihomoManager.helperConnection)
     }
 
     // MARK: - Health Checks

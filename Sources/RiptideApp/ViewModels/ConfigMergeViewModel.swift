@@ -175,12 +175,12 @@ public final class ConfigMergeViewModel: @unchecked Sendable {
 
     private func ruleToString(_ rule: ProxyRule) -> String {
         switch rule {
-        case .domain(let d, let p): return "DOMAIN,\(d),\(policyStr(p))"
-        case .domainSuffix(let s, let p): return "DOMAIN-SUFFIX,\(s),\(policyStr(p))"
-        case .domainKeyword(let k, let p): return "DOMAIN-KEYWORD,\(k),\(policyStr(p))"
-        case .ipCIDR(let c, let p): return "IP-CIDR,\(c),\(policyStr(p))"
-        case .geoIP(let cc, let p): return "GEOIP,\(cc),\(policyStr(p))"
-        case .final(let p): return "MATCH,\(policyStr(p))"
+        case .domain(let domain, let policy): return "DOMAIN,\(domain),\(policyStr(policy))"
+        case .domainSuffix(let suffix, let policy): return "DOMAIN-SUFFIX,\(suffix),\(policyStr(policy))"
+        case .domainKeyword(let keyword, let policy): return "DOMAIN-KEYWORD,\(keyword),\(policyStr(policy))"
+        case .ipCIDR(let cidr, let policy): return "IP-CIDR,\(cidr),\(policyStr(policy))"
+        case .geoIP(let country, let policy): return "GEOIP,\(country),\(policyStr(policy))"
+        case .final(let policy): return "MATCH,\(policyStr(policy))"
         case .reject: return "REJECT"
         default: return "MATCH,DIRECT"
         }
@@ -195,10 +195,10 @@ public final class ConfigMergeViewModel: @unchecked Sendable {
     }
 
     private func computeDiff(base: RiptideConfig, merged: RiptideConfig) -> MergeDiff {
-        let addedProxies = merged.proxies.filter { m in !base.proxies.contains(where: { $0.name == m.name }) }
-        let removedProxies = base.proxies.filter { b in !merged.proxies.contains(where: { $0.name == b.name }) }
-        let modifiedProxies = merged.proxies.filter { m in
-            base.proxies.contains(where: { $0.name == m.name && $0 != m })
+        let addedProxies = merged.proxies.filter { mergedProxy in !base.proxies.contains(where: { $0.name == mergedProxy.name }) }
+        let removedProxies = base.proxies.filter { baseProxy in !merged.proxies.contains(where: { $0.name == baseProxy.name }) }
+        let modifiedProxies = merged.proxies.filter { mergedProxy in
+            base.proxies.contains(where: { $0.name == mergedProxy.name && $0 != mergedProxy })
         }
 
         let addedRules = max(0, merged.rules.count - base.rules.count)
