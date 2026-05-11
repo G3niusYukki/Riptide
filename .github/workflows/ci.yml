@@ -17,13 +17,13 @@ jobs:
     name: SwiftLint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Detect changed Swift files
         id: changed-swift-files
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@v46
         with:
           files: |
             **/*.swift
@@ -44,7 +44,7 @@ jobs:
     runs-on: macos-14
     needs: swift-lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Swift
         uses: swift-actions/setup-swift@v2
@@ -52,7 +52,7 @@ jobs:
           swift-version: ${{ env.SWIFT_VERSION }}
 
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
@@ -77,10 +77,10 @@ jobs:
       run:
         working-directory: ./riptide-windows
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -105,10 +105,10 @@ jobs:
       run:
         working-directory: ./riptide-windows/src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js (for Tauri runtime dep)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
