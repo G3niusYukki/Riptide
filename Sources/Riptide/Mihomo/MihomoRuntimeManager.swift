@@ -149,7 +149,6 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         self.eventHandler = handler
     }
 
-
     // MARK: - Initialization
 
     /// Creates a new MihomoRuntimeManager with the specified dependencies.
@@ -480,7 +479,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
                     hung = true
                 }
                 if hung {
-                    print("[MihomoRuntimeManager] Warning: mihomo process unresponsive after terminate — forceful kill not available via XPC helper (requires helper update)")
+                    print("[MihomoRuntimeManager] Warning: mihomo process unresponsive after terminate"
+                        + " — forceful kill not available via XPC helper (requires helper update)")
                 }
             }
 
