@@ -232,7 +232,14 @@ public actor ModeCoordinator {
 
     /// Starts the system proxy guard and monitor for system proxy mode.
     private func startSystemProxyGuard() async {
-        guard let controller = await resolveSystemProxyController() else { return }
+        guard let controller = await resolveSystemProxyController() else {
+            emit(.guardUnavailable(reason:
+                "System proxy guard unavailable: privileged helper not installed. "
+                + "Your proxy settings will not auto-restore if changed externally. "
+                + "Consider switching to TUN mode for full traffic interception."
+            ))
+            return
+        }
         let proxyGuard = SystemProxyGuard(controller: controller)
         do {
             try await proxyGuard.enable(expectedHTTPPort: ModeCoordinator.defaultHTTPPort, expectedSOCKSPort: nil)

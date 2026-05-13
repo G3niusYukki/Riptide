@@ -208,6 +208,8 @@ public final class AppViewModel: @unchecked Sendable {
 
     // Errors
     public private(set) var lastError: String?
+    /// Warning shown when system proxy guard is unavailable (no helper).
+    public private(set) var guardUnavailableWarning: String?
 
     // Helper installation
     public private(set) var helperInstalled: Bool = false
@@ -298,6 +300,14 @@ public final class AppViewModel: @unchecked Sendable {
             tunnelState = .running
             startStatsPolling()
             Task { await fetchLogs() } // Fetch initial logs
+            // Check for guard unavailability in System Proxy mode
+            let events = await modeCoordinator.recentEvents()
+            if let guardEvent = events.first(where: {
+                if case .guardUnavailable = $0 { return true }
+                return false
+            }), case .guardUnavailable(let reason) = guardEvent {
+                self.guardUnavailableWarning = reason
+            }
             lastError = nil
         } catch {
             lastError = String(describing: error)

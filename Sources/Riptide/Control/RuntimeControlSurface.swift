@@ -44,6 +44,7 @@ public enum RuntimeEvent: Sendable, Equatable, Codable {
     case connectionOpened(RuntimeConnectionSnapshot)
     case connectionClosed(UUID)
     case error(RuntimeErrorSnapshot)
+    case guardUnavailable(reason: String)
 }
 
 /// A lightweight surface carrying runtime mode and configuration context.
