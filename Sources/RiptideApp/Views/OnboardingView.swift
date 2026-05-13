@@ -6,12 +6,14 @@ struct OnboardingView: View {
     @Binding var isPresented: Bool
     @State private var step: OnboardingStep = .welcome
     @State private var helperInstalled = false
+    @State private var selectedMode: RuntimeMode = .tun
 
     enum OnboardingStep: Int, CaseIterable {
         case welcome = 0
         case helperInstall = 1
-        case importConfig = 2
-        case complete = 3
+        case modeSelect = 2
+        case importConfig = 3
+        case complete = 4
     }
 
     var body: some View {
@@ -35,6 +37,8 @@ struct OnboardingView: View {
                     welcomeStep
                 case .helperInstall:
                     helperInstallStep
+                case .modeSelect:
+                    modeSelectionStep
                 case .importConfig:
                     importConfigStep
                 case .complete:
@@ -59,6 +63,8 @@ struct OnboardingView: View {
                 Button(nextButtonTitle) {
                     withAnimation {
                         if step == .complete {
+                            // Save mode choice before completing
+                            UserDefaults.standard.set(selectedMode.rawValue, forKey: "selectedRuntimeMode")
                             isPresented = false
                         } else {
                             step = OnboardingStep(rawValue: step.rawValue + 1) ?? .complete
@@ -70,7 +76,7 @@ struct OnboardingView: View {
             }
             .padding(24)
         }
-        .frame(width: 520, height: 400)
+        .frame(width: 520, height: 440)
         .background(Theme.backgroundGradient)
     }
 
@@ -78,6 +84,7 @@ struct OnboardingView: View {
         switch step {
         case .welcome: return "开始设置"
         case .helperInstall: return "跳过"
+        case .modeSelect: return "继续"
         case .importConfig: return "跳过"
         case .complete: return "开始使用 Riptide"
         }
@@ -129,6 +136,51 @@ struct OnboardingView: View {
         .padding(.horizontal, 40)
     }
 
+    private var modeSelectionStep: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 48))
+                .foregroundStyle(Theme.accent)
+
+            Text("选择运行模式")
+                .font(.title2.bold())
+                .foregroundStyle(Theme.text)
+
+            if helperInstalled {
+                Text("辅助工具已安装，两种模式都完全可用")
+                    .font(.callout)
+                    .foregroundStyle(Theme.success)
+            } else {
+                Text("辅助工具未安装 — TUN 模式推荐")
+                    .font(.callout)
+                    .foregroundStyle(Theme.warning)
+            }
+
+            // TUN mode option
+            ModeOptionView(
+                title: "TUN 模式",
+                subtitle: helperInstalled
+                    ? "全流量拦截 · 系统级代理"
+                    : "全流量拦截 · 无需 Apple Developer · 推荐",
+                isRecommended: !helperInstalled,
+                isSelected: selectedMode == .tun,
+                action: { selectedMode = .tun }
+            )
+
+            // System Proxy option
+            ModeOptionView(
+                title: "系统代理模式",
+                subtitle: helperInstalled
+                    ? "轻量级 · 设置系统代理"
+                    : "轻量级 · 系统代理守卫不可用",
+                isRecommended: helperInstalled,
+                isSelected: selectedMode == .systemProxy,
+                action: { selectedMode = .systemProxy }
+            )
+        }
+        .padding(.horizontal, 40)
+    }
+
     private var importConfigStep: some View {
         VStack(spacing: 16) {
             Image(systemName: "doc.badge.plus")
@@ -156,13 +208,67 @@ struct OnboardingView: View {
             Text("设置完成！")
                 .font(.title.bold())
                 .foregroundStyle(Theme.text)
-            Text("现在你可以开始使用 Riptide 了")
+            Text("运行模式：\(selectedMode == .tun ? "TUN 模式" : "系统代理模式")")
                 .font(.body)
                 .foregroundStyle(Theme.subtext)
-            Text("点击右上角的\"开始使用 Riptide\"进入主界面")
+            Text("点击\"开始使用 Riptide\"进入主界面")
                 .font(.callout)
                 .foregroundStyle(Theme.subtext.opacity(0.7))
         }
         .padding(.horizontal, 40)
+    }
+}
+
+// MARK: - Mode Option View
+
+private struct ModeOptionView: View {
+    let title: String
+    let subtitle: String
+    let isRecommended: Bool
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.body.bold())
+                            .foregroundStyle(Theme.text)
+                        if isRecommended {
+                            Text("推荐")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Theme.accent.opacity(0.2))
+                                .foregroundStyle(Theme.accent)
+                                .cornerRadius(4)
+                        }
+                    }
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Theme.subtext)
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                        .font(.title3)
+                } else {
+                    Image(systemName: "circle")
+                        .foregroundStyle(Theme.subtext.opacity(0.4))
+                        .font(.title3)
+                }
+            }
+            .padding(10)
+            .background(isSelected ? Theme.accent.opacity(0.08) : Color.clear)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Theme.accent : Theme.subtext.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
