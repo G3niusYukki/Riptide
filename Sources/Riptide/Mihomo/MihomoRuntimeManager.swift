@@ -456,6 +456,24 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             if terminationError == nil {
                 await waitForTermination()
             }
+
+            // Forceful fallback: if health check still succeeds after 3s, process is hung
+            if let wrapper = apiClientWrapper {
+                var hung = false
+                for _ in 0..<10 {
+                    let alive = await wrapper.client.healthCheck()
+                    if !alive {
+                        hung = false
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms
+                    hung = true
+                }
+                if hung {
+                    print("[MihomoRuntimeManager] Warning: mihomo process unresponsive after terminate — forceful kill not available via XPC helper (requires helper update)")
+                }
+            }
+
             await helperConnection.disconnect()
         }
 
@@ -726,30 +744,59 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     }
 
     /// Verifies that the TUN interface is up and running.
-    /// Uses `ifconfig` to check if the device exists and has the UP flag.
+    /// Dynamically detects the active mihomo TUN interface by listing all utun devices
+    /// and checking for UP flag with an IP in the 198.18.x.x range (mihomo gVisor default).
     private func verifyTUNInterface() async -> Bool {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/sbin/ifconfig")
-        proc.arguments = [tunDeviceName]
+        // Get all network interface names
+        let listProc = Process()
+        listProc.executableURL = URL(fileURLWithPath: "/sbin/ifconfig")
+        listProc.arguments = ["-l"]
 
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
+        let listPipe = Pipe()
+        listProc.standardOutput = listPipe
+        listProc.standardError = FileHandle.nullDevice
 
         do {
-            try proc.run()
-            proc.waitUntilExit()
+            try listProc.run()
+            listProc.waitUntilExit()
         } catch {
             return false
         }
 
-        guard proc.terminationStatus == 0 else { return false }
+        guard listProc.terminationStatus == 0,
+              let listOutput = String(data: listPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        else { return false }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return false }
+        let interfaces = listOutput.components(separatedBy: .whitespaces).filter { $0.hasPrefix("utun") }
 
-        // Check for "UP" flag in ifconfig output
-        return output.contains("UP")
+        // Check each utun interface for UP flag and mihomo IP range
+        for iface in interfaces {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/sbin/ifconfig")
+            proc.arguments = [iface]
+
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            proc.standardError = FileHandle.nullDevice
+
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+            } catch {
+                continue
+            }
+
+            guard proc.terminationStatus == 0,
+                  let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+            else { continue }
+
+            // Must be UP and have an address in the 198.18.x.x range (mihomo gVisor default)
+            if output.contains("UP") && output.range(of: "inet 198\\.18\\.", options: .regularExpression) != nil {
+                return true
+            }
+        }
+
+        return false
     }
 
     /// Flushes the macOS DNS cache after TUN mode stops.
