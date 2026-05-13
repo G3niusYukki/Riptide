@@ -34,6 +34,8 @@ This gives you:
 - **Clash-compatible** — drop in your existing `.yaml` configs and subscriptions
 - **Transparent** — every line is Swift, no opaque binary blobs beyond mihomo itself
 
+> **Unsigned builds:** TUN mode is the recommended path — it intercepts all traffic at the packet level via mihomo's gVisor stack and does not require the privileged helper.
+
 ---
 
 ## ✨ Features
@@ -143,8 +145,8 @@ Local Proxy / TUN packet
 
 | Mode | Status | Description |
 |------|--------|-------------|
-| **System Proxy** | Stable | Primary path — mihomo sidecar + macOS system proxy configuration with auto-guard |
-| **TUN Mode** | Beta | mihomo TUN with gvisor stack + auto-recovery — requires sudo (no Apple Developer account needed) |
+| **System Proxy** | Stable | mihomo sidecar + macOS system proxy configuration with auto-guard (guard requires signed helper) |
+| **TUN Mode** | Stable | Full traffic interception via mihomo gVisor TUN + auto-recovery — recommended for unsigned builds. Requires sudo, no Apple Developer account needed |
 
 ---
 
@@ -165,7 +167,7 @@ Local Proxy / TUN packet
    ```
    Then open normally.
 
-> Riptide is fully open source but not Apple-signed (no $99/year developer certificate). `xattr -cr` simply removes the "downloaded from internet" quarantine flag.
+> Riptide is fully open source but not Apple-signed (no $99/year developer certificate). `xattr -cr` simply removes the "downloaded from internet" quarantine flag. After launching, select **TUN mode** during onboarding for full traffic interception without Apple signing.
 
 ### Install (Homebrew)
 

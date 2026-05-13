@@ -53,8 +53,6 @@ extension RuntimeError: LocalizedError {
             return "mihomo 已在运行中"
         case .notRunning:
             return "mihomo 未运行"
-        case .tunUnavailable(let reason):
-            return "TUN 模式不可用: \(reason)"
         }
     }
 
@@ -70,8 +68,6 @@ extension RuntimeError: LocalizedError {
             return "请先停止当前运行的实例"
         case .notRunning:
             return "请先启动 mihomo"
-        case .tunUnavailable:
-            return "请使用系统代理模式，或检查 Helper 安装状态"
         default:
             return "请尝试重启 mihomo"
         }
