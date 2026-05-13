@@ -31,6 +31,11 @@ public protocol MihomoRuntimeManaging: Actor {
     var currentProfile: TunnelProfile? { get }
     /// XPC connection to the privileged helper tool.
     var helperConnection: HelperToolConnection { get }
+    /// The most recent TUN recovery error, if any.
+    var latestRecoveryError: RuntimeErrorSnapshot? { get }
+    /// Sets a closure that receives runtime events from this manager.
+    /// Called by ModeCoordinator to wire event forwarding.
+    func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async
 
     /// Sets up the runtime by creating necessary directories.
     func setup() async throws
@@ -138,6 +143,11 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     public private(set) var latestRecoveryError: RuntimeErrorSnapshot?
     /// Closure to emit runtime events (set by ModeCoordinator).
     public var eventHandler: (@Sendable (RuntimeEvent) -> Void)?
+
+    /// Sets the event handler closure (conforms to MihomoRuntimeManaging protocol).
+    public func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
+        self.eventHandler = handler
+    }
 
 
     // MARK: - Initialization

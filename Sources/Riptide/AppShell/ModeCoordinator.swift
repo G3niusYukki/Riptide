@@ -34,6 +34,11 @@ public actor ModeCoordinator {
             throw SystemProxyError.unknown("no profile for mode")
         }
 
+        // Wire event handler so mihomoRuntime can emit events to this coordinator
+        await mihomoManager.setEventHandler({ [weak self] event in
+            Task { await self?.emit(event) }
+        })
+
         do {
             try await mihomoManager.start(mode: mode, profile: profile)
             activeMode = mode

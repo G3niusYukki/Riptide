@@ -10,6 +10,11 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
     var isRunning: Bool = false
     var currentMode: RuntimeMode? = nil
     var currentProfile: TunnelProfile? = nil
+    var latestRecoveryError: RuntimeErrorSnapshot? = nil
+    var eventHandler: (@Sendable (RuntimeEvent) -> Void)? = nil
+    func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
+        self.eventHandler = handler
+    }
     let helperConnection: HelperToolConnection = HelperToolConnection()
 
     // Configuration state
