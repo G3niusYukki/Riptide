@@ -130,6 +130,15 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
     /// TUN monitoring task for continuous interface health checking.
     private var tunMonitorTask: Task<Void, Never>?
+    /// Count of consecutive failed TUN recovery attempts.
+    private var tunRecoveryFailures: Int = 0
+    /// Maximum consecutive recovery attempts before giving up.
+    private let maxTUNRecoveryAttempts = 3
+    /// The most recent TUN recovery error, surfaced to ModeCoordinator.
+    public private(set) var latestRecoveryError: RuntimeErrorSnapshot?
+    /// Closure to emit runtime events (set by ModeCoordinator).
+    public var eventHandler: (@Sendable (RuntimeEvent) -> Void)?
+
 
     // MARK: - Initialization
 
@@ -313,6 +322,11 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         isRunning = true
         currentMode = mode
         currentProfile = profile
+        if mode == .tun {
+            tunRecoveryFailures = 0
+            latestRecoveryError = nil
+            eventHandler?(.stateChanged(.running))
+        }
     }
 
     /// Applies mode-specific configuration after mihomo is confirmed running.
@@ -379,19 +393,38 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
     /// Attempts to recover TUN mode by restarting mihomo.
     private func attemptTUNRecovery() async {
-        guard let profile = currentProfile else { return }
-        print("[MihomoRuntimeManager] Stopping mihomo for TUN recovery")
+        guard let profile = currentProfile else {
+            return
+        }
+
+        tunRecoveryFailures += 1
+
+        if tunRecoveryFailures > maxTUNRecoveryAttempts {
+            print("[MihomoRuntimeManager] TUN recovery exhausted after \(maxTUNRecoveryAttempts) consecutive attempts — stopping monitor")
+            stopTUNMonitoring()
+            let snapshot = RuntimeErrorSnapshot(
+                code: "E_TUN_RECOVERY_EXHAUSTED",
+                message: "TUN recovery failed after \(maxTUNRecoveryAttempts) consecutive attempts. TUN monitoring stopped."
+            )
+            latestRecoveryError = snapshot
+            eventHandler?(.error(snapshot))
+            return
+        }
+
+        let backoffSeconds: UInt64 = UInt64(min(pow(2.0, Double(tunRecoveryFailures)), 8.0))
+        print("[MihomoRuntimeManager] TUN recovery attempt \(tunRecoveryFailures)/\(maxTUNRecoveryAttempts) with \(backoffSeconds)s backoff")
+
         try? await stop()
-        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds cooldown
-        print("[MihomoRuntimeManager] Restarting mihomo for TUN recovery")
+        try? await Task.sleep(nanoseconds: backoffSeconds * 1_000_000_000)
+
         do {
             try await start(mode: .tun, profile: profile)
+            tunRecoveryFailures = 0
             print("[MihomoRuntimeManager] TUN recovery succeeded")
         } catch {
-            print("[MihomoRuntimeManager] TUN recovery failed: \(error)")
+            print("[MihomoRuntimeManager] TUN recovery attempt \(tunRecoveryFailures) failed: \(error)")
         }
     }
-
     /// Stops the mihomo runtime.
     /// - Throws: RuntimeError if shutdown fails or runtime is not running.
     public func stop() async throws {
