@@ -203,10 +203,9 @@ The `riptide-windows/` directory is a separate Tauri + React + TypeScript + Rust
 
 ## Known Limitations
 
-1. **Helper Tool Signing**: `RiptideHelper/Resources/Info.plist` requires valid Apple Developer Team ID for production SMJobBless
-2. **macOS TUN**: Uses NetworkExtension and SMJobBless APIs — not portable
-3. **QUIC transport**: Requires macOS 14+ (`NWProtocolQUIC`)
-4. **Windows port**: In progress (Phase 2), `feat/windows-port-phase2` branch
+1. **Helper Tool Signing**: `RiptideHelper/Resources/Info.plist` requires valid Apple Developer Team ID for production SMJobBless. Without signing, TUN mode (via sudo + mihomo gVisor) works fully; System Proxy guard is unavailable.
+2. **QUIC transport**: Requires macOS 14+ (`NWProtocolQUIC`)
+3. **Windows port**: In progress (Phase 2), `feat/windows-port-phase2` branch
 
 ## References
 
