@@ -313,27 +313,39 @@ struct ConfigTabView: View {
             .pickerStyle(.segmented)
             .disabled(vm.isRunning)
 
-            Text("TUN 模式暂未开放：需完成真实 mihomo TUN 集成、权限链路和端到端验证后再启用。")
-                .font(.caption)
-                .foregroundStyle(Theme.subtext)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Helper installation button (shown when TUN selected but helper not installed)
-            if vm.connectionMode == .tun && !vm.helperInstalled {
+            // Start / Stop button
+            HStack(spacing: 12) {
                 Button {
-                    showHelperSetup = true
+                    Task { await vm.toggleTunnel() }
                 } label: {
-                    HStack {
-                        Image(systemName: "lock.shield")
-                        Text("安装Helper工具")
+                    HStack(spacing: 6) {
+                        Image(systemName: vm.isRunning ? "stop.fill" : "play.fill")
+                        Text(vm.isRunning ? "停止代理" : "启动代理")
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Theme.danger)
-                .padding(.top, 4)
+                .tint(vm.isRunning ? Theme.danger : Theme.accent)
+                .keyboardShortcut(.return, modifiers: [])
 
-                Text("TUN模式需要安装Helper工具才能配置网络接口")
+                // Helper setup (only when TUN selected and helper not installed)
+                if vm.connectionMode == .tun && !vm.helperInstalled {
+                    Button {
+                        showHelperSetup = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.shield")
+                            Text("安装Helper")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.warning)
+                }
+            }
+
+            // TUN mode sudo info
+            if vm.connectionMode == .tun && !vm.helperInstalled {
+                Text("Helper 未安装时将使用 sudo 提权启动，macOS 会弹出密码框。")
                     .font(.caption)
                     .foregroundStyle(Theme.subtext)
                     .frame(maxWidth: .infinity, alignment: .leading)
