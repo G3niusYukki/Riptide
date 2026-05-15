@@ -1,6 +1,6 @@
 # Riptide 项目可用性分析与 Release DMG 构建报告
 
-## 🚀 Latest Release: v0.2.0 — Production Readiness (2026-05-15)
+## 🚀 Latest Release: v1.7.0 — Production Readiness (2026-05-15)
 
 ### Changelog
 
