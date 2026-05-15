@@ -2,6 +2,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
   <img src="https://img.shields.io/badge/tests-562%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/version-1.7.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
 </p>
