@@ -42,7 +42,7 @@ This gives you:
 
 ### Proxy Protocols
 
-Shadowsocks AEAD · VMess · VLESS (XTLS/Vision) · Trojan · Hysteria2 · Snell v2/v3 · SOCKS5 · HTTP CONNECT
+Shadowsocks AEAD · VMess · VLESS (XTLS/Vision) · VLESS Reality · Trojan · Hysteria2 · TUIC · WireGuard · Snell v2/v3 · SOCKS5 · HTTP CONNECT
 
 ### Transport
 
@@ -85,6 +85,13 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 - **Subscription auto-update** — background scheduler with configurable intervals (5-minute check cycle)
 - **Rule set auto-update** — periodic refresh of remote rule sets integrated into profile lifecycle
 - **Config backup/restore** — automatic backup on profile switch, manual backup, restore from history (max 20 backups)
+- **Kill Switch (On-Demand VPN)** — blocks all traffic when VPN is disconnected, preventing IP/DNS leaks
+- **Sleep/Wake recovery** — automatically restores the runtime after Mac sleep/wake cycles
+- **Network change recovery** — detects WiFi/Ethernet transitions and re-establishes connections
+- **Graceful node degradation** — automatically fails over to next available proxy when a node is unreachable
+- **Adaptive startup** — exponential backoff readiness check (100ms→2s) eliminates fixed-delay startup pauses
+- **Diagnostic reports** — `GET /diagnostics` REST + WebSocket endpoints with structured JSON reports
+- **Connection timing metrics** — per-connection policy resolution and proxy connect latency tracking
 - **System proxy guard** — monitors and auto-restores system proxy settings if externally modified
 - **TUN auto-recovery** — continuous interface health monitoring with automatic mihomo restart on failure
 - **XPC helper maturation** — automatic reconnection with exponential backoff, 30s heartbeat, 3s timeout protection, version validation
