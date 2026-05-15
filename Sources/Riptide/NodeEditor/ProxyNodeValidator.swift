@@ -113,6 +113,9 @@ public actor ProxyNodeValidator {
                 errors.append("TUIC requires a password")
             }
 
+        case .wireguard:
+            // WireGuard validation is handled separately (private key, public key, etc.)
+            break
 
         case .http, .socks5, .relay:
             // No additional required fields

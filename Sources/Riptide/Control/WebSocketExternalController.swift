@@ -18,10 +18,17 @@ public actor WebSocketExternalController {
     private var config: RiptideConfig
     private var listener: NWListener?
     private var activeConnections: [UUID: WebSocketConnection] = [:]
+    /// Optional provider for diagnostic reports (injected by app layer).
+    private var diagnosticReportProvider: (@Sendable () async -> DiagnosticReport)?
 
-    public init(runtime: LiveTunnelRuntime, config: RiptideConfig) {
+    public init(
+        runtime: LiveTunnelRuntime,
+        config: RiptideConfig,
+        diagnosticReportProvider: (@Sendable () async -> DiagnosticReport)? = nil
+    ) {
         self.runtime = runtime
         self.config = config
+        self.diagnosticReportProvider = diagnosticReportProvider
     }
 
     /// Start the WebSocket controller on the specified host and port.
@@ -165,6 +172,8 @@ public actor WebSocketExternalController {
             return await handleGetTraffic(request)
         case ("GET", "/version"):
             return handleGetVersion(request)
+        case ("GET", "/diagnostics"):
+            return await handleGetDiagnostics(request)
         default:
             return WebSocketResponse(id: request.id, status: "error", data: nil, error: "Not found")
         }
@@ -310,6 +319,30 @@ public actor WebSocketExternalController {
         )
     }
 
+    private func handleGetDiagnostics(_ request: WebSocketRequest) async -> WebSocketResponse {
+        if let provider = diagnosticReportProvider {
+            let report = await provider()
+            if let data = try? JSONEncoder().encode(report),
+               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return WebSocketResponse(id: request.id, status: "ok", data: dict, error: nil)
+            }
+        }
+        // Fallback: lightweight inline diagnostics
+        let status = await runtime.status()
+        return WebSocketResponse(
+            id: request.id,
+            status: "ok",
+            data: [
+                "version": "1.0.0",
+                "mode": "tun",
+                "activeConnections": activeConnections.count,
+                "bytesUp": status.bytesUp,
+                "bytesDown": status.bytesDown
+            ],
+            error: nil
+        )
+    }
+
     private func proxyTypeString(_ kind: ProxyKind) -> String {
         switch kind {
         case .http: return "Http"
@@ -322,6 +355,7 @@ public actor WebSocketExternalController {
         case .snell: return "Snell"
         case .relay: return "Relay"
         case .tuic: return "Tuic"
+        case .wireguard: return "WireGuard"
         }
     }
 

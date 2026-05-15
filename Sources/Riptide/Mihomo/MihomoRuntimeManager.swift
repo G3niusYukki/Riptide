@@ -298,20 +298,30 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         let client = MihomoAPIClient(baseURL: apiURL)
         apiClientWrapper = SendableAPIClient(client)
 
-        // 8. Wait for API ready (health check with retries)
+        // 8. Wait for API ready (adaptive exponential backoff with max timeout).
+        //    Replaces the old fixed-interval polling (10 × 500ms = 5s worst case)
+        //    with a readiness loop that starts at 100ms and doubles each attempt,
+        //    capped at 2s per attempt, with an overall timeout of 10 seconds.
+        //    This reduces startup latency by ~400ms in the common case where
+        //    mihomo becomes ready within the first 100-200ms of launch.
         guard let wrapper = apiClientWrapper else {
             throw RuntimeError.apiNotAvailable
         }
 
         var apiReady = false
-        for attempt in 1...healthCheckRetries {
+        let startTime = ContinuousClock.now
+        let maxWait: Duration = .seconds(10)
+        var delay: Duration = .milliseconds(100)
+
+        while true {
             apiReady = await wrapper.client.healthCheck()
-            if apiReady {
-                break
-            }
-            if attempt < healthCheckRetries {
-                try? await Task.sleep(nanoseconds: healthCheckRetryInterval)
-            }
+            if apiReady { break }
+
+            let elapsed = ContinuousClock.now - startTime
+            if elapsed > maxWait { break }
+
+            try? await Task.sleep(for: delay)
+            delay = min(delay * 2, .seconds(2))
         }
 
         guard apiReady else {

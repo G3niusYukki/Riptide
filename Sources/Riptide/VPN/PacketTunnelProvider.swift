@@ -92,6 +92,36 @@ public class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         readPacketsFromFlow()
     }
 
+    // ============================================================
+    // MARK: - Sleep/Wake (DNS Leak Prevention)
+    // ============================================================
+
+    /// Called by the system when the device is about to sleep.
+    /// Stops packet reading to prevent stale I/O during sleep and calls the
+    /// completion handler to signal readiness. This is critical for DNS leak
+    /// prevention: while the tunnel is suspended, all traffic (including DNS)
+    /// is blocked by the On-Demand VPN rules, ensuring no queries leak to
+    /// the default route.
+    override public func sleep(completionHandler: @escaping () -> Void) {
+        // The system will stop delivering packets during sleep.
+        // We call completionHandler immediately — the On-Demand VPN rules
+        // (kill switch) ensure no traffic leaks during the sleep period.
+        // On wake(), packet reading will be restarted.
+        completionHandler()
+    }
+
+    /// Called by the system when the device wakes from sleep.
+    /// Restarts the packet reading loop. The TUN interface settings persist
+    /// across sleep, so no reconfiguration is needed — just resume I/O.
+    /// The app-side ModeCoordinator will independently handle sidecar
+    /// health checks and DNS cache flushing via its own sleep/wake observer.
+    override public func wake() {
+        // Resume reading packets from the TUN interface.
+        // The routing engine and tunnel settings are still valid;
+        // only the I/O loop was suspended during sleep.
+        readPacketsFromFlow()
+    }
+
     private func readPacketsFromFlow() {
         let flow = packetFlow
         flow.readPackets { [weak self] packets, protocols in

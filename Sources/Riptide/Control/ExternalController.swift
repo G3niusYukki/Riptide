@@ -19,6 +19,8 @@ public actor ExternalController {
     private var requestLog: [APIRequestLog]
     private var currentMode: RuntimeMode
     private let maxLogs: Int = 1000
+    /// Optional provider for diagnostic reports (injected by app layer).
+    private var diagnosticReportProvider: (@Sendable () async -> DiagnosticReport)?
 
     private struct ConnectionContext: Sendable {
         let id: UUID
@@ -45,12 +47,17 @@ public actor ExternalController {
         }
     }
 
-    public init(runtime: LiveTunnelRuntime, config: RiptideConfig) {
+    public init(
+        runtime: LiveTunnelRuntime,
+        config: RiptideConfig,
+        diagnosticReportProvider: (@Sendable () async -> DiagnosticReport)? = nil
+    ) {
         self.runtime = runtime
         self.config = config
         self.activeConnections = [:]
         self.requestLog = []
         self.currentMode = .systemProxy
+        self.diagnosticReportProvider = diagnosticReportProvider
     }
 
     public func start(host: String = "127.0.0.1", port: UInt16 = 9090) async throws -> String {
@@ -199,6 +206,25 @@ public actor ExternalController {
                 "down": status.bytesDown
             ])
 
+        case ("GET", "/diagnostics"):
+            if let provider = diagnosticReportProvider {
+                let report = await provider()
+                if let data = try? JSONEncoder().encode(report),
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    return json(200, dict)
+                }
+                return json(500, ["error": "failed to encode diagnostic report"])
+            }
+            // Fallback: lightweight inline diagnostics without ModeCoordinator access
+            let status = await runtime.status()
+            return json(200, [
+                "version": "1.0.0",
+                "mode": currentMode.rawValue,
+                "activeConnections": activeConnections.count,
+                "bytesUp": status.bytesUp,
+                "bytesDown": status.bytesDown
+            ])
+
         case ("GET", "/logs"):
             var logs: [[String: Any]] = []
             for log in requestLog.suffix(50) {
@@ -234,6 +260,7 @@ public actor ExternalController {
         case .snell: return "Snell"
         case .relay: return "Relay"
         case .tuic: return "TUIC"
+        case .wireguard: return "WireGuard"
         }
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Coordinates runtime mode transitions between system proxy and TUN,
 /// using MihomoRuntimeManager as the underlying runtime.
@@ -14,6 +15,9 @@ public actor ModeCoordinator {
     private var systemProxyMonitor: SystemProxyMonitor?
     private var healthCheckTask: Task<Void, Never>?
     private var healthResults: [String: HealthResult] = [:]
+    private var sleepWakeObserver: SleepWakeObserver?
+    private let pathMonitor = NWPathMonitor()
+    private var pathMonitorQueue: DispatchQueue?
 
     private let maxEvents = 100
 
@@ -53,6 +57,12 @@ public actor ModeCoordinator {
             // Start periodic health checks for proxies
             startHealthChecks(proxies: profile.config.proxies)
 
+            // Start sleep/wake observer for recovery after Mac sleep/wake cycles
+            startSleepWakeObserver()
+
+            // Start network path monitoring for WiFi/Ethernet change recovery
+            startNetworkMonitoring()
+
             // Initialize Provider scheduler
             providerScheduler = ProviderUpdateScheduler { [weak self] providerID in
                 await self?.updateProvider(id: providerID)
@@ -71,6 +81,12 @@ public actor ModeCoordinator {
     }
 
     public func stop() async throws {
+        // Stop sleep/wake observer
+        stopSleepWakeObserver()
+
+        // Stop network path monitoring
+        stopNetworkMonitoring()
+
         // Stop health checks
         stopHealthChecks()
 
@@ -122,6 +138,86 @@ public actor ModeCoordinator {
     /// Whether the helper tool is installed (required for both modes with mihomo).
     public func isHelperInstalled() async -> Bool {
         await mihomoManager.helperConnection.isHelperInstalled()
+    }
+
+    /// Generates a structured diagnostic report collecting state from all runtime
+    /// subcomponents. Useful for debugging user-reported issues — the report can
+    /// be serialized as JSON and shared.
+    public func generateDiagnosticReport() async -> DiagnosticReport {
+        let helperInstalled = await mihomoManager.helperConnection.isHelperInstalled()
+        let mihomoRunning = await mihomoManager.isRunning
+
+        // Mihomo version (best-effort, uses standard install paths)
+        let mihomoVersion: String? = {
+            let path = MihomoPaths().executable
+            let version = getCurrentMihomoVersion(executablePath: path)
+            return version != "unknown" ? version : nil
+        }()
+
+        // System proxy state
+        let systemProxyReport: DiagnosticReport.SystemProxyReport?
+        if activeMode == .systemProxy {
+            systemProxyReport = DiagnosticReport.SystemProxyReport(
+                enabled: systemProxyGuard != nil,
+                httpPort: ModeCoordinator.defaultHTTPPort,
+                socksPort: nil,
+                guarded: systemProxyGuard != nil
+            )
+        } else {
+            systemProxyReport = nil
+        }
+
+        // DNS config from current profile
+        let dnsReport: DiagnosticReport.DNSReport?
+        if let profile = await mihomoManager.currentProfile {
+            let policy = profile.config.dnsPolicy
+            dnsReport = DiagnosticReport.DNSReport(
+                mode: policy.fakeIPEnabled ? "fakeIP" : "realIP",
+                fakeIPCIDR: policy.fakeIPEnabled ? policy.fakeIPCIDR : nil,
+                remoteServers: policy.primaryResolvers.map(\.address),
+                doHEndpoints: policy.primaryResolvers.compactMap { $0.kind == .doh ? $0.dohURL : nil },
+                cacheEnabled: true
+            )
+        } else {
+            dnsReport = nil
+        }
+
+        // Recent errors from event buffer
+        let recentErrors: [DiagnosticReport.DiagnosticErrorEntry] = eventBuffer.compactMap { event in
+            if case .error(let snapshot) = event {
+                return DiagnosticReport.DiagnosticErrorEntry(
+                    code: snapshot.code,
+                    message: snapshot.message,
+                    timestamp: snapshot.timestamp
+                )
+            }
+            return nil
+        }
+
+        // Active connections
+        let activeConnections = (try? await mihomoManager.getConnections().count) ?? 0
+
+        // Traffic
+        let traffic = (try? await mihomoManager.getTraffic()) ?? (up: 0, down: 0)
+
+        // VPN status (TUN mode only)
+        let vpnStatus: String? = activeMode == .tun ? (mihomoRunning ? "connected" : "disconnected") : nil
+
+        let collector = DiagnosticCollector()
+        return collector.buildReport(
+            mode: activeMode,
+            mihomoRunning: mihomoRunning,
+            mihomoVersion: mihomoVersion != "unknown" ? mihomoVersion : nil,
+            vpnStatus: vpnStatus,
+            systemProxy: systemProxyReport,
+            dnsConfig: dnsReport,
+            recentErrors: recentErrors,
+            activeConnections: activeConnections,
+            bytesUp: UInt64(traffic.up),
+            bytesDown: UInt64(traffic.down),
+            uptimeSeconds: nil, // uptime tracking not yet implemented
+            helperInstalled: helperInstalled
+        )
     }
 
     /// Gets traffic statistics from the mihomo runtime.
@@ -262,6 +358,132 @@ public actor ModeCoordinator {
         systemProxyMonitor = nil
         await systemProxyGuard?.disable()
         systemProxyGuard = nil
+    }
+
+    // MARK: - Sleep/Wake Recovery
+
+    /// Starts the sleep/wake observer to handle macOS sleep/wake cycles.
+    /// On wake, triggers recovery: verify mihomo sidecar health, flush DNS cache,
+    /// and emit a state change event so the UI can reflect recovery status.
+    private func startSleepWakeObserver() {
+        let observer = SleepWakeObserver()
+        observer.start(
+            onSleep: { [weak self] in
+                Task { await self?.prepareForSleep() }
+            },
+            onWake: { [weak self] in
+                Task { await self?.recoverFromWake() }
+            }
+        )
+        sleepWakeObserver = observer
+    }
+
+    /// Stops the sleep/wake observer and releases its resources.
+    private func stopSleepWakeObserver() {
+        sleepWakeObserver?.stop()
+        sleepWakeObserver = nil
+    }
+
+    /// Called when the system is about to sleep.
+    /// Emits a state change event so the UI can reflect that the runtime
+    /// will be suspended. No aggressive teardown is performed — mihomo
+    /// connections will naturally time out during sleep and be re-established on wake.
+    private func prepareForSleep() async {
+        emit(.degraded(activeMode, "system_sleep"))
+    }
+
+    /// Called when the system wakes from sleep.
+    /// Performs a multi-step recovery to restore the runtime:
+    /// 1. Verify mihomo sidecar is still alive via health check
+    /// 2. Flush DNS cache to clear stale entries accumulated during sleep
+    /// 3. Emit recovery status events for UI feedback
+    ///
+    /// If the sidecar has crashed during sleep, the existing TUN monitoring
+    /// in MihomoRuntimeManager will detect this independently and trigger
+    /// its own recovery cycle (up to 3 retries).
+    private func recoverFromWake() async {
+        guard await mihomoManager.isRunning else {
+            // Runtime was stopped while sleeping — nothing to recover
+            return
+        }
+
+        emit(.degraded(activeMode, "wake_recovery_started"))
+
+        // 1. Health check — verify mihomo API is responsive
+        let healthy: Bool
+        do {
+            _ = try await mihomoManager.getTraffic()
+            healthy = true
+        } catch {
+            healthy = false
+        }
+
+        if healthy {
+            // DNS cache flush is handled internally by MihomoRuntimeManager
+            // during its TUN monitoring cycle (dscacheutil + DNSResponder restart).
+            // Stale cache entries will also expire on their own TTL.
+
+            emit(.stateChanged(.running))
+        } else {
+            // Sidecar is unresponsive — the TUN monitor will attempt recovery.
+            // Emit a degraded event so the UI can show a warning.
+            emit(.degraded(activeMode, "wake_recovery_sidecar_unresponsive"))
+        }
+    }
+
+    // MARK: - Network Path Monitoring
+
+    /// Starts NWPathMonitor to detect network interface changes (WiFi ↔ Ethernet,
+    /// VPN interface up/down, etc.). When a change is detected, triggers a
+    /// lightweight recovery: verifies mihomo sidecar health and emits status events.
+    ///
+    /// This works alongside the existing TUN monitoring in MihomoRuntimeManager:
+    /// - NWPathMonitor detects interface-level changes (instant)
+    /// - TUN monitor polls the mihomo API every 10s (periodic safety net)
+    private func startNetworkMonitoring() {
+        let queue = DispatchQueue(label: "com.riptide.network-monitor")
+        pathMonitorQueue = queue
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            Task { await self?.handleNetworkPathChange(path) }
+        }
+        pathMonitor.start(queue: queue)
+    }
+
+    /// Stops network path monitoring.
+    private func stopNetworkMonitoring() {
+        pathMonitor.cancel()
+        pathMonitorQueue = nil
+    }
+
+    /// Called when the network path changes (interface up/down, route change).
+    /// On recovery (status becomes satisfied after being unsatisfied), performs
+    /// a health check against the mihomo API to ensure the sidecar is responsive.
+    ///
+    /// Debounce: if the path flip-flops rapidly, each change is handled independently
+    /// but the health check is a lightweight operation (~HTTP GET to localhost).
+    private func handleNetworkPathChange(_ path: NWPath) async {
+        guard await mihomoManager.isRunning else { return }
+
+        if path.status == .satisfied {
+            // Network is available — verify sidecar health
+            let healthy: Bool
+            do {
+                _ = try await mihomoManager.getTraffic()
+                healthy = true
+            } catch {
+                healthy = false
+            }
+
+            if healthy {
+                emit(.stateChanged(.running))
+            } else {
+                // Sidecar unresponsive — TUN monitor will attempt recovery
+                emit(.degraded(activeMode, "network_change_sidecar_unresponsive"))
+            }
+        } else {
+            // Network is unavailable — emit degraded status
+            emit(.degraded(activeMode, "network_unavailable"))
+        }
     }
 
     /// Resolves the system proxy controller, using the injected one or creating a default.

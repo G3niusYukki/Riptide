@@ -25,6 +25,21 @@ public struct TunnelProfile: Sendable {
     }
 }
 
+/// Timing breakdown for a single connection establishment.
+public struct ConnectionTiming: Sendable, Equatable, Codable {
+    /// Policy resolution time in milliseconds (DNS + rule matching).
+    public let policyResolutionMs: Double
+    /// Proxy connection time in milliseconds (transport + protocol handshake).
+    public let proxyConnectMs: Double
+    /// Total connection establishment time in milliseconds.
+    public var totalMs: Double { policyResolutionMs + proxyConnectMs }
+
+    public init(policyResolutionMs: Double, proxyConnectMs: Double) {
+        self.policyResolutionMs = policyResolutionMs
+        self.proxyConnectMs = proxyConnectMs
+    }
+}
+
 public struct TunnelRuntimeStatus: Equatable, Sendable, Codable {
     public let bytesUp: UInt64
     public let bytesDown: UInt64

@@ -26,6 +26,8 @@ public actor LiveTunnelRuntime: TunnelRuntime {
     private var ruleSetRefreshTask: Task<Void, Never>?
     /// Active proxy providers, keyed by provider name.
     private var proxyProviders: [String: ProxyProvider] = [:]
+    /// Connection timing records, keyed by connection ID.
+    private var connectionTimings: [UUID: ConnectionTiming] = [:]
 
     public init(
         proxyDialer: any TransportDialer,
@@ -47,6 +49,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         self.currentProfile = nil
         self.currentStatus = TunnelRuntimeStatus()
         self.activeConnections = [:]
+        self.connectionTimings = [:]
     }
 
     public func start(profile: TunnelProfile) async throws {
@@ -134,7 +137,10 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             throw LiveTunnelRuntimeError.notStarted
         }
 
+        let policyStart = ContinuousClock.now
         let policy = await resolvePolicy(profile: profile, target: target)
+        let policyEnd = ContinuousClock.now
+        let policyMs = Double((policyEnd - policyStart).components.attoseconds) / 1_000_000_000_000_000
         switch policy {
         case .reject:
             throw LiveTunnelRuntimeError.rejectPolicy
@@ -157,39 +163,71 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             return context
 
         case .proxyNode(let name):
-            guard let node = profile.config.proxies.first(where: { $0.name == name }) else {
-                throw LiveTunnelRuntimeError.missingProxyNode(name)
-            }
-            let context: ConnectedProxyContext
-            if node.kind == .relay {
-                // Relay: follow the chain to find the terminal non-relay node, connect to it,
-                // and wrap the connection in a RelayTransportSession so all traffic is tunneled
-                // through the relay hop.
-                guard let chainName = node.chainProxyName else {
-                    throw LiveTunnelRuntimeError.missingProxyNode("\(name) (relay with no chain target)")
+            // Graceful degradation: if the first proxy node fails, try other nodes
+            // in the profile. This prevents a single dead proxy from taking down
+            // all connections in global/rule mode.
+            let candidates = proxyNodeCandidates(startingFrom: name, profile: profile)
+            var lastError: Error?
+
+            for candidate in candidates {
+                guard let node = profile.config.proxies.first(where: { $0.name == candidate }) else {
+                    continue
                 }
-                guard let terminalNode = profile.config.proxies.first(where: { $0.name == chainName }) else {
-                    throw LiveTunnelRuntimeError.missingProxyNode(chainName)
+                do {
+                    let context: ConnectedProxyContext
+                    if node.kind == .relay {
+                        guard let chainName = node.chainProxyName else {
+                            continue
+                        }
+                        guard let terminalNode = profile.config.proxies.first(where: { $0.name == chainName }) else {
+                            continue
+                        }
+                        let innerContext = try await connector.connect(via: terminalNode, to: target)
+                        let relaySession: any TransportSession = RelayTransportSession(inner: innerContext.connection.session)
+                        context = ConnectedProxyContext(
+                            node: node,
+                            connection: innerContext.connection,
+                            encryptedStream: innerContext.encryptedStream,
+                            relaySession: relaySession
+                        )
+                    } else {
+                        let connectStart = ContinuousClock.now
+                        context = try await connector.connect(via: node, to: target)
+                        let connectEnd = ContinuousClock.now
+                        let connectMs = Double((connectEnd - connectStart).components.attoseconds) / 1_000_000_000_000_000
+                        connectionTimings[context.connection.id] = ConnectionTiming(
+                            policyResolutionMs: policyMs,
+                            proxyConnectMs: connectMs
+                        )
+                    }
+                    activeConnections[context.connection.id] = context
+                    currentStatus = TunnelRuntimeStatus(
+                        bytesUp: currentStatus.bytesUp,
+                        bytesDown: currentStatus.bytesDown,
+                        activeConnections: activeConnections.count
+                    )
+                    return context
+                } catch {
+                    lastError = error
+                    continue
                 }
-                let innerContext = try await connector.connect(via: terminalNode, to: target)
-                let relaySession: any TransportSession = RelayTransportSession(inner: innerContext.connection.session)
-                context = ConnectedProxyContext(
-                    node: node,
-                    connection: innerContext.connection,
-                    encryptedStream: innerContext.encryptedStream,
-                    relaySession: relaySession
-                )
-            } else {
-                context = try await connector.connect(via: node, to: target)
             }
-            activeConnections[context.connection.id] = context
-            currentStatus = TunnelRuntimeStatus(
-                bytesUp: currentStatus.bytesUp,
-                bytesDown: currentStatus.bytesDown,
-                activeConnections: activeConnections.count
-            )
-            return context
+            // All candidates exhausted — propagate the last error
+            if let error = lastError {
+                throw error
+            }
+            throw LiveTunnelRuntimeError.missingProxyNode(name)
         }
+    }
+
+    /// Returns the connection timing record for a given connection ID.
+    public func connectionTiming(for id: UUID) -> ConnectionTiming? {
+        connectionTimings[id]
+    }
+
+    /// Returns all recent connection timing records (last 100, newest first).
+    public func recentConnectionTimings(limit: Int = 100) -> [(UUID, ConnectionTiming)] {
+        Array(connectionTimings.suffix(limit)).sorted { $0.1.totalMs > $1.1.totalMs }
     }
 
     public func recordTransfer(connectionID: UUID, bytesUp: UInt64 = 0, bytesDown: UInt64 = 0) {
@@ -208,6 +246,7 @@ public actor LiveTunnelRuntime: TunnelRuntime {
         guard let context = activeConnections.removeValue(forKey: id) else {
             return
         }
+        connectionTimings.removeValue(forKey: id)
 
         // Close the relay session wrapping the inner connection, if any.
         if let relaySession = context.relaySession as? RelayTransportSession {
@@ -272,5 +311,20 @@ public actor LiveTunnelRuntime: TunnelRuntime {
             asnResolver: asnResolver
         )
         return engine.resolve(target: ruleTarget)
+    }
+
+    /// Returns an ordered list of proxy node names to try for a given starting name.
+    /// The primary candidate is first, followed by all other proxies in the profile.
+    /// This enables graceful degradation: if the first proxy is dead, the next one
+    /// in the list is tried automatically.
+    ///
+    /// In global mode (where the primary is always the first proxy in the list),
+    /// this provides automatic failover through all available proxies.
+    private func proxyNodeCandidates(startingFrom primary: String, profile: TunnelProfile) -> [String] {
+        var candidates = [primary]
+        for proxy in profile.config.proxies where proxy.name != primary {
+            candidates.append(proxy.name)
+        }
+        return candidates
     }
 }

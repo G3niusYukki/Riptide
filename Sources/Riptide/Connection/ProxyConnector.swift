@@ -29,6 +29,13 @@ public struct ProxyConnector: Sendable {
     }
 
     public func connect(via node: ProxyNode, to target: ConnectionTarget) async throws -> ConnectedProxyContext {
+        // Reality path: use RealityTransportDialer for TLS camouflage (SNI, ALPN, cert verification).
+        // Reality connections bypass the transport pool because they require per-connection
+        // TLS configuration that cannot be reused across different targets.
+        if node.kind == .vless, let reality = RealityConfig.from(node: node) {
+            return try await performVLESSRealityConnect(node: node, reality: reality, target: target)
+        }
+
         let connection = try await pool.acquire(for: node)
         do {
             switch node.kind {
@@ -50,6 +57,10 @@ public struct ProxyConnector: Sendable {
                 return try await performSnellConnect(connection: connection, node: node, target: target)
             case .tuic:
                 return try await performTUICConnect(connection: connection, node: node, target: target)
+            case .wireguard:
+                // WireGuard is handled by mihomo sidecar; the library does not
+                // implement a native WireGuard protocol handler.
+                throw ProtocolError.connectionRejected("WireGuard requires mihomo runtime")
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never
@@ -125,6 +136,30 @@ public struct ProxyConnector: Sendable {
         )
     }
 
+    /// Establishes a VLESS + Reality connection using RealityTransportDialer for TLS
+    /// camouflage. Reality connections bypass the transport pool because each connection
+    /// requires unique TLS configuration (SNI set to camouflage target, not proxy server).
+    private func performVLESSRealityConnect(
+        node: ProxyNode,
+        reality: RealityConfig,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString) else {
+            throw ProtocolError.malformedResponse("VLESS Reality node missing uuid")
+        }
+        let dialer = RealityTransportDialer(
+            reality: reality,
+            proxyServer: node.server,
+            proxyPort: node.port
+        )
+        let session = try await dialer.openSession(to: node)
+        let vlessStream = VLESSStream(session: session, uuid: uuid, reality: reality)
+        try await vlessStream.connect(to: target, flow: nil) // flow is nil in Reality mode
+        let connection = PooledTransportConnection(node: node, session: session)
+        return ConnectedProxyContext(node: node, connection: connection)
+    }
+
+    /// Standard (non-Reality) VLESS connection.
     private func performVLESSConnect(
         connection: PooledTransportConnection,
         node: ProxyNode,
@@ -133,17 +168,10 @@ public struct ProxyConnector: Sendable {
         guard let uuidString = node.uuid, let uuid = UUID(uuidString: uuidString) else {
             throw ProtocolError.malformedResponse("VLESS node missing uuid")
         }
-        let reality = RealityConfig.from(node: node)
-        if reality != nil {
-            // Reality requires a Reality-capable TLS transport (SNI camouflage, TLS 1.3).
-            // The current transport path uses DialerSelector which doesn't select
-            // RealityTransportDialer. To use Reality, the transport acquisition in
-            // ProxyConnector.connect() must route through RealityTransportDialer
-            // when RealityConfig is present. For now, use the existing TLS transport
-            // with Reality config passed through for future transport-layer integration.
-        }
-        let vlessStream = VLESSStream(session: connection.session, uuid: uuid, reality: reality)
-        try await vlessStream.connect(to: target, flow: reality != nil ? nil : node.flow)
+        // Reality nodes are handled by performVLESSRealityConnect() before pool acquire.
+        // This method only processes standard VLESS connections.
+        let vlessStream = VLESSStream(session: connection.session, uuid: uuid, reality: nil)
+        try await vlessStream.connect(to: target, flow: node.flow)
         return ConnectedProxyContext(node: node, connection: connection)
     }
 

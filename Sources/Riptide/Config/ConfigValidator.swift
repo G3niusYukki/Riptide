@@ -477,6 +477,7 @@ public actor ConfigValidator {
         case "socks5": return .socks5
         case "relay": return .relay
         case "snell": return .snell
+        case "wireguard", "wg": return .wireguard
         default: return .http
         }
     }

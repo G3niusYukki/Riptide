@@ -144,6 +144,8 @@ public struct EditableProxyNode: Equatable, Sendable {
 
         case .tuic:
             node.port = 443
+        case .wireguard:
+            node.port = 51820
         }
 
         return node
@@ -233,6 +235,15 @@ public struct ProxyFieldRequirements {
                 supportsWebSocket: false
             )
 
+        case .wireguard:
+            return ProxyFieldRequirements(
+                requiresCipher: false,
+                requiresPassword: true,   // private key
+                requiresUUID: false,
+                requiresSNI: false,
+                supportsNetwork: false,
+                supportsWebSocket: false
+            )
 
         case .http, .socks5, .relay:
             return ProxyFieldRequirements(

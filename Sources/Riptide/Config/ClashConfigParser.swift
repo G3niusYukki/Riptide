@@ -233,6 +233,20 @@ public enum ClashConfigParser {
                     password: password,
                     snellVersion: proxy.snellVersion
                 )
+
+            case .wireguard:
+                guard let password = proxy.password, !password.isEmpty else {
+                    throw ClashConfigError.invalidProxy(index: index, reason: "private-key is required for WireGuard")
+                }
+                return ProxyNode(
+                    name: proxy.name,
+                    kind: .wireguard,
+                    server: proxy.server,
+                    port: port,
+                    password: password
+                    // WireGuard-specific fields (public-key, pre-shared-key, reserved, mtu, ip)
+                    // are added via ProxyNode's wireguard* properties — to be wired in step 3.
+                )
             }
         }
     }
@@ -259,6 +273,8 @@ public enum ClashConfigParser {
             return .relay
         case "snell":
             return .snell
+        case "wireguard":
+            return .wireguard
         default:
             throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy type: \(rawType ?? "nil")")
         }

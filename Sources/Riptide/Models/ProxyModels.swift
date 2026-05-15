@@ -17,6 +17,7 @@ public enum ProxyKind: Equatable, Sendable {
     case relay
     case snell
     case tuic
+    case wireguard
 }
 
 public struct ProxyNode: Equatable, Sendable {
@@ -43,6 +44,11 @@ public struct ProxyNode: Equatable, Sendable {
     public let realityShortId: String?
     public let realityPublicKey: String?
     public let realityFingerprint: String?
+    public let wireguardPublicKey: String?
+    public let wireguardPreSharedKey: String?
+    public let wireguardReserved: String?
+    public let wireguardMTU: Int?
+    public let wireguardIP: String?
 
     public init(
         name: String,
@@ -67,7 +73,12 @@ public struct ProxyNode: Equatable, Sendable {
         realityServerName: String? = nil,
         realityShortId: String? = nil,
         realityPublicKey: String? = nil,
-        realityFingerprint: String? = nil
+        realityFingerprint: String? = nil,
+        wireguardPublicKey: String? = nil,
+        wireguardPreSharedKey: String? = nil,
+        wireguardReserved: String? = nil,
+        wireguardMTU: Int? = nil,
+        wireguardIP: String? = nil
     ) {
         self.name = name
         self.kind = kind
@@ -92,6 +103,11 @@ public struct ProxyNode: Equatable, Sendable {
         self.realityShortId = realityShortId
         self.realityPublicKey = realityPublicKey
         self.realityFingerprint = realityFingerprint
+        self.wireguardPublicKey = wireguardPublicKey
+        self.wireguardPreSharedKey = wireguardPreSharedKey
+        self.wireguardReserved = wireguardReserved
+        self.wireguardMTU = wireguardMTU
+        self.wireguardIP = wireguardIP
     }
 }
 

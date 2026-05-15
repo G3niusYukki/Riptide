@@ -14,7 +14,8 @@ public enum ProxyValidationRules: Sendable {
         .http: ["name", "type", "server", "port"],
         .socks5: ["name", "type", "server", "port"],
         .relay: ["name", "type", "server", "port", "chain"],
-        .snell: ["name", "type", "server", "port", "password"]
+        .snell: ["name", "type", "server", "port", "password"],
+        .wireguard: ["name", "type", "server", "port", "password"]
     ]
 
     /// Valid cipher methods for Shadowsocks

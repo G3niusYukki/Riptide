@@ -170,6 +170,8 @@ public enum MihomoConfigGenerator {
             return "tuic"
         case .relay:
             return "relay"
+        case .wireguard:
+            return "wireguard"
         }
     }
 
@@ -201,6 +203,8 @@ public enum MihomoConfigGenerator {
         case .tuic:
             appendPassword(proxy: proxy, to: &lines)
             appendSNIAndCertFields(proxy: proxy, to: &lines, sniKey: "sni")
+        case .wireguard:
+            appendWireGuardFields(proxy: proxy, to: &lines)
         case .http, .socks5:
             // For HTTP/SOCKS5, cipher is used as username
             if let cipher = proxy.cipher {
@@ -237,6 +241,42 @@ public enum MihomoConfigGenerator {
     private static func appendNetwork(proxy: ProxyNode, to lines: inout [String]) {
         if let network = proxy.network {
             lines.append("    network: \(yamlEscape(network))")
+        }
+    }
+
+    /// Appends WireGuard-specific configuration fields.
+    /// Maps ProxyNode fields to mihomo wireguard outbound format:
+    /// - password → private-key (required)
+    /// - wireguardPublicKey → public-key (optional, for peer)
+    /// - wireguardPreSharedKey → pre-shared-key (optional)
+    /// - wireguardReserved → reserved (optional, base64 encoded)
+    /// - wireguardMTU → mtu (optional, default 1420)
+    private static func appendWireGuardFields(proxy: ProxyNode, to lines: inout [String]) {
+        // Private key (mapped from password field)
+        if let privateKey = proxy.password {
+            lines.append("    private-key: \(yamlEscape(privateKey))")
+        }
+        // Optional peer public key
+        if let publicKey = proxy.wireguardPublicKey {
+            lines.append("    public-key: \(yamlEscape(publicKey))")
+        }
+        // Optional pre-shared key
+        if let psk = proxy.wireguardPreSharedKey {
+            lines.append("    pre-shared-key: \(yamlEscape(psk))")
+        }
+        // Optional reserved bytes (base64)
+        if let reserved = proxy.wireguardReserved {
+            lines.append("    reserved: \(yamlEscape(reserved))")
+        }
+        // MTU
+        if let mtu = proxy.wireguardMTU {
+            lines.append("    mtu: \(mtu)")
+        } else {
+            lines.append("    mtu: 1420")
+        }
+        // IP address(es) assigned to this peer
+        if let ip = proxy.wireguardIP {
+            lines.append("    ip: \(yamlEscape(ip))")
         }
     }
 

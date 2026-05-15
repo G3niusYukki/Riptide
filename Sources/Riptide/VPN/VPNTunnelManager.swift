@@ -113,10 +113,25 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
 
     public func installConfiguration() async throws {
         let managers = try await NETunnelProviderManager.loadAllFromPreferences()
+
+        // Configure or update on-demand rules (kill switch: always connect).
+        // This ensures that when the VPN is not connected, ALL traffic is blocked
+        // rather than leaking to the default route. The system will automatically
+        // attempt to reconnect the VPN whenever any network interface is available.
+        let onDemandRule = NEOnDemandRuleConnect()
+        onDemandRule.interfaceTypeMatch = .any
+
         if let existing = managers.first {
+            // Update existing configuration with on-demand rules
+            existing.onDemandRules = [onDemandRule]
+            existing.isOnDemandEnabled = true
+            existing.isEnabled = true
+            try await existing.saveToPreferences()
+            try await existing.loadFromPreferences()
             manager = existing
             return
         }
+
         let newManager = NETunnelProviderManager()
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = "com.riptide.tunnel"
@@ -124,6 +139,8 @@ public final class VPNTunnelManager: NSObject, VPNTunnelManagerProtocol {
         newManager.protocolConfiguration = proto
         newManager.localizedDescription = "Riptide"
         newManager.isEnabled = true
+        newManager.onDemandRules = [onDemandRule]
+        newManager.isOnDemandEnabled = true
         try await newManager.saveToPreferences()
         try await newManager.loadFromPreferences()
         manager = newManager

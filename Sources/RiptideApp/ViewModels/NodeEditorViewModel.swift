@@ -272,6 +272,7 @@ extension ProxyKind {
         case .snell: return "Snell"
         case .relay: return "Relay"
         case .tuic: return "TUIC"
+        case .wireguard: return "WireGuard"
         }
     }
 
@@ -287,6 +288,7 @@ extension ProxyKind {
         case .socks5: return "socks5"
         case .relay: return "relay"
         case .tuic: return "tuic"
+        case .wireguard: return "wireguard"
         }
     }
 }

@@ -110,6 +110,7 @@ extension ProxyKind {
         case .snell: return "Snell"
         case .relay: return "Relay"
         case .tuic: return "TUIC"
+        case .wireguard: return "WireGuard"
         }
     }
 }
