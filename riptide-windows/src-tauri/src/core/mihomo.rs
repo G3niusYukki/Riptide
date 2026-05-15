@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use tokio::sync::Mutex;
 
 use crate::core::mihomo_api::MihomoApiClient;
+use serde_yaml;
 
 pub struct MihomoManager {
     app_handle: AppHandle,
@@ -110,11 +111,32 @@ impl MihomoManager {
         *self.api_secret.lock().await = secret;
     }
 
-    /// Generate mihomo config from profile
+    /// Generate mihomo config from profile YAML, injecting runtime settings
+    /// (mixed-port, external-controller, log-level, ipv6) that the user
+    /// shouldn't have to manually configure.
     pub fn generate_config(&self, profile_content: &str) -> anyhow::Result<String> {
-        // TODO: Parse profile and generate mihomo config
-        // For now, just return the profile content as-is
-        Ok(profile_content.to_string())
+        // Parse the profile YAML into a mutable config struct
+        let mut config: crate::config::parser::ClashRawConfig =
+            serde_yaml::from_str(profile_content)
+                .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
+
+        // Inject runtime settings (only if not already set by the user)
+        if config.mixed_port.is_none() {
+            config.mixed_port = Some(7890);
+        }
+        if config.external_controller.is_none() {
+            config.external_controller = Some("127.0.0.1:9090".to_string());
+        }
+        if config.log_level.is_none() {
+            config.log_level = Some("info".to_string());
+        }
+        if config.ipv6.is_none() {
+            config.ipv6 = Some(true);
+        }
+
+        // Serialize back to YAML
+        serde_yaml::to_string(&config)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))
     }
 }
 

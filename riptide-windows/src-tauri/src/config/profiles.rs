@@ -41,22 +41,43 @@ impl Profile {
         profile
     }
 
-    /// Parse YAML content to verify validity
+    /// Parse YAML content to verify validity.
+    /// Returns Ok(()) if the YAML is valid Clash config, Err with details if not.
     pub fn validate(&self) -> Result<(), String> {
-        // TODO: Implement YAML validation
-        Ok(())
+        crate::config::parser::parse_clash_config(&self.content)
+            .map(|_| ())
+            .map_err(|e| format!("Invalid YAML config: {}", e))
     }
 
-    /// Get proxies from profile
+    /// Get proxies from profile by parsing YAML and extracting proxy nodes.
     pub fn get_proxies(&self) -> Vec<Proxy> {
-        // TODO: Parse YAML and extract proxies
-        Vec::new()
+        match crate::config::parser::parse_clash_config(&self.content) {
+            Ok(config) => {
+                config.proxies.unwrap_or_default().into_iter().map(|p| Proxy {
+                    name: p.name,
+                    server: p.server.unwrap_or_default(),
+                    port: p.port.unwrap_or(0),
+                    proxy_type: p.proxy_type.unwrap_or_else(|| "unknown".to_string()),
+                }).collect()
+            }
+            Err(_) => Vec::new(),
+        }
     }
 
-    /// Get proxy groups from profile
+    /// Get proxy groups from profile by parsing YAML and extracting groups.
     pub fn get_proxy_groups(&self) -> Vec<ProxyGroup> {
-        // TODO: Parse YAML and extract proxy groups
-        Vec::new()
+        match crate::config::parser::parse_clash_config(&self.content) {
+            Ok(config) => {
+                config.proxy_groups.unwrap_or_default().into_iter().map(|g| ProxyGroup {
+                    name: g.name.unwrap_or_default(),
+                    group_type: g.group_type.unwrap_or_else(|| "select".to_string()),
+                    proxies: g.proxies.unwrap_or_default(),
+                    url: g.url,
+                    interval: g.interval,
+                }).collect()
+            }
+            Err(_) => Vec::new(),
+        }
     }
 
     /// Update the node count
