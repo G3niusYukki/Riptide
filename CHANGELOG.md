@@ -2,6 +2,12 @@
 
 All notable changes to Riptide are documented here.
 
+## [1.6.0] - TUN Mode UI Unlocked
+
+- **TUN mode UI unlocked**: removed `tunUnavailable` warning block, added start/stop toggle button with keyboard shortcut (Return key) and visual state indicators (cf4b129)
+- **TUN fallback guidance**: info message in UI explains sudo-based privilege escalation when helper is not installed (cf4b129)
+- **SwiftLint compliance**: resolved trailing newline, vertical whitespace, and line length violations (e6f9dcb)
+
 ## [2.0.0] - GA Release
 
 ### 🎉 General Availability
