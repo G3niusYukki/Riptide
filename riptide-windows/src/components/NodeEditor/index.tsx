@@ -10,6 +10,7 @@ const PROTOCOL_OPTIONS: { value: string; label: string }[] = [
   { value: 'trojan', label: 'Trojan' },
   { value: 'hysteria2', label: 'Hysteria2' },
   { value: 'tuic', label: 'TUIC' },
+  { value: 'anytls', label: 'AnyTLS' },
   { value: 'snell', label: 'Snell' },
   { value: 'socks5', label: 'SOCKS5' },
   { value: 'http', label: 'HTTP' },
@@ -329,12 +330,13 @@ function FormView({
         </Row>
       </Section>
 
-      {draft.type === 'ss' && <ShadowsocksFields draft={draft} set={set} />}
+      {draft.type === 'ss' && <ShadowsocksFields draft={draft} set={set} onChange={onChange} />}
       {draft.type === 'vmess' && <VmessFields draft={draft} set={set} onChange={onChange} />}
       {draft.type === 'vless' && <VlessFields draft={draft} set={set} onChange={onChange} />}
       {draft.type === 'trojan' && <TrojanFields draft={draft} set={set} />}
       {draft.type === 'hysteria2' && <Hysteria2Fields draft={draft} set={set} />}
       {draft.type === 'tuic' && <TuicFields draft={draft} set={set} />}
+      {draft.type === 'anytls' && <AnyTlsFields draft={draft} set={set} />}
       {(draft.type === 'socks5' || draft.type === 'http') && (
         <HttpSocksFields draft={draft} set={set} />
       )}
@@ -347,33 +349,166 @@ function FormView({
 
 type SetterFn = <K extends keyof ClashProxy>(key: K) => (value: ClashProxy[K]) => void;
 
-function ShadowsocksFields({ draft, set }: { draft: ClashProxy; set: SetterFn }) {
+function ShadowsocksFields({
+  draft,
+  set,
+  onChange,
+}: {
+  draft: ClashProxy;
+  set: SetterFn;
+  onChange: (next: ClashProxy) => void;
+}) {
+  const plugin = draft.plugin ?? '';
+  const pluginOpts = (draft['plugin-opts'] ?? {}) as Record<string, unknown>;
+  const setPluginOpt = (key: string, value: unknown) => {
+    const next = { ...pluginOpts };
+    if (value === undefined || value === '' || value === null) {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+    onChange({
+      ...draft,
+      'plugin-opts': Object.keys(next).length ? next : undefined,
+    });
+  };
   return (
-    <Section title="Shadowsocks">
-      <Row>
-        <Field label="加密方式">
-          <select
-            value={draft.cipher ?? 'aes-256-gcm'}
-            onChange={(e) => set('cipher')(e.target.value)}
-            className={inputCls}
-          >
-            {SS_CIPHERS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="密码">
-          <input
-            type="password"
-            value={draft.password ?? ''}
-            onChange={(e) => set('password')(e.target.value)}
-            className={inputCls}
-          />
-        </Field>
-      </Row>
-    </Section>
+    <>
+      <Section title="Shadowsocks">
+        <Row>
+          <Field label="加密方式">
+            <select
+              value={draft.cipher ?? 'aes-256-gcm'}
+              onChange={(e) => set('cipher')(e.target.value)}
+              className={inputCls}
+            >
+              {SS_CIPHERS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="密码">
+            <input
+              type="password"
+              value={draft.password ?? ''}
+              onChange={(e) => set('password')(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section title="插件">
+        <Row>
+          <Field label="Plugin">
+            <select
+              value={plugin}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) {
+                  onChange({ ...draft, plugin: v });
+                } else {
+                  // Clearing plugin also clears its options.
+                  const next = { ...draft };
+                  delete next.plugin;
+                  delete next['plugin-opts'];
+                  onChange(next);
+                }
+              }}
+              className={inputCls}
+            >
+              <option value="">（无）</option>
+              <option value="obfs">simple-obfs</option>
+              <option value="v2ray-plugin">v2ray-plugin</option>
+              <option value="shadow-tls">shadow-tls</option>
+              <option value="restls">restls</option>
+            </select>
+          </Field>
+        </Row>
+        {plugin === 'shadow-tls' && (
+          <Row>
+            <Field label="ShadowTLS host">
+              <input
+                value={(pluginOpts.host as string | undefined) ?? ''}
+                onChange={(e) => setPluginOpt('host', e.target.value)}
+                className={inputCls}
+                placeholder="cloud.tencent.com"
+              />
+            </Field>
+            <Field label="ShadowTLS 密码">
+              <input
+                type="password"
+                value={(pluginOpts.password as string | undefined) ?? ''}
+                onChange={(e) => setPluginOpt('password', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="协议版本">
+              <select
+                value={String((pluginOpts.version as number | undefined) ?? 3)}
+                onChange={(e) => setPluginOpt('version', Number(e.target.value))}
+                className={inputCls}
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </Field>
+          </Row>
+        )}
+        {plugin === 'obfs' && (
+          <Row>
+            <Field label="混淆模式">
+              <select
+                value={(pluginOpts.mode as string | undefined) ?? 'http'}
+                onChange={(e) => setPluginOpt('mode', e.target.value)}
+                className={inputCls}
+              >
+                <option value="http">http</option>
+                <option value="tls">tls</option>
+              </select>
+            </Field>
+            <Field label="混淆 host">
+              <input
+                value={(pluginOpts.host as string | undefined) ?? ''}
+                onChange={(e) => setPluginOpt('host', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+          </Row>
+        )}
+        {plugin === 'v2ray-plugin' && (
+          <Row>
+            <Field label="传输模式">
+              <select
+                value={(pluginOpts.mode as string | undefined) ?? 'websocket'}
+                onChange={(e) => setPluginOpt('mode', e.target.value)}
+                className={inputCls}
+              >
+                <option value="websocket">websocket</option>
+              </select>
+            </Field>
+            <Field label="Host">
+              <input
+                value={(pluginOpts.host as string | undefined) ?? ''}
+                onChange={(e) => setPluginOpt('host', e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Path">
+              <input
+                value={(pluginOpts.path as string | undefined) ?? ''}
+                onChange={(e) => setPluginOpt('path', e.target.value)}
+                className={inputCls}
+                placeholder="/"
+              />
+            </Field>
+          </Row>
+        )}
+      </Section>
+    </>
   );
 }
 
@@ -875,6 +1010,111 @@ function SnellFields({ draft, set }: { draft: ClashProxy; set: SetterFn }) {
             <option value="http">http</option>
             <option value="tls">tls</option>
           </select>
+        </Field>
+      </Row>
+    </Section>
+  );
+}
+
+function AnyTlsFields({ draft, set }: { draft: ClashProxy; set: SetterFn }) {
+  return (
+    <Section title="AnyTLS">
+      <Row>
+        <Field label="密码">
+          <input
+            type="password"
+            value={draft.password ?? ''}
+            onChange={(e) => set('password')(e.target.value)}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="SNI">
+          <input
+            value={draft.sni ?? ''}
+            onChange={(e) => set('sni')(e.target.value)}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Client Fingerprint">
+          <select
+            value={draft['client-fingerprint'] ?? ''}
+            onChange={(e) => set('client-fingerprint')(e.target.value || undefined)}
+            className={inputCls}
+          >
+            {FINGERPRINT_OPTIONS.map((f) => (
+              <option key={f} value={f}>
+                {f === '' ? '（默认）' : f}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </Row>
+      <Row>
+        <Field label="跳过证书验证">
+          <select
+            value={String(draft['skip-cert-verify'] ?? false)}
+            onChange={(e) => set('skip-cert-verify')(e.target.value === 'true')}
+            className={inputCls}
+          >
+            <option value="false">否</option>
+            <option value="true">是</option>
+          </select>
+        </Field>
+        <Field label="ALPN (逗号分隔)">
+          <input
+            value={(draft.alpn ?? []).join(',')}
+            onChange={(e) =>
+              set('alpn')(
+                e.target.value
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              )
+            }
+            className={inputCls}
+            placeholder="h2,http/1.1"
+          />
+        </Field>
+      </Row>
+      <Row>
+        <Field label="空闲会话检测(秒)">
+          <input
+            type="number"
+            value={draft['idle-session-check-interval'] ?? ''}
+            onChange={(e) =>
+              set('idle-session-check-interval')(
+                e.target.value === '' ? undefined : Number(e.target.value),
+              )
+            }
+            className={inputCls}
+            placeholder="30"
+          />
+        </Field>
+        <Field label="空闲会话超时(秒)">
+          <input
+            type="number"
+            value={draft['idle-session-timeout'] ?? ''}
+            onChange={(e) =>
+              set('idle-session-timeout')(
+                e.target.value === '' ? undefined : Number(e.target.value),
+              )
+            }
+            className={inputCls}
+            placeholder="30"
+          />
+        </Field>
+        <Field label="最小空闲会话数">
+          <input
+            type="number"
+            value={draft['min-idle-session'] ?? ''}
+            onChange={(e) =>
+              set('min-idle-session')(
+                e.target.value === '' ? undefined : Number(e.target.value),
+              )
+            }
+            className={inputCls}
+            placeholder="0"
+          />
         </Field>
       </Row>
     </Section>

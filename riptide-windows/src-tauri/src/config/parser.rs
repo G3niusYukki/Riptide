@@ -202,6 +202,14 @@ pub struct ClashRawProxy {
     // Common TLS options
     #[serde(rename = "disable-auto-tls")]
     pub disable_auto_tls: Option<bool>,
+
+    // AnyTLS specific
+    #[serde(rename = "idle-session-check-interval")]
+    pub idle_session_check_interval: Option<u32>,
+    #[serde(rename = "idle-session-timeout")]
+    pub idle_session_timeout: Option<u32>,
+    #[serde(rename = "min-idle-session")]
+    pub min_idle_session: Option<u32>,
 }
 
 /// WebSocket options

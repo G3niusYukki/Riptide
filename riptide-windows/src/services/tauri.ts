@@ -151,6 +151,11 @@ export interface ClashProxy {
 
   // Snell
   version?: number;
+
+  // AnyTLS — session pooling controls (mihomo native)
+  'idle-session-check-interval'?: number;
+  'idle-session-timeout'?: number;
+  'min-idle-session'?: number;
 }
 
 export const listProfileProxies = (profileId: string) =>
@@ -214,6 +219,10 @@ export const setTunOptions = (options: TunOptions) =>
 
 // mihomo binary lifecycle
 export const downloadMihomo = () => invoke<string>('download_mihomo');
+
+// WARP — anonymous registration that saves the result as a Clash profile.
+export const registerWarpProfile = (name?: string) =>
+  invoke<Profile>('register_warp_profile', { name });
 
 // Mode coordinator
 export type AppMode = 'off' | 'system_proxy' | 'tun';
