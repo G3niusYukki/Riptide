@@ -75,40 +75,46 @@ impl HotkeyManager {
     /// Register default hotkeys
     /// - Ctrl+Alt+P: Toggle proxy
     /// - Ctrl+Alt+M: Toggle mode
+    ///
+    /// Individual registrations are tolerated to fail (the OS may have another
+    /// app holding that combo); we log a warning and continue so at least the
+    /// remaining shortcuts are usable. Only a manager-init failure is fatal.
     pub fn register_default_hotkeys(&mut self) -> Result<(), HotkeyError> {
-        // Ctrl+Alt+P: Toggle proxy
-        let toggle_proxy = HotKey::new(
-            Some(Modifiers::CONTROL | Modifiers::ALT),
-            Code::KeyP,
+        self.try_register(
+            HotkeyAction::ToggleProxy,
+            HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP),
+            "Ctrl+Alt+P: Toggle Proxy",
         );
-        self.manager.register(toggle_proxy)
-            .map_err(|e| HotkeyError::RegistrationFailed(e.to_string()))?;
-        
-        self.registered_keys.push(HotkeyConfig {
-            action: HotkeyAction::ToggleProxy,
-            hotkey: toggle_proxy,
-            description: "Ctrl+Alt+P: Toggle Proxy".to_string(),
-        });
-        
-        log::info!("Registered global hotkey: Ctrl+Alt+P (Toggle Proxy)");
-        
-        // Ctrl+Alt+M: Toggle mode
-        let toggle_mode = HotKey::new(
-            Some(Modifiers::CONTROL | Modifiers::ALT),
-            Code::KeyM,
+        self.try_register(
+            HotkeyAction::ToggleMode,
+            HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyM),
+            "Ctrl+Alt+M: Toggle Mode",
         );
-        self.manager.register(toggle_mode)
-            .map_err(|e| HotkeyError::RegistrationFailed(e.to_string()))?;
-        
-        self.registered_keys.push(HotkeyConfig {
-            action: HotkeyAction::ToggleMode,
-            hotkey: toggle_mode,
-            description: "Ctrl+Alt+M: Toggle Mode".to_string(),
-        });
-        
-        log::info!("Registered global hotkey: Ctrl+Alt+M (Toggle Mode)");
-        
+
+        if self.registered_keys.is_empty() {
+            log::warn!("No global hotkeys were registered (all combos conflicted)");
+        }
         Ok(())
+    }
+
+    fn try_register(&mut self, action: HotkeyAction, hotkey: HotKey, description: &str) {
+        match self.manager.register(hotkey) {
+            Ok(()) => {
+                self.registered_keys.push(HotkeyConfig {
+                    action,
+                    hotkey,
+                    description: description.to_string(),
+                });
+                log::info!("Registered global hotkey: {}", description);
+            }
+            Err(e) => {
+                log::warn!(
+                    "Skipping global hotkey '{}' — another app likely owns it: {}",
+                    description,
+                    e
+                );
+            }
+        }
     }
     
     /// Register a custom hotkey
