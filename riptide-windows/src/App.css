@@ -1,7 +1,22 @@
 @import "tailwindcss";
 
-/* Riptide Dark Theme */
-:root {
+/* =====================================================================
+ * Theme tokens.
+ *
+ * The dark palette lives under :root (and is duplicated under .dark so
+ * media-query and explicit-toggle paths agree). The light palette lives
+ * under .light. Per-component code keeps using Tailwind utility classes
+ * like `bg-slate-900` and `text-slate-100`; the .light cascade below
+ * remaps those utilities to a light value at runtime.
+ *
+ * This is intentionally a thin override layer rather than a full Tailwind
+ * theme migration — getting parity for a v1 light mode without rewriting
+ * every component. A future pass should move components to semantic tokens
+ * (e.g. `bg-surface`, `text-fg`) so the override block can shrink.
+ * ===================================================================== */
+
+:root,
+.dark {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --bg-tertiary: #334155;
@@ -13,6 +28,24 @@
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
   --border-color: #334155;
+  --scrollbar-thumb: #334155;
+  --scrollbar-thumb-hover: #475569;
+}
+
+.light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --accent-blue: #2563eb;
+  --accent-emerald: #059669;
+  --accent-red: #dc2626;
+  --accent-yellow: #d97706;
+  --border-color: #e2e8f0;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
 }
 
 * {
@@ -47,13 +80,13 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
+  background: var(--scrollbar-thumb);
   border-radius: 5px;
   border: 2px solid var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Windows-specific selection styling */
@@ -103,3 +136,75 @@ input, textarea, select {
 .animate-slideIn {
   animation: slideIn 0.2s ease-out;
 }
+
+/* =====================================================================
+ * Light-mode utility remaps.
+ *
+ * Each block below shadows the equivalent Tailwind utility so existing
+ * dark-themed markup looks correct under .light. Order matters: opacity
+ * variants must come *after* their solid counterparts so they win
+ * specificity ties.
+ * ===================================================================== */
+
+/* Surface backgrounds */
+.light .bg-slate-950 { background-color: #f1f5f9 !important; }
+.light .bg-slate-900 { background-color: #ffffff !important; }
+.light .bg-slate-800 { background-color: #f1f5f9 !important; }
+.light .bg-slate-700 { background-color: #e2e8f0 !important; }
+
+/* Hover variants */
+.light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+.light .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; }
+.light .hover\:bg-slate-900:hover { background-color: #f1f5f9 !important; }
+
+/* Opacity surface variants commonly used for translucent panels */
+.light .bg-slate-900\/50 { background-color: rgba(248, 250, 252, 0.85) !important; }
+.light .bg-slate-900\/60 { background-color: rgba(248, 250, 252, 0.9) !important; }
+.light .bg-slate-950\/40 { background-color: rgba(241, 245, 249, 0.7) !important; }
+.light .bg-slate-950\/60 { background-color: rgba(241, 245, 249, 0.85) !important; }
+.light .bg-slate-800\/60 { background-color: rgba(226, 232, 240, 0.85) !important; }
+.light .bg-black\/60 { background-color: rgba(15, 23, 42, 0.25) !important; }
+.light .bg-black\/50 { background-color: rgba(15, 23, 42, 0.2) !important; }
+
+/* Foreground / text */
+.light .text-slate-50,
+.light .text-slate-100,
+.light .text-slate-200 { color: #0f172a !important; }
+.light .text-slate-300 { color: #1e293b !important; }
+.light .text-slate-400 { color: #475569 !important; }
+.light .text-slate-500 { color: #64748b !important; }
+.light .text-slate-600 { color: #475569 !important; }
+.light .text-slate-700 { color: #334155 !important; }
+
+/* Hover text */
+.light .hover\:text-slate-100:hover,
+.light .hover\:text-slate-200:hover { color: #0f172a !important; }
+
+/* Placeholder */
+.light .placeholder-slate-400::placeholder,
+.light .placeholder-slate-500::placeholder { color: #94a3b8 !important; }
+
+/* Borders */
+.light .border-slate-950,
+.light .border-slate-900,
+.light .border-slate-800 { border-color: #e2e8f0 !important; }
+.light .border-slate-700 { border-color: #cbd5e1 !important; }
+.light .border-slate-600 { border-color: #94a3b8 !important; }
+.light .hover\:border-slate-700:hover { border-color: #94a3b8 !important; }
+
+/* Accent backgrounds — slightly lighter under light theme so contrast works */
+.light .bg-blue-600 { background-color: #2563eb !important; }
+.light .hover\:bg-blue-500:hover { background-color: #3b82f6 !important; }
+.light .bg-blue-600\/20 { background-color: rgba(37, 99, 235, 0.12) !important; }
+.light .hover\:bg-blue-600\/30:hover { background-color: rgba(37, 99, 235, 0.2) !important; }
+.light .text-blue-400 { color: #2563eb !important; }
+
+.light .bg-red-950\/40 { background-color: rgba(254, 226, 226, 0.6) !important; }
+.light .border-red-900\/60 { border-color: #fecaca !important; }
+.light .text-red-300 { color: #b91c1c !important; }
+.light .text-red-400 { color: #dc2626 !important; }
+.light .hover\:text-red-400:hover { color: #dc2626 !important; }
+
+.light .text-emerald-400 { color: #059669 !important; }
+.light .text-amber-400,
+.light .text-yellow-400 { color: #b45309 !important; }
