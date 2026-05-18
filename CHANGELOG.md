@@ -2,6 +2,82 @@
 
 All notable changes to Riptide are documented here.
 
+## [2.0.0] - Unified GA across macOS + Windows
+
+First release where the macOS app and the Windows port carry the same
+version number, are both built from one tree, and both actually run
+end-to-end. The previous "[2.0.0] GA" entry below refers to the macOS
+foundation hardening pass; this 2.0.0 elevates the Windows port to the
+same standard and re-cuts the release together.
+
+### 🪟 Windows port — first installable release
+
+Everything under `riptide-windows/` was built up across Phase 0–5 over
+the past month and is now packaged in a single NSIS + MSI installer:
+
+- **Foundation**: disk-backed profile store with stable UUIDs in
+  filenames, persisted active-profile pointer, real `generate_config`
+  merge, mihomo binary auto-download (SHA-256 pinned to
+  `1ae6eeec…ec15b0f` for v1.18.10), single-instance guard, centralised
+  `tracing` logging at `%APPDATA%\Riptide\logs\`.
+- **Modes & Service**: TUN via mihomo's gVisor stack, dedicated
+  `riptide-tun-service.exe` SCM binary, one-shot UAC elevation for
+  install/uninstall, system-proxy drift guard, single-mutex Mode
+  Coordinator with `mode_state` events.
+- **Subscriptions & Config**: auto-refresh scheduler with per-profile
+  intervals, `Subscription-Userinfo` header parsing, GeoIP / GeoSite
+  auto-download, DNS policy overlay (DoH/DoT/DoQ + FakeIP), WebDAV
+  sync (HTTPS-only, DPAPI-encrypted credentials), clipboard import,
+  `riptide://import?...` deep links.
+- **Resilience**: graceful degradation watcher distinguishing
+  deliberate vs unexpected mihomo exits, opt-in kill switch (blackhole
+  route on TUN crash), sleep/wake + network-change recovery with health
+  probes, one-button diagnostics report (excludes credentials).
+- **Anti-censorship**: one-click China / Iran / Russia region presets,
+  global `client-fingerprint` stamping, anonymous Cloudflare WARP
+  registration (local Curve25519 keypair → CF API → saved as a mihomo
+  `wireguard` profile with derived `reserved` bytes).
+- **Node editor**: visual proxy CRUD per profile covering Shadowsocks
+  (with shadow-tls / v2ray-plugin / restls plugin options), VMess,
+  VLESS (with Reality), Trojan, Hysteria2, TUIC, AnyTLS, Snell, HTTP,
+  SOCKS5. Round-trips through `serde_yaml::Value` so unknown profile
+  keys survive edits.
+- **UX**: light + dark theme (with a CSS override layer so existing
+  utilities flip palette without per-component rewrites), 5-language
+  i18n (zh-CN, en-US, fa-IR, ru-RU, ja-JP), system tray menu, global
+  hotkeys (Ctrl+Alt+P / Ctrl+Alt+M, fault-tolerant when conflicting),
+  autostart with `--minimized`, update check.
+
+### 🚧 Build pipeline unblocked
+
+Three latent issues had been silently keeping `tauri build` from
+producing real artifacts for weeks (the script exited 0 after the
+precheck):
+
+- `@tauri-apps/api` (2.11) was ahead of the Rust `tauri` crate (2.10);
+  Cargo refused to bundle when there were two binaries without
+  `default-run`; the React tree wasn't wrapped in `QueryClientProvider`
+  so the first hook call killed the layout.
+
+All three are fixed and the produced exe boots end-to-end.
+
+### 🧹 Polish
+
+- Sidebar widened to a labelled column with mode indicator at the
+  bottom; Header refined with a local-proxy address tag and softer
+  status badges; Dashboard cards gained tonal halos and a LIVE pulse
+  when traffic is active.
+- All Windows data now lives under `%APPDATA%\Riptide\` (previously
+  mihomo landed under `%APPDATA%\com.riptide.app\` while logs/profiles
+  used the canonical path).
+
+### 🍎 macOS
+
+No behavioural changes from 1.7.0; the macOS app inherits the version
+bump so both platforms ship in sync.
+
+---
+
 ## [Windows port v1.2.0] - Phase 0–5 build-out
 
 ### 🏗️ Foundation (Phase 0)

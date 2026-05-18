@@ -42,7 +42,7 @@ export function Sidebar() {
             <p className="text-sm font-semibold text-slate-100 tracking-tight leading-tight">
               Riptide
             </p>
-            <p className="text-[10px] text-slate-500 leading-tight">v1.1.0</p>
+            <p className="text-[10px] text-slate-500 leading-tight">v2.0.0</p>
           </div>
         </div>
       </div>

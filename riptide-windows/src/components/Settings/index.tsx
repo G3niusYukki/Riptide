@@ -96,7 +96,7 @@ export function SettingsPage() {
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
             <h3 className="text-lg font-semibold text-slate-100 mb-3">{t('settings.about')}</h3>
             <div className="text-xs text-slate-400 space-y-1.5">
-              <p className="font-medium text-slate-300">Riptide v1.1.0</p>
+              <p className="font-medium text-slate-300">Riptide v2.0.0</p>
               <p>{t('settings.aboutText')}</p>
               <p className="text-slate-600">© 2026 Riptide Team</p>
               <button
