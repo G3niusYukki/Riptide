@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Profile, Proxy, ProxyGroup, Connection, TrafficStats, AppState } from '../types';
+import type { AppMode } from '../services/tauri';
 
 interface RiptideState extends AppState {
   // Profiles
@@ -34,6 +35,15 @@ interface RiptideState extends AppState {
   setTunModeEnabled: (enabled: boolean) => void;
   setAutoStart: (enabled: boolean) => void;
   setSilentStart: (enabled: boolean) => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+
+  // Mode coordinator state
+  mode: AppMode;
+  modeTransitioning: boolean;
+  modeError: string | null;
+  setMode: (mode: AppMode) => void;
+  setModeTransitioning: (transitioning: boolean) => void;
+  setModeError: (error: string | null) => void;
 }
 
 export const useRiptideStore = create<RiptideState>()(
@@ -46,6 +56,7 @@ export const useRiptideStore = create<RiptideState>()(
       tunModeEnabled: false,
       autoStart: false,
       silentStart: false,
+      theme: 'dark',
       profiles: [],
       proxies: [],
       proxyGroups: [],
@@ -57,29 +68,43 @@ export const useRiptideStore = create<RiptideState>()(
         uploadSpeed: 0,
         downloadSpeed: 0,
       },
-      
+      mode: 'off',
+      modeTransitioning: false,
+      modeError: null,
+
       // Actions
       setProfiles: (profiles) => set({ profiles }),
-      addProfile: (profile) => set((state) => ({ 
-        profiles: [...state.profiles, profile] 
+      addProfile: (profile) => set((state) => ({
+        profiles: [...state.profiles, profile]
       })),
-      removeProfile: (id) => set((state) => ({ 
-        profiles: state.profiles.filter((p) => p.id !== id) 
+      removeProfile: (id) => set((state) => ({
+        profiles: state.profiles.filter((p) => p.id !== id)
       })),
-      
+
       setProxies: (proxies) => set({ proxies }),
       setProxyGroups: (groups) => set({ proxyGroups: groups }),
       setSelectedProxy: (name) => set({ selectedProxy: name }),
-      
+
       setConnections: (connections) => set({ connections }),
       setTraffic: (traffic) => set({ traffic }),
-      
+
       setIsRunning: (running) => set({ isRunning: running }),
       setActiveProfile: (id) => set({ activeProfile: id }),
       setSystemProxyEnabled: (enabled) => set({ systemProxyEnabled: enabled }),
       setTunModeEnabled: (enabled) => set({ tunModeEnabled: enabled }),
       setAutoStart: (enabled) => set({ autoStart: enabled }),
       setSilentStart: (enabled) => set({ silentStart: enabled }),
+      setTheme: (theme) => set({ theme }),
+
+      setMode: (mode) => set({
+        mode,
+        // Keep the legacy flags in sync so older components don't need to change yet.
+        isRunning: mode !== 'off',
+        systemProxyEnabled: mode === 'system_proxy',
+        tunModeEnabled: mode === 'tun',
+      }),
+      setModeTransitioning: (transitioning) => set({ modeTransitioning: transitioning }),
+      setModeError: (error) => set({ modeError: error }),
     }),
     {
       name: 'riptide-storage',
@@ -88,6 +113,7 @@ export const useRiptideStore = create<RiptideState>()(
         selectedProxy: state.selectedProxy,
         autoStart: state.autoStart,
         silentStart: state.silentStart,
+        theme: state.theme,
       }),
     }
   )

@@ -68,5 +68,12 @@
         "mergeRefs": []
       }
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["riptide"]
+      }
+    }
   }
 }

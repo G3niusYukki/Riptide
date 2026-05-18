@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::config::profile_meta::ProfileMetadata;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub id: String,
@@ -15,6 +17,9 @@ pub struct Profile {
     pub path: Option<PathBuf>,
     pub is_active: bool,
     pub node_count: Option<usize>,
+    /// Sidecar metadata: subscription URL, traffic, expiry. Loaded from disk on `list_profiles`.
+    #[serde(default)]
+    pub metadata: ProfileMetadata,
 }
 
 impl Profile {
@@ -31,6 +36,7 @@ impl Profile {
             path: None,
             is_active: false,
             node_count: None,
+            metadata: ProfileMetadata::default(),
         }
     }
 
@@ -160,49 +166,68 @@ pub mod storage {
         WindowsDirs::profiles_dir()
     }
 
-    /// Generate a unique filename for a profile
-    pub fn generate_profile_filename(name: &str) -> String {
-        let sanitized = name
+    /// Generate a stable filename embedding the profile UUID so the ID survives reloads.
+    /// Format: `<sanitized_name>__<uuid_simple>.yaml`
+    pub fn generate_profile_filename(name: &str, id: &str) -> String {
+        let sanitized: String = name
             .chars()
             .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-            .collect::<String>();
-        format!("{}_{}.yaml", sanitized, uuid::Uuid::new_v4().simple())
+            .collect();
+        let id_simple = id.replace('-', "");
+        // Double underscore separator avoids collisions with user-provided underscores in names.
+        format!("{}__{}.yaml", sanitized, id_simple)
     }
 
-    /// Save a profile to disk
+    /// Parse the embedded profile UUID out of a filename produced by `generate_profile_filename`.
+    fn parse_id_from_filename(stem: &str) -> Option<String> {
+        let (_, tail) = stem.rsplit_once("__")?;
+        if tail.len() != 32 || !tail.chars().all(|c| c.is_ascii_hexdigit()) {
+            return None;
+        }
+        // Re-hyphenate into canonical UUID form.
+        Some(format!(
+            "{}-{}-{}-{}-{}",
+            &tail[0..8], &tail[8..12], &tail[12..16], &tail[16..20], &tail[20..32]
+        ))
+    }
+
+    /// Save a profile to disk. The filename embeds `profile.id` so IDs survive reloads.
     pub fn save_profile(profile: &mut Profile) -> Result<(), String> {
-        // Ensure directory exists
         WindowsDirs::ensure_dirs()
             .map_err(|e| format!("Failed to create directories: {}", e))?;
 
-        // Generate path if not set
         if profile.path.is_none() {
-            let filename = generate_profile_filename(&profile.name);
+            let filename = generate_profile_filename(&profile.name, &profile.id);
             let path = get_profiles_dir().join(&filename);
             profile.path = Some(path);
         }
 
         let path = profile.path.as_ref().unwrap();
-
-        // Write content to file
         fs::write(path, &profile.content)
             .map_err(|e| format!("Failed to write profile file: {}", e))?;
 
         profile.updated_at = Utc::now();
-
         Ok(())
     }
 
-    /// Load a profile from disk
+    /// Load a profile from disk. Recovers the stable ID from the filename.
     pub fn load_profile(path: &PathBuf) -> Result<Profile, String> {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read profile file: {}", e))?;
 
-        let name = path
+        let stem = path
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
+            .unwrap_or("Unknown");
+
+        let (name, id) = match parse_id_from_filename(stem) {
+            Some(id) => {
+                let display_name = stem.rsplit_once("__").map(|(n, _)| n).unwrap_or(stem);
+                (display_name.to_string(), id)
+            }
+            // Legacy file (or hand-placed): fabricate an ID. Caller will re-save to migrate.
+            None => (stem.to_string(), uuid::Uuid::new_v4().to_string()),
+        };
 
         let metadata = fs::metadata(path)
             .map_err(|e| format!("Failed to read file metadata: {}", e))?;
@@ -211,20 +236,18 @@ pub mod storage {
             .created()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
-            .flatten()
+            .and_then(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
             .unwrap_or_else(Utc::now);
 
         let updated_at = metadata
             .modified()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
-            .flatten()
+            .and_then(|d| DateTime::from_timestamp(d.as_secs() as i64, 0))
             .unwrap_or_else(Utc::now);
 
         Ok(Profile {
-            id: uuid::Uuid::new_v4().to_string(),
+            id,
             name,
             content,
             created_at,
@@ -232,11 +255,29 @@ pub mod storage {
             path: Some(path.clone()),
             is_active: false,
             node_count: None,
+            metadata: crate::config::profile_meta::load(path),
         })
+    }
+
+    /// Update a profile's content and persist. Updates `node_count` from parsed config.
+    pub fn update_profile_content(profile: &mut Profile, new_content: String) -> Result<(), String> {
+        let path = profile
+            .path
+            .clone()
+            .ok_or_else(|| "Profile has no on-disk path".to_string())?;
+
+        fs::write(&path, &new_content)
+            .map_err(|e| format!("Failed to write profile file: {}", e))?;
+
+        profile.content = new_content;
+        profile.updated_at = Utc::now();
+        Ok(())
     }
 
     /// Delete a profile from disk
     pub fn delete_profile_file(path: &PathBuf) -> Result<(), String> {
+        // Best-effort: clean up the sidecar so we don't leave orphan metadata.
+        crate::config::profile_meta::delete(path);
         fs::remove_file(path)
             .map_err(|e| format!("Failed to delete profile file: {}", e))
     }
@@ -276,5 +317,34 @@ pub mod storage {
 
         fs::write(dest_path, content)
             .map_err(|e| format!("Failed to export profile: {}", e))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn filename_round_trips_profile_id() {
+            let id = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
+            let filename = generate_profile_filename("My Cool Profile", id);
+            assert!(filename.ends_with(".yaml"));
+            let stem = filename.trim_end_matches(".yaml");
+            assert_eq!(parse_id_from_filename(stem), Some(id.to_string()));
+        }
+
+        #[test]
+        fn legacy_filename_without_uuid_returns_none() {
+            assert!(parse_id_from_filename("just_a_name").is_none());
+            assert!(parse_id_from_filename("name__notarealuuid").is_none());
+        }
+
+        #[test]
+        fn sanitizes_special_chars_in_name() {
+            let id = "00000000-0000-0000-0000-000000000000";
+            let filename = generate_profile_filename("a/b\\c:d?e*f", id);
+            assert!(!filename.contains('/'));
+            assert!(!filename.contains('\\'));
+            assert!(!filename.contains(':'));
+        }
     }
 }

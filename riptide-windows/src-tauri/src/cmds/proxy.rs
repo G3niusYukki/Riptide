@@ -1,14 +1,21 @@
 //! Proxy control commands
 
+use crate::cmds::config::{resolve_active_profile_content, AppState};
 use crate::core::mihomo::MihomoManager;
 use crate::core::mihomo_api::{ProxyInfo, ProxyGroupDetail};
 use std::collections::{HashMap, HashSet};
 use tauri::State;
 
-/// Start the proxy service
+/// Start the proxy service. Writes the merged mihomo config from the active
+/// profile before launching the process; fails fast if no profile is selected.
 #[tauri::command]
-pub async fn start_proxy(state: State<'_, MihomoManager>) -> Result<(), String> {
-    state.start().await.map_err(|e| e.to_string())
+pub async fn start_proxy(
+    mihomo: State<'_, MihomoManager>,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let content = resolve_active_profile_content(&app_state)?;
+    mihomo.write_config(&content).map_err(|e| e.to_string())?;
+    mihomo.start().await.map_err(|e| e.to_string())
 }
 
 /// Stop the proxy service
@@ -17,10 +24,16 @@ pub async fn stop_proxy(state: State<'_, MihomoManager>) -> Result<(), String> {
     state.stop().await.map_err(|e| e.to_string())
 }
 
-/// Restart the proxy service
+/// Restart the proxy service. Regenerates the merged config so any profile
+/// edits (or profile switch) take effect.
 #[tauri::command]
-pub async fn restart_proxy(state: State<'_, MihomoManager>) -> Result<(), String> {
-    state.restart().await.map_err(|e| e.to_string())
+pub async fn restart_proxy(
+    mihomo: State<'_, MihomoManager>,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let content = resolve_active_profile_content(&app_state)?;
+    mihomo.write_config(&content).map_err(|e| e.to_string())?;
+    mihomo.restart().await.map_err(|e| e.to_string())
 }
 
 /// Get proxy status

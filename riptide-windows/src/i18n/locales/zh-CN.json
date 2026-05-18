@@ -98,7 +98,21 @@
     "installSuccess": "TUN 服务安装成功",
     "installFailed": "TUN 服务安装失败",
     "about": "关于",
-    "aboutText": "A native Windows proxy client powered by mihomo"
+    "aboutText": "A native Windows proxy client powered by mihomo",
+    "tabs": {
+      "network": "网络",
+      "dns": "DNS",
+      "sync": "同步",
+      "assets": "资源",
+      "recovery": "恢复",
+      "about": "关于"
+    },
+    "mode": {
+      "off": "关闭",
+      "systemProxy": "系统代理",
+      "tun": "TUN",
+      "transitioning": "切换中…"
+    }
   },
   "common": {
     "loading": "加载中...",

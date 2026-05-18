@@ -377,7 +377,7 @@ pub struct ClashRawFallbackFilter {
 }
 
 /// TUN configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ClashRawTUN {
     pub enable: Option<bool>,
     /// Device name

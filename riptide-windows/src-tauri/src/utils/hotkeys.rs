@@ -201,26 +201,45 @@ impl Drop for HotkeyManager {
     }
 }
 
-/// Initialize global hotkeys with default settings
+/// Initialize global hotkeys with default settings. The listener thread
+/// forwards each press to the frontend as a Tauri event (`hotkey-toggle-proxy`
+/// / `hotkey-toggle-mode`) — the UI subscribes and dispatches the actual
+/// action through the Mode Coordinator.
 pub fn init_hotkeys(app_handle: AppHandle) -> Result<HotkeyManager, HotkeyError> {
     let mut manager = HotkeyManager::new()?;
-    manager.set_app_handle(app_handle);
+    manager.set_app_handle(app_handle.clone());
     manager.register_default_hotkeys()?;
-    
-    // Start the listener
-    manager.start_listener(|action| {
-        match action {
-            HotkeyAction::ToggleProxy => {
-                log::info!("Global hotkey: Toggle proxy");
-                // The action will be handled by the frontend via event
+
+    // Start the listener — clone the registered keys (cheap, they're tiny)
+    // into the worker thread so it can map ids back to actions without
+    // borrowing the manager.
+    let registered = manager.get_registered_hotkeys().to_vec();
+    thread::spawn(move || {
+        let receiver = GlobalHotKeyEvent::receiver();
+        log::info!("Global hotkey listener started");
+        loop {
+            let Ok(event) = receiver.recv() else { break };
+            // Only fire on Pressed; Released would double-trigger.
+            if event.state != global_hotkey::HotKeyState::Pressed {
+                continue;
             }
-            HotkeyAction::ToggleMode => {
-                log::info!("Global hotkey: Toggle mode");
-                // The action will be handled by the frontend via event
+            for config in &registered {
+                if config.hotkey.id() == event.id {
+                    let event_name = match config.action {
+                        HotkeyAction::ToggleProxy => "hotkey-toggle-proxy",
+                        HotkeyAction::ToggleMode => "hotkey-toggle-mode",
+                    };
+                    if let Err(e) = app_handle.emit(event_name, ()) {
+                        log::warn!("Failed to emit {}: {}", event_name, e);
+                    } else {
+                        log::info!("Hotkey fired: {}", config.description);
+                    }
+                    break;
+                }
             }
         }
     });
-    
+
     Ok(manager)
 }
 

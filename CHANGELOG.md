@@ -2,6 +2,61 @@
 
 All notable changes to Riptide are documented here.
 
+## [Windows port v1.2.0] - Phase 0–5 build-out
+
+### 🏗️ Foundation (Phase 0)
+- **Profile system unified**: removed legacy in-memory `Mutex<Vec<Profile>>` commands; everything now disk-backed with stable UUIDs embedded in filenames (`<name>__<uuid>.yaml`) so IDs survive reloads
+- **Active profile persisted** to `%APPDATA%\Riptide\active.json` via atomic write
+- **`generate_config` real merge**: `MihomoManager.write_config` now actually injects profile YAML + runtime settings into mihomo's config path before launch (previously dead-code)
+- **mihomo auto-download** on first run with SHA-256 verification + progress events
+- **Single-instance guard** via `tauri-plugin-single-instance`
+- **Centralised logging** through `tracing` + daily rolling file appender
+
+### 🔀 Modes & Service (Phase 1)
+- **TUN via mihomo's gVisor stack** (deleted dead `windows_tun.rs` + `wintun` crate dep)
+- **Windows service**: new `riptide-tun-service.exe` binary registers with SCM, reads launch config from `%PROGRAMDATA%`, runs mihomo as SYSTEM
+- **One-shot UAC elevation**: `ShellExecuteEx(verb=runas)` + `--install-service`/`--uninstall-service` CLI flags
+- **System proxy drift guard**: auto-restores Windows proxy settings every 3s when external apps tamper with them
+- **Mode Coordinator**: single mutex serializes Off/SystemProxy/TUN transitions, emits `mode_state` events
+
+### 📡 Subscriptions & Configuration (Phase 2)
+- **Subscription auto-refresh scheduler** (default 24h, per-profile interval, configurable)
+- **`Subscription-Userinfo` header parsing** for traffic/expiry tracking
+- **GeoIP / GeoSite auto-download** with progress events
+- **DNS policy overlay** (`DnsPolicy`): user-managed DoH/DoT/DoQ nameservers, FakeIP mode, per-domain policy
+- **WebDAV sync**: HTTPS-only, Basic Auth, DPAPI-encrypted credential storage; zip backup of profiles + sidecars
+- **Clipboard import** with auto-detect for share URI vs subscription URL
+- **Deep link** `riptide://import?url=…` / `riptide://import?uri=…`
+
+### 🛡️ Resilience (Phase 3)
+- **Graceful degradation**: mihomo crash watcher distinguishes deliberate vs unexpected exits, emits `mihomo_crashed`/`mihomo_exited`
+- **Kill switch**: optional blackhole route on TUN crash (`route add 0.0.0.0/0 → 127.0.0.1`), manual release
+- **Sleep/wake & network-change recovery**: clock-jump and default-gateway change detection, mihomo health probe, auto-restart on 2 consecutive failures
+- **Diagnostics report**: one-button collection of versions/mode/service status/asset state/log tail with explicit exclusions (no profile YAML, no connections, no credentials)
+
+### 🪨 Anti-censorship (Phase 4, partial)
+- **Region presets**: China / Iran / Russia one-click rule + DNS overlays
+- **TLS tricks**: global `client-fingerprint` stamping (TLS fragment plumbing stubbed)
+
+### 🎨 UX & Release Engineering (Phase 5, partial)
+- **Autostart + silent start** with `--minimized` flag handling
+- **System tray menu**: show/hide, mode switch, quit
+- **Global hotkeys**: `Ctrl+Alt+P` toggle proxy, `Ctrl+Alt+M` cycle modes
+- **Theme infrastructure** (light/dark/system preference; visual light theme pending)
+- **i18n**: zh-CN + en-US translated, fa-IR/ru-RU/ja-JP seeded with English fallback
+- **Update check** with open-in-browser flow
+- **Settings page**: tabbed (Network / DNS / Sync / Assets / Recovery / About)
+
+### 🧹 Cleanup
+- Deleted `core/windows_tun.rs` (wintun-direct approach abandoned in favor of mihomo TUN)
+- All pre-existing build warnings cleared; `cargo check --bins --lib` produces zero warnings
+
+### Known Limitations
+- `MIHOMO_SHA256` placeholder must be filled before release tagging
+- Full auto-updater requires Tauri signing keypair
+- Cloudflare WARP integration deferred (requires WireGuard keygen + CF registration API)
+- Node editor UI for Reality / AnyTLS / ShadowTLS / TUIC deferred
+
 ## [1.6.0] - TUN Mode UI Unlocked
 
 - **TUN mode UI unlocked**: removed `tunUnavailable` warning block, added start/stop toggle button with keyboard shortcut (Return key) and visual state indicators (cf4b129)

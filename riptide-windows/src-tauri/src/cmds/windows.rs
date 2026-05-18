@@ -3,17 +3,28 @@
 //! These commands provide access to Windows-optimized proxy and system proxy
 //! management features.
 
+use crate::cmds::config::{resolve_active_profile_content, AppState};
+use crate::core::mihomo::{MihomoManager, TunOptions, TunnelMode};
 use crate::core::windows_proxy::WindowsProxyManager;
 use crate::core::windows_sysproxy::{WindowsSysProxyController, WindowsProxyConfig};
-use crate::core::windows_tun::{WindowsTUNManager, TUNStatusDto};
 use tauri::{AppHandle, State};
 use std::sync::Mutex;
 
 /// State wrapper for WindowsProxyManager
 pub struct WindowsProxyState(pub Mutex<WindowsProxyManager>);
 
-/// State wrapper for WindowsTUNManager
-pub struct WindowsTUNState(pub Mutex<WindowsTUNManager>);
+/// DTO returned by `get_tun_status`. The legacy wintun-based manager that
+/// used to live in `core/windows_tun.rs` is gone — TUN is now driven by
+/// mihomo's own TUN stack via the active profile's config. This struct stays
+/// here because the UI still expects this shape.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct TUNStatusDto {
+    pub status: String,
+    pub running: bool,
+    pub adapter_name: Option<String>,
+    pub interface_ip: Option<String>,
+    pub gateway: Option<String>,
+}
 
 /// Start the mihomo proxy using Windows-optimized process management
 #[tauri::command]
@@ -128,57 +139,67 @@ pub fn init_windows_proxy_state(app_handle: &AppHandle) -> anyhow::Result<Window
     Ok(WindowsProxyState(Mutex::new(manager)))
 }
 
-/// Initialize Windows TUN state for the application
-pub fn init_windows_tun_state(app_handle: &AppHandle) -> anyhow::Result<WindowsTUNState> {
-    // Get the app data directory where wintun.dll should be bundled
-    let app_dir = crate::utils::dirs::get_app_data_dir(app_handle)?;
-    let wintun_path = app_dir.join("wintun.dll");
-    
-    // Check if wintun.dll exists in the app directory
-    // In production, wintun.dll should be bundled via tauri.conf.json resources
-    let wintun_dll_path = if wintun_path.exists() {
-        wintun_path
-    } else {
-        // Fallback to current directory (for development)
-        std::env::current_dir()?.join("wintun.dll")
-    };
-    
-    log::info!("Wintun DLL path: {:?}", wintun_dll_path);
-    
-    let manager = WindowsTUNManager::new(wintun_dll_path);
-    Ok(WindowsTUNState(Mutex::new(manager)))
-}
-
 // ==================== TUN Mode Commands ====================
 
-/// Start TUN mode
+/// Start TUN mode. Switches `MihomoManager` to TUN, rewrites config with a
+/// `tun:` block injected, then starts (or restarts) mihomo. Requires that
+/// the app is running with administrator privileges *or* the RiptideTUN
+/// Windows service is installed (Task 1.2 / 1.3) — without either, mihomo
+/// will refuse to create the TUN device.
 #[tauri::command]
-pub async fn start_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
-    let mut mgr = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-    if mgr.get_status() == crate::core::windows_tun::TUNStatus::Stopped {
-        mgr.create_adapter().map_err(|e| e.to_string())?;
+pub async fn start_tun_mode(
+    mihomo: State<'_, MihomoManager>,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let content = resolve_active_profile_content(&app_state)?;
+    mihomo.set_mode(TunnelMode::Tun);
+    mihomo.write_config(&content).map_err(|e| e.to_string())?;
+
+    // If mihomo is already running (e.g., in System Proxy mode), a restart
+    // is required to pick up the new config. Otherwise just start fresh.
+    if mihomo.is_running().await {
+        mihomo.restart().await.map_err(|e| e.to_string())
+    } else {
+        mihomo.start().await.map_err(|e| e.to_string())
     }
-    mgr.start().map_err(|e| e.to_string())
 }
 
-/// Stop TUN mode
+/// Stop TUN mode. Reverts the mode pointer to System Proxy so a subsequent
+/// `start_proxy` doesn't unexpectedly come up in TUN.
 #[tauri::command]
-pub async fn stop_tun_mode(state: State<'_, WindowsTUNState>) -> Result<(), String> {
-    state.0.lock().map_err(|e| format!("Lock error: {}", e))?.stop().map_err(|e| e.to_string())
+pub async fn stop_tun_mode(mihomo: State<'_, MihomoManager>) -> Result<(), String> {
+    mihomo.stop().await.map_err(|e| e.to_string())?;
+    mihomo.set_mode(TunnelMode::SystemProxy);
+    Ok(())
 }
 
-/// Get TUN mode status
+/// Get TUN mode status.
 #[tauri::command]
-pub fn get_tun_status(state: State<'_, WindowsTUNState>) -> Result<TUNStatusDto, String> {
-    let manager = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-    let config = manager.get_config();
+pub async fn get_tun_status(mihomo: State<'_, MihomoManager>) -> Result<TUNStatusDto, String> {
+    let mode = mihomo.current_mode();
+    let opts = mihomo.current_tun_options();
+    let running = mode == TunnelMode::Tun && mihomo.is_running().await;
+    let status_str = if running { "running" } else { "stopped" };
     Ok(TUNStatusDto {
-        status: format!("{}", manager.get_status()),
-        running: false,
-        adapter_name: Some(config.adapter_name.clone()),
-        interface_ip: Some(config.interface_ip.clone()),
-        gateway: Some(config.gateway.clone()),
+        status: status_str.to_string(),
+        running,
+        adapter_name: Some(opts.device.clone()),
+        interface_ip: None,
+        gateway: None,
     })
+}
+
+/// Update the runtime TUN options (device name, stack, MTU, …). Takes effect
+/// next time TUN mode is started or the proxy is restarted.
+#[tauri::command]
+pub fn set_tun_options(mihomo: State<'_, MihomoManager>, options: TunOptions) -> Result<(), String> {
+    mihomo.set_tun_options(options);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_tun_options(mihomo: State<'_, MihomoManager>) -> TunOptions {
+    mihomo.current_tun_options()
 }
 
 #[cfg(test)]
@@ -189,7 +210,7 @@ mod tests {
     fn test_proxy_config_dto_conversion() {
         let config = WindowsProxyConfig::http_proxy("127.0.0.1", 7890);
         let dto = WindowsProxyConfigDto::from(config);
-        
+
         assert!(dto.enable);
         assert!(dto.proxy_server.contains("7890"));
         assert!(!dto.bypass_list.is_empty());
@@ -199,7 +220,7 @@ mod tests {
     fn test_disabled_config_dto() {
         let config = WindowsProxyConfig::disabled();
         let dto = WindowsProxyConfigDto::from(config);
-        
+
         assert!(!dto.enable);
         assert!(dto.proxy_server.is_empty());
     }

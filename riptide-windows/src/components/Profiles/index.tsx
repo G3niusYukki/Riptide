@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRiptideStore } from '../../stores/riptide';
-import { Plus, Trash2, Edit3, Download, FileText } from 'lucide-react';
+import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste } from 'lucide-react';
 import type { Profile } from '../../types';
 import * as tauri from '../../services/tauri';
 
@@ -16,6 +16,14 @@ export function Profiles() {
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Load profiles from disk on mount — the in-memory store doesn't survive reloads.
+  useEffect(() => {
+    tauri
+      .getProfiles()
+      .then((list) => useRiptideStore.getState().setProfiles(list))
+      .catch((err) => console.error('Failed to load profiles:', err));
+  }, []);
 
   const handleAddProfile = async () => {
     if (!newProfileName.trim()) return;
@@ -45,6 +53,27 @@ export function Profiles() {
       setShowShareUriModal(false);
     } catch (error) {
       console.error('Failed to import share URI:', error);
+    }
+  };
+
+  const handleImportFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const trimmed = text.trim();
+      if (!trimmed) {
+        alert('剪贴板为空');
+        return;
+      }
+      // Detect known share URI prefixes; otherwise treat as URL.
+      const isShare = /^(ss|ssr|vmess|vless|trojan|hysteria2|tuic):\/\//i.test(trimmed);
+      const profile = isShare
+        ? await tauri.importShareUri(trimmed)
+        : await tauri.importProfileFromUrl(trimmed);
+      addProfile(profile);
+      alert(`已导入：${profile.name}`);
+    } catch (error) {
+      console.error('Clipboard import failed:', error);
+      alert(`导入失败：${error}`);
     }
   };
 
@@ -105,6 +134,14 @@ export function Profiles() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-100">配置文件</h2>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleImportFromClipboard}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            title="从剪贴板自动识别 share:// 或订阅 URL"
+          >
+            <ClipboardPaste size={14} />
+            剪贴板
+          </button>
           <button
             onClick={() => setShowShareUriModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"

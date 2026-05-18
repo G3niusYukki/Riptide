@@ -1,11 +1,29 @@
 // Type definitions for Riptide Windows
 
+export interface SubscriptionInfo {
+  upload?: number;
+  download?: number;
+  total?: number;
+  expire_at?: string;
+}
+
+export interface ProfileMetadata {
+  source_url?: string;
+  update_interval_secs?: number;
+  last_updated_at?: string;
+  subscription?: SubscriptionInfo;
+}
+
 export interface Profile {
   id: string;
   name: string;
   content: string;
   created_at: string;
   updated_at: string;
+  path?: string;
+  is_active?: boolean;
+  node_count?: number;
+  metadata?: ProfileMetadata;
 }
 
 export interface Proxy {
@@ -112,4 +130,5 @@ export interface AppState {
   tunModeEnabled: boolean;
   autoStart: boolean;
   silentStart: boolean;
+  theme: 'light' | 'dark' | 'system';
 }
