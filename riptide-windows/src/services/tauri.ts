@@ -78,6 +78,93 @@ export const setProfileSubscription = (
 export const getProfileMetadata = (id: string) =>
   invoke<ProfileMetadata>('get_profile_metadata', { id });
 
+// Per-proxy editor (in-profile CRUD)
+//
+// Field names mirror the Rust ClashRawProxy struct's serde representation:
+// — kebab-case for fields marked with #[serde(rename)] (e.g. "skip-cert-verify")
+// — snake_case for plain fields ("alter_id" stays snake_case in JSON because
+//   only "alterId" gets the rename, etc.)
+// Keep new fields in sync with config/parser.rs.
+export interface ClashProxy {
+  name: string;
+  type?: string;
+  server?: string;
+  port?: number;
+  udp?: boolean;
+  network?: string;
+
+  // Shadowsocks
+  cipher?: string;
+  password?: string;
+  plugin?: string;
+  'plugin-opts'?: Record<string, unknown>;
+
+  // VMess / VLESS
+  uuid?: string;
+  alterId?: number;
+  security?: string;
+  flow?: string;
+
+  // TLS-ish
+  'skip-cert-verify'?: boolean;
+  sni?: string;
+  alpn?: string[];
+  fingerprint?: string;
+  'client-fingerprint'?: string;
+
+  // Hysteria2
+  ports?: string;
+  'hop-interval'?: number;
+  'ca-str'?: string;
+  ca?: string;
+  obfs?: string;
+  'obfs-password'?: string;
+
+  // TUIC
+  'congestion-controller'?: string;
+  'udp-relay-mode'?: string;
+  'heartbeat-interval'?: number;
+  'disable-sni'?: boolean;
+  'reduce-rtt'?: boolean;
+  'request-version'?: number;
+  'max-udp-relay-packet-size'?: number;
+  'fast-open'?: boolean;
+  'max-open-streams'?: number;
+
+  // WebSocket / gRPC / H2
+  'ws-path'?: string;
+  'ws-headers'?: Record<string, string>;
+  'grpc-service-name'?: string;
+  'h2-host'?: string[];
+
+  // Reality (VLESS/XTLS)
+  'reality-opts'?: { public_key?: string; 'short-id'?: string; 'spider-x'?: string };
+  pbk?: string;
+  sid?: string;
+  spx?: string;
+
+  // HTTP / SOCKS5
+  username?: string;
+  headers?: Record<string, string>;
+  tls?: boolean;
+  'udp-over-tcp'?: boolean;
+
+  // Snell
+  version?: number;
+}
+
+export const listProfileProxies = (profileId: string) =>
+  invoke<ClashProxy[]>('list_profile_proxies', { profileId });
+export const addProfileProxy = (profileId: string, proxy: ClashProxy) =>
+  invoke<void>('add_profile_proxy', { profileId, proxy });
+export const updateProfileProxy = (
+  profileId: string,
+  originalName: string,
+  proxy: ClashProxy,
+) => invoke<void>('update_profile_proxy', { profileId, originalName, proxy });
+export const deleteProfileProxy = (profileId: string, name: string) =>
+  invoke<void>('delete_profile_proxy', { profileId, name });
+
 // System commands
 export const enableSystemProxy = (httpPort: number, socksPort?: number) =>
   invoke<void>('enable_system_proxy', { httpPort, socksPort });

@@ -189,6 +189,11 @@ pub fn run() {
             cmds::config::refresh_profile,
             cmds::config::set_profile_subscription,
             cmds::config::get_profile_metadata,
+            // Per-proxy editor (in-profile CRUD)
+            cmds::proxy_editor::list_profile_proxies,
+            cmds::proxy_editor::add_profile_proxy,
+            cmds::proxy_editor::update_profile_proxy,
+            cmds::proxy_editor::delete_profile_proxy,
             // mihomo lifecycle
             core::mihomo_bootstrap::download_mihomo,
             // Geo assets

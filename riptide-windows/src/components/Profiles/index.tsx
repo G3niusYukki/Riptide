@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRiptideStore } from '../../stores/riptide';
-import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste } from 'lucide-react';
+import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste, Boxes } from 'lucide-react';
 import type { Profile } from '../../types';
 import * as tauri from '../../services/tauri';
+import { NodeEditor } from '../NodeEditor';
 
 export function Profiles() {
   const { profiles, addProfile, removeProfile, setActiveProfile } = useRiptideStore();
@@ -16,6 +17,7 @@ export function Profiles() {
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [nodeEditorTarget, setNodeEditorTarget] = useState<Profile | null>(null);
 
   // Load profiles from disk on mount — the in-memory store doesn't survive reloads.
   useEffect(() => {
@@ -199,6 +201,13 @@ export function Profiles() {
                 激活
               </button>
               <button
+                onClick={() => setNodeEditorTarget(profile)}
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                title="节点编辑器"
+              >
+                <Boxes size={14} />
+              </button>
+              <button
                 onClick={() => handleEdit(profile)}
                 className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500/50"
               >
@@ -342,6 +351,22 @@ export function Profiles() {
             </div>
           </div>
         </div>
+      )}
+
+      {nodeEditorTarget && (
+        <NodeEditor
+          profileId={nodeEditorTarget.id}
+          profileName={nodeEditorTarget.name}
+          onClose={async () => {
+            setNodeEditorTarget(null);
+            try {
+              const list = await tauri.getProfiles();
+              useRiptideStore.getState().setProfiles(list);
+            } catch (err) {
+              console.error('Failed to refresh profiles after node editing:', err);
+            }
+          }}
+        />
       )}
     </div>
   );
