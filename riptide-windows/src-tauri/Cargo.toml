@@ -48,6 +48,10 @@ sha2 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 base64 = "0.22"
 
+# WARP / WireGuard keypair
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+rand = "0.8"
+
 # Global hotkey support
 global-hotkey = "0.6"
 

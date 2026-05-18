@@ -196,6 +196,8 @@ pub fn run() {
             cmds::proxy_editor::delete_profile_proxy,
             // mihomo lifecycle
             core::mihomo_bootstrap::download_mihomo,
+            // WARP integration
+            core::warp::register_warp_profile,
             // Geo assets
             core::geo_assets::get_geo_assets,
             core::geo_assets::download_geo_assets,

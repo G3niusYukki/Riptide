@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRiptideStore } from '../../stores/riptide';
-import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste, Boxes } from 'lucide-react';
+import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste, Boxes, Cloud } from 'lucide-react';
 import type { Profile } from '../../types';
 import * as tauri from '../../services/tauri';
 import { NodeEditor } from '../NodeEditor';
@@ -18,6 +18,7 @@ export function Profiles() {
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [nodeEditorTarget, setNodeEditorTarget] = useState<Profile | null>(null);
+  const [registeringWarp, setRegisteringWarp] = useState(false);
 
   // Load profiles from disk on mount — the in-memory store doesn't survive reloads.
   useEffect(() => {
@@ -79,6 +80,21 @@ export function Profiles() {
     }
   };
 
+  const handleRegisterWarp = async () => {
+    if (registeringWarp) return;
+    setRegisteringWarp(true);
+    try {
+      const profile = await tauri.registerWarpProfile();
+      addProfile(profile);
+      alert(`已注册 WARP：${profile.name}`);
+    } catch (error) {
+      console.error('WARP registration failed:', error);
+      alert(`WARP 注册失败：${error}`);
+    } finally {
+      setRegisteringWarp(false);
+    }
+  };
+
   const handleImportFromUrl = async () => {
     if (!importUrl.trim()) return;
     
@@ -136,6 +152,15 @@ export function Profiles() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-100">配置文件</h2>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleRegisterWarp}
+            disabled={registeringWarp}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
+            title="向 Cloudflare 注册匿名 WARP peer 并保存为配置"
+          >
+            <Cloud size={14} />
+            {registeringWarp ? '注册中…' : 'WARP'}
+          </button>
           <button
             onClick={handleImportFromClipboard}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"

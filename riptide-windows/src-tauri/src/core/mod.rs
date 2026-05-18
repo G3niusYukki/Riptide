@@ -15,6 +15,7 @@ pub mod sysproxy;
 pub mod service;
 pub mod tls_tricks;
 pub mod tray;
+pub mod warp;
 pub mod webdav;
 
 // Windows-specific modules
