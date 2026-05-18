@@ -32,7 +32,7 @@ pub const MIHOMO_DOWNLOAD_URL: &str = "https://github.com/MetaCubeX/mihomo/relea
 
 /// SHA-256 of `MIHOMO_ARCHIVE_NAME`. Empty string disables verification — only
 /// use that during development before a Riptide release is cut.
-pub const MIHOMO_SHA256: &str = "";
+pub const MIHOMO_SHA256: &str = "1ae6eeec10630945d7f4139cd550f4fc32a9ed53370365dfe59c9d564ec15b0f";
 
 /// Name of the executable inside the zip (and in our app data dir).
 pub const MIHOMO_EXE_NAME: &str = "mihomo.exe";
