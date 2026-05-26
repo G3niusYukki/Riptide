@@ -16,6 +16,7 @@ public enum ScriptType: String, Sendable {
     case requestModify = "request-modify"
     case responseModify = "response-modify"
     case ruleProvider = "rule-provider"
+    case profileScript = "profile-script"
 }
 
 // Wrapper for JSContext to allow @unchecked Sendable
@@ -105,5 +106,41 @@ public actor ScriptEngine {
 
     public func listScripts() -> [String] {
         Array(contexts.keys)
+    }
+
+    // MARK: - Profile Script
+
+    /// Execute a profile transformation script.
+    /// The script should define a `transform(config)` function that receives
+    /// the config as a JSON object and returns a modified config object.
+    /// - Parameters:
+    ///   - scriptName: Name of the loaded script
+    ///   - configJSON: JSON string representation of the config
+    /// - Returns: JSON string of the transformed config
+    public func executeProfileScript(scriptName: String, configJSON: String) throws -> String {
+        guard let wrapper = contexts[scriptName] else {
+            throw ScriptError.runtimeError("script not loaded: \(scriptName)")
+        }
+
+        let jsContext = wrapper.context
+
+        // Parse the config JSON and set it as a global variable
+        let parseScript = "var config = JSON.parse('\(configJSON.replacingOccurrences(of: "'", with: "\\'"))');"
+        jsContext.evaluateScript(parseScript)
+        if let exception = jsContext.exception {
+            throw ScriptError.runtimeError("failed to parse config JSON: \(exception.toString() ?? "unknown error")")
+        }
+
+        // Execute the transform function
+        let result = jsContext.evaluateScript("JSON.stringify(transform(config))")
+        if let exception = jsContext.exception {
+            throw ScriptError.runtimeError("transform failed: \(exception.toString() ?? "unknown error")")
+        }
+
+        guard let jsonResult = result as? String else {
+            throw ScriptError.runtimeError("transform did not return a valid JSON string")
+        }
+
+        return jsonResult
     }
 }

@@ -35,6 +35,206 @@ public struct ConfigMerger: Sendable {
         }
     }
 
+    // MARK: - Script Merge
+
+    /// Merges config with a script transformation.
+    /// The script receives the base config as JSON and should return a transformed config as JSON.
+    /// The script output is then merged with the base config and any additional merge YAMLs.
+    /// - Parameters:
+    ///   - base: The base RiptideConfig
+    ///   - script: JavaScript code with a `transform(config)` function
+    ///   - mergeYAMLs: Additional YAML files to merge after script transformation
+    /// - Returns: The final merged RiptideConfig
+    public static func mergeWithScript(
+        base: RiptideConfig,
+        script: String,
+        mergeYAMLs: [String] = []
+    ) async throws -> RiptideConfig {
+        // Create a script engine and execute the profile script
+        let engine = ScriptEngine()
+        let scriptContext = ScriptContext(
+            name: "profile-transform",
+            source: script,
+            type: .profileScript
+        )
+        try await engine.loadScript(scriptContext)
+
+        // Convert base config to JSON
+        let baseJSON = try configToJSON(base)
+
+        // Execute the script
+        let transformedJSON = try await engine.executeProfileScript(
+            scriptName: "profile-transform",
+            configJSON: baseJSON
+        )
+
+        // Parse the transformed config back to RiptideConfig
+        let transformedConfig = try configFromJSON(transformedJSON)
+
+        // Apply any additional merge YAMLs
+        if mergeYAMLs.isEmpty {
+            return transformedConfig
+        }
+        return try merge(base: transformedConfig, mergeYAMLs: mergeYAMLs)
+    }
+
+    // MARK: - JSON Conversion Helpers
+
+    /// Converts a RiptideConfig to a JSON string.
+    private static func configToJSON(_ config: RiptideConfig) throws -> String {
+        var dict: [String: Any] = ["mode": config.mode.rawValue]
+
+        if !config.proxies.isEmpty {
+            dict["proxies"] = config.proxies.map { proxyToDict($0) }
+        }
+
+        if !config.proxyGroups.isEmpty {
+            dict["proxy-groups"] = config.proxyGroups.map { groupToDict($0) }
+        }
+
+        if !config.rules.isEmpty {
+            dict["rules"] = config.rules.map { ruleToString($0) }
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw MergeError.parseFailed("failed to serialize config to JSON")
+        }
+        return json
+    }
+
+    /// Converts a JSON string back to a RiptideConfig.
+    private static func configFromJSON(_ json: String) throws -> RiptideConfig {
+        guard let data = json.data(using: .utf8),
+              let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw MergeError.invalidYAML("failed to parse JSON from script output")
+        }
+
+        // Parse mode
+        let mode: ProxyMode = {
+            guard let modeStr = dict["mode"] as? String else { return .rule }
+            return ProxyMode(rawValue: modeStr) ?? .rule
+        }()
+
+        // Parse proxies
+        var proxies: [ProxyNode] = []
+        if let rawProxies = dict["proxies"] as? [[String: Any]] {
+            for rawProxy in rawProxies {
+                if let parsed = try? parseRawProxy(rawProxy) {
+                    proxies.append(parsed)
+                }
+            }
+        }
+
+        // Parse proxy groups
+        var proxyGroups: [ProxyGroup] = []
+        if let rawGroups = dict["proxy-groups"] as? [[String: Any]] {
+            for rawGroup in rawGroups {
+                if let parsed = parseRawProxyGroup(rawGroup) {
+                    proxyGroups.append(parsed)
+                }
+            }
+        }
+
+        // Parse rules
+        var rules: [ProxyRule] = []
+        if let rawRules = dict["rules"] as? [String] {
+            for ruleStr in rawRules {
+                let parts = ruleStr.split(separator: ",").map {
+                    $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                if let rule = parseRule(parts: parts) {
+                    rules.append(rule)
+                }
+            }
+        }
+
+        // Parse DNS policy
+        var fakeIPEnabled = false
+        var fakeIPCIDR = "198.18.0.0/16"
+        var hosts: [String: String] = [:]
+        if let rawDNS = dict["dns"] as? [String: Any] {
+            if let enable = rawDNS["enable"] as? Bool { fakeIPEnabled = enable }
+            if let fakeRange = rawDNS["fake-ip-range"] as? String { fakeIPCIDR = fakeRange }
+            if let rawHosts = rawDNS["hosts"] as? [String: String] { hosts = rawHosts }
+        }
+        let dnsPolicy = DNSPolicy(
+            fakeIPEnabled: fakeIPEnabled,
+            fakeIPCIDR: fakeIPCIDR,
+            hosts: hosts
+        )
+
+        return RiptideConfig(
+            mode: mode,
+            proxies: proxies,
+            rules: rules,
+            proxyGroups: proxyGroups,
+            dnsPolicy: dnsPolicy
+        )
+    }
+
+    private static func proxyToDict(_ node: ProxyNode) -> [String: Any] {
+        var dict: [String: Any] = [
+            "name": node.name,
+            "type": proxyKindToMihomoType(node.kind),
+            "server": node.server,
+            "port": node.port
+        ]
+        if let cipher = node.cipher { dict["cipher"] = cipher }
+        if let password = node.password { dict["password"] = password }
+        if let uuid = node.uuid { dict["uuid"] = uuid }
+        return dict
+    }
+
+    private static func proxyKindToMihomoType(_ kind: ProxyKind) -> String {
+        switch kind {
+        case .http: return "http"
+        case .socks5: return "socks5"
+        case .shadowsocks: return "ss"
+        case .vmess: return "vmess"
+        case .vless: return "vless"
+        case .trojan: return "trojan"
+        case .hysteria2: return "hysteria2"
+        case .relay: return "relay"
+        case .snell: return "snell"
+        case .tuic: return "tuic"
+        case .wireguard: return "wireguard"
+        }
+    }
+
+    private static func groupToDict(_ group: ProxyGroup) -> [String: Any] {
+        var dict: [String: Any] = [
+            "name": group.id,
+            "type": group.kind.rawValue,
+            "proxies": group.proxies
+        ]
+        if let interval = group.interval { dict["interval"] = interval }
+        if let tolerance = group.tolerance { dict["tolerance"] = tolerance }
+        if let strategy = group.strategy { dict["strategy"] = strategy.rawValue }
+        return dict
+    }
+
+    private static func ruleToString(_ rule: ProxyRule) -> String {
+        switch rule {
+        case .domain(let domain, let policy): return "DOMAIN,\(domain),\(policyStr(policy))"
+        case .domainSuffix(let suffix, let policy): return "DOMAIN-SUFFIX,\(suffix),\(policyStr(policy))"
+        case .domainKeyword(let keyword, let policy): return "DOMAIN-KEYWORD,\(keyword),\(policyStr(policy))"
+        case .ipCIDR(let cidr, let policy): return "IP-CIDR,\(cidr),\(policyStr(policy))"
+        case .geoIP(let country, let policy): return "GEOIP,\(country),\(policyStr(policy))"
+        case .final(let policy): return "MATCH,\(policyStr(policy))"
+        case .reject: return "REJECT"
+        default: return "MATCH,DIRECT"
+        }
+    }
+
+    private static func policyStr(_ policy: RoutingPolicy) -> String {
+        switch policy {
+        case .direct: return "DIRECT"
+        case .reject: return "REJECT"
+        case .proxyNode(let name): return name
+        }
+    }
+
     // MARK: - Deep Merge Implementation
 
     private static func deepMerge(base: RiptideConfig, merge: [String: Any]) throws -> RiptideConfig {

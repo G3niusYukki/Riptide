@@ -1,0 +1,15 @@
+mode: rule
+proxies:
+  - name: proxy1
+    type: ss
+    server: 1.1.1.1
+    port: 443
+    cipher: aes-256-gcm
+    password: pass1
+dns:
+  enable: true
+  fake-ip-range: "198.18.0.1/24"
+  hosts:
+    "example.com": "127.0.0.1"
+rules:
+  - MATCH,DIRECT

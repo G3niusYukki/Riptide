@@ -1,0 +1,228 @@
+/* =====================================================================
+ * Semantic Theme Tokens
+ *
+ * CSS custom property tokens for the Riptide theme system.
+ * All color values should reference these tokens instead of hardcoded
+ * Tailwind classes. This enables easy theme switching and consistent
+ * design across the application.
+ * ===================================================================== */
+
+:root {
+  /* Background hierarchy */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #1e293b;
+
+  /* Text hierarchy */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Borders */
+  --border-primary: #334155;
+  --border-secondary: #1e293b;
+
+  /* Accent colors */
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-bg: rgba(59, 130, 246, 0.15);
+
+  /* Status colors */
+  --success: #10b981;
+  --success-hover: #059669;
+  --success-bg: rgba(16, 185, 129, 0.15);
+
+  --warning: #f59e0b;
+  --warning-hover: #d97706;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+
+  --error: #ef4444;
+  --error-hover: #dc2626;
+  --error-bg: rgba(239, 68, 68, 0.15);
+
+  /* Code / editor */
+  --code-bg: #0c1222;
+  --code-text: #e2e8f0;
+  --code-line-number: #475569;
+  --code-selection: rgba(59, 130, 246, 0.3);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #334155;
+  --scrollbar-thumb-hover: #475569;
+  --scrollbar-track: var(--bg-secondary);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --border-primary: #e2e8f0;
+  --border-secondary: #f1f5f9;
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-bg: rgba(59, 130, 246, 0.1);
+
+  --success: #059669;
+  --success-hover: #047857;
+  --success-bg: rgba(5, 150, 105, 0.1);
+
+  --warning: #d97706;
+  --warning-hover: #b45309;
+  --warning-bg: rgba(217, 119, 6, 0.1);
+
+  --error: #dc2626;
+  --error-hover: #b91c1c;
+  --error-bg: rgba(220, 38, 38, 0.1);
+
+  --code-bg: #f8fafc;
+  --code-text: #1e293b;
+  --code-line-number: #94a3b8;
+  --code-selection: rgba(59, 130, 246, 0.2);
+
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-track: var(--bg-secondary);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Nord Theme */
+[data-theme="nord"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --bg-tertiary: #434c5e;
+  --bg-elevated: #3b4252;
+
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-muted: #4c566a;
+
+  --border-primary: #434c5e;
+  --border-secondary: #3b4252;
+
+  --accent-primary: #88c0d0;
+  --accent-hover: #81a1c1;
+  --accent-bg: rgba(136, 192, 208, 0.15);
+
+  --success: #a3be8c;
+  --success-hover: #8fbcbb;
+  --success-bg: rgba(163, 190, 140, 0.15);
+
+  --warning: #ebcb8b;
+  --warning-hover: #d08770;
+  --warning-bg: rgba(235, 203, 139, 0.15);
+
+  --error: #bf616a;
+  --error-hover: #d08770;
+  --error-bg: rgba(191, 97, 106, 0.15);
+
+  --code-bg: #2e3440;
+  --code-text: #eceff4;
+  --code-line-number: #4c566a;
+  --code-selection: rgba(136, 192, 208, 0.3);
+
+  --scrollbar-thumb: #434c5e;
+  --scrollbar-thumb-hover: #4c566a;
+  --scrollbar-track: var(--bg-secondary);
+}
+
+/* Dracula Theme */
+[data-theme="dracula"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #343746;
+  --bg-tertiary: #44475a;
+  --bg-elevated: #343746;
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #6272a4;
+  --text-muted: #44475a;
+
+  --border-primary: #44475a;
+  --border-secondary: #343746;
+
+  --accent-primary: #bd93f9;
+  --accent-hover: #ff79c6;
+  --accent-bg: rgba(189, 147, 249, 0.15);
+
+  --success: #50fa7b;
+  --success-hover: #ffb86c;
+  --success-bg: rgba(80, 250, 123, 0.15);
+
+  --warning: #f1fa8c;
+  --warning-hover: #ffb86c;
+  --warning-bg: rgba(241, 250, 140, 0.15);
+
+  --error: #ff5555;
+  --error-hover: #ff6e6e;
+  --error-bg: rgba(255, 85, 85, 0.15);
+
+  --code-bg: #282a36;
+  --code-text: #f8f8f2;
+  --code-line-number: #6272a4;
+  --code-selection: rgba(189, 147, 249, 0.3);
+
+  --scrollbar-thumb: #44475a;
+  --scrollbar-thumb-hover: #6272a4;
+  --scrollbar-track: var(--bg-secondary);
+}
+
+/* Solarized Dark Theme */
+[data-theme="solarized-dark"] {
+  --bg-primary: #002b36;
+  --bg-secondary: #073642;
+  --bg-tertiary: #586e75;
+  --bg-elevated: #073642;
+
+  --text-primary: #839496;
+  --text-secondary: #657b83;
+  --text-muted: #586e75;
+
+  --border-primary: #586e75;
+  --border-secondary: #073642;
+
+  --accent-primary: #268bd2;
+  --accent-hover: #2aa198;
+  --accent-bg: rgba(38, 139, 210, 0.15);
+
+  --success: #859900;
+  --success-hover: #b58900;
+  --success-bg: rgba(133, 153, 0, 0.15);
+
+  --warning: #b58900;
+  --warning-hover: #cb4b16;
+  --warning-bg: rgba(181, 137, 0, 0.15);
+
+  --error: #dc322f;
+  --error-hover: #d33682;
+  --error-bg: rgba(220, 50, 47, 0.15);
+
+  --code-bg: #002b36;
+  --code-text: #839496;
+  --code-line-number: #586e75;
+  --code-selection: rgba(38, 139, 210, 0.3);
+
+  --scrollbar-thumb: #586e75;
+  --scrollbar-thumb-hover: #657b83;
+  --scrollbar-track: var(--bg-secondary);
+}

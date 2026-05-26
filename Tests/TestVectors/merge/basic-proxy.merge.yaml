@@ -1,0 +1,9 @@
+proxies:
+  - name: proxy2
+    type: ss
+    server: 2.2.2.2
+    port: 8388
+    cipher: chacha20-ietf-poly1305
+    password: pass2
+rules:
+  - DOMAIN-SUFFIX,google.com,PROXY

@@ -1,0 +1,6 @@
+dns:
+  enable: true
+  fake-ip-range: "198.18.0.1/24"
+  enhanced-mode: fake-ip
+  hosts:
+    "example.com": "127.0.0.1"

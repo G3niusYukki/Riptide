@@ -1,0 +1,17 @@
+mode: rule
+proxies:
+  - name: proxy1
+    type: ss
+    server: 1.1.1.1
+    port: 443
+    cipher: aes-256-gcm
+    password: pass1
+  - name: proxy2
+    type: ss
+    server: 2.2.2.2
+    port: 8388
+    cipher: chacha20-ietf-poly1305
+    password: pass2
+rules:
+  - MATCH,DIRECT
+  - DOMAIN-SUFFIX,google.com,PROXY
