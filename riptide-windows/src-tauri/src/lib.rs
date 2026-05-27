@@ -211,6 +211,11 @@ pub fn run() {
             cmds::rewrite::add_rewrite_rule,
             cmds::rewrite::delete_rewrite_rule,
             cmds::rewrite::toggle_rewrite_rule,
+            // Gateway / ICS
+            cmds::gateway::enable_gateway,
+            cmds::gateway::disable_gateway,
+            cmds::gateway::is_gateway_enabled,
+            cmds::gateway::get_gateway_devices,
             // WebDAV sync
             cmds::webdav::webdav_get_config,
             cmds::webdav::webdav_set_config,

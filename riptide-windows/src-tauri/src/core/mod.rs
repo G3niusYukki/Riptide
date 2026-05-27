@@ -1,6 +1,7 @@
 //! Core business logic modules
 
 pub mod diagnostics;
+pub mod gateway;
 pub mod geo_assets;
 pub mod kill_switch;
 pub mod mihomo;

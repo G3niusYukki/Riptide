@@ -6,12 +6,14 @@ import { SyncTab } from './SyncTab';
 import { AssetsTab } from './AssetsTab';
 import { RecoveryTab } from './RecoveryTab';
 import { RewriteTab } from './RewriteTab';
+import { AppearanceSettings } from '../AppearanceSettings';
+import { GatewayTab } from './GatewayTab';
 import { useRiptideStore } from '../../stores/riptide';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import i18n from '../../i18n';
 import * as tauri from '../../services/tauri';
 
-type Tab = 'network' | 'dns' | 'rewrite' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'about';
+type Tab = 'network' | 'dns' | 'rewrite' | 'gateway' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'appearance' | 'about';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -30,10 +32,12 @@ export function SettingsPage() {
     { id: 'network', label: '网络' },
     { id: 'dns', label: 'DNS' },
     { id: 'rewrite', label: '重写' },
+    { id: 'gateway', label: '网关' },
     { id: 'sync', label: '同步' },
     { id: 'assets', label: '资源' },
     { id: 'recovery', label: '恢复' },
     { id: 'diagnostics', label: '诊断' },
+    { id: 'appearance', label: '外观' },
     { id: 'about', label: '关于' },
   ];
 
@@ -60,10 +64,12 @@ export function SettingsPage() {
       {active === 'network' && <NetworkTab />}
       {active === 'dns' && <DnsTab />}
       {active === 'rewrite' && <RewriteTab />}
+      {active === 'gateway' && <GatewayTab />}
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
       {active === 'diagnostics' && <RecoveryTab showDiagnostics />}
+      {active === 'appearance' && <AppearanceSettings />}
       {active === 'about' && (
         <div className="space-y-3">
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
