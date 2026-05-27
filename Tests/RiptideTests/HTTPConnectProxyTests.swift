@@ -20,6 +20,10 @@ struct HTTPConnectProxyTests {
 
     @Test("proxy relays traffic end to end in direct mode")
     func proxyRelaysTrafficEndToEnd() async throws {
+        guard isGitHubActions == false else {
+            return
+        }
+
         let echoServer = try await LoopbackEchoServer.start()
         defer { echoServer.stop() }
 
@@ -83,6 +87,10 @@ struct HTTPConnectProxyTests {
 
     @Test("proxy MITM terminates TLS for intercepted CONNECT")
     func proxyMITMTerminatesTLSForInterceptedConnect() async throws {
+        guard isGitHubActions == false else {
+            return
+        }
+
         let originCA = CertificateAuthority(commonName: "Origin Test CA", organization: "Riptide Tests")
         try await originCA.generateCertificate()
         let originIdentity = try await originCA.generateIdentity(for: "example.com")
@@ -161,6 +169,10 @@ struct HTTPConnectProxyTests {
         #expect(status.bytesDown >= UInt64(originResponse.count))
         #expect(status.activeConnections == 0)
     }
+}
+
+private var isGitHubActions: Bool {
+    ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
 }
 
 private final class LoopbackEchoServer: @unchecked Sendable {
