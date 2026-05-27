@@ -272,6 +272,19 @@ export const deleteRewriteRule = (id: string) =>
 export const toggleRewriteRule = (id: string, enabled: boolean) =>
   invoke<void>('toggle_rewrite_rule', { id, enabled });
 
+// Gateway / ICS commands
+export const enableGateway = (outboundInterface: string, subnet: string) =>
+  invoke<void>('enable_gateway', { outboundInterface, subnet });
+export const disableGateway = () => invoke<void>('disable_gateway');
+export const isGatewayEnabled = () => invoke<boolean>('is_gateway_enabled');
+export interface GatewayDevice {
+  ip: string;
+  mac: string;
+  interface: string;
+}
+export const getGatewayDevices = () =>
+  invoke<GatewayDevice[]>('get_gateway_devices');
+
 // WebDAV sync
 export interface WebDAVConfigDto {
   endpoint: string;

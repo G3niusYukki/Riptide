@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Power, Wifi, Globe } from 'lucide-react';
+import { Power, Wifi } from 'lucide-react';
 import * as tauri from '../../services/tauri';
-
-interface ConnectedDevice {
-  ip: string;
-  mac: string;
-  interface: string;
-}
+import type { GatewayDevice } from '../../services/tauri';
 
 export function GatewayTab() {
   const [enabled, setEnabled] = useState(false);
   const [outboundIface, setOutboundIface] = useState('Ethernet');
   const [subnet, setSubnet] = useState('192.168.137.0/24');
-  const [devices, setDevices] = useState<ConnectedDevice[]>([]);
+  const [devices, setDevices] = useState<GatewayDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    tauri.invoke<boolean>('is_gateway_enabled').then(setEnabled).catch(console.error);
+    tauri.isGatewayEnabled().then(setEnabled).catch(console.error);
     refreshDevices();
   }, []);
 
   const refreshDevices = async () => {
     try {
-      const devs = await tauri.invoke<ConnectedDevice[]>('get_gateway_devices');
+      const devs = await tauri.getGatewayDevices();
       setDevices(devs);
     } catch (e) {
       console.error('Failed to get devices:', e);
@@ -35,10 +30,10 @@ export function GatewayTab() {
     setError(null);
     try {
       if (enabled) {
-        await tauri.invoke('disable_gateway');
+        await tauri.disableGateway();
         setEnabled(false);
       } else {
-        await tauri.invoke('enable_gateway', { outboundInterface: outboundIface, subnet });
+        await tauri.enableGateway(outboundIface, subnet);
         setEnabled(true);
       }
       await refreshDevices();
