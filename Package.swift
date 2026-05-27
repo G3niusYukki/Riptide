@@ -42,10 +42,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "RiptideSecurityShim",
-            cSettings: [
-                .define("ADOPT_NEW_SecIdentityCreate")
-            ]
+            name: "RiptideSecurityShim"
         ),
         .executableTarget(
             name: "RiptideCLI",
