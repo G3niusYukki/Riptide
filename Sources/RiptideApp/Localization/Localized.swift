@@ -180,7 +180,7 @@ public enum Localized: String, CaseIterable {
     }
 }
 
-/// Extended language codes supported by the app (8 options including system auto-detect).
+/// Extended language codes supported by the app (10 options including system auto-detect).
 public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
     case system = "system"
     case chineseSimplified = "zh-Hans"
@@ -190,6 +190,8 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
     case japanese = "ja"
     case korean = "ko"
     case persian = "fa"
+    case portuguese = "pt-BR"
+    case vietnamese = "vi"
 
     public var id: String { rawValue }
 
@@ -204,6 +206,8 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
         case .japanese: return "日本語"
         case .korean: return "한국어"
         case .persian: return "فارسی"
+        case .portuguese: return "Português"
+        case .vietnamese: return "Tiếng Việt"
         }
     }
 
@@ -231,6 +235,10 @@ public enum AppLanguage: String, CaseIterable, Sendable, Identifiable {
             return .korean
         } else if preferred.hasPrefix("fa") {
             return .persian
+        } else if preferred.hasPrefix("pt") {
+            return .portuguese
+        } else if preferred.hasPrefix("vi") {
+            return .vietnamese
         } else {
             return .english
         }

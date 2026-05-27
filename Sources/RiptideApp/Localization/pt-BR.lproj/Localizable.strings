@@ -1,0 +1,40 @@
+/* Riptide Portuguese (Brazil) Localization */
+
+/* MARK: - Tab Names */
+"tab.config" = "Configuração";
+"tab.proxy" = "Proxies";
+"tab.traffic" = "Tráfego";
+"tab.rules" = "Regras";
+"tab.logs" = "Logs";
+
+/* MARK: - Config Tab */
+"config.mode" = "Modo";
+"config.system_proxy" = "Proxy do Sistema";
+"config.tun_mode" = "Modo TUN";
+"config.import" = "Importar Config";
+"config.profiles" = "Perfis";
+"config.subscriptions" = "Assinaturas";
+"config.no_subscriptions" = "Sem Assinaturas";
+"config.add_subscription_hint" = "Adicione uma assinatura remota para obter nós automaticamente";
+"config.helper_installed" = "Auxiliar Instalado";
+"config.helper_not_installed" = "Auxiliar Não Instalado";
+"config.install_helper" = "Instalar Auxiliar";
+"config.install_helper_hint" = "Modo TUN requer ferramenta auxiliar";
+"config.mode_locked" = "Modo Bloqueado";
+"config.all_configs" = "Todas Configs";
+
+/* MARK: - Common */
+"common.cancel" = "Cancelar";
+"common.confirm" = "Confirmar";
+"common.add" = "Adicionar";
+"common.save" = "Salvar";
+"common.delete" = "Excluir";
+"common.edit" = "Editar";
+"common.close" = "Fechar";
+"common.loading" = "Carregando";
+"common.error" = "Erro";
+"common.unknown" = "Desconhecido";
+
+/* MARK: - App */
+"app.name" = "Riptide";
+"app.tagline" = "Cliente Proxy Rápido e Seguro";

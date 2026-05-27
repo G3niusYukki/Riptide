@@ -1,24 +1,51 @@
 import SwiftUI
+import AppKit
 
+/// App theme colors. Adapts to light/dark mode via `colorScheme`.
 enum Theme {
-    static let background = Color(hex: "1a1a2e")
-    static let backgroundEnd = Color(hex: "16213e")
-    static let card = Color.clear  // use .ultraThinMaterial in views
+    // Fixed accent colors (work in both light and dark modes)
     static let accent = Color(hex: "0fbcf9")
     static let success = Color(hex: "0be881")
     static let danger = Color(hex: "fd7272")
     static let warning = Color(hex: "ffaa00")
-    static let text = Color.white
-    static let subtext = Color.secondary
+    static let background = Color(hex: "1a1a2e")        // dark background, legacy
+    static let backgroundEnd = Color(hex: "16213e")      // dark gradient end, legacy
     static let cardRadius: CGFloat = 12
     static let buttonRadius: CGFloat = 8
 
+    // Semantic colors — auto-adapt to color scheme
+    static let text = Color.primary
+    static let subtext = Color.secondary
+    static let card = Color.clear  // use .ultraThinMaterial in views
+
+    /// Background gradient that adapts to the current color scheme.
+    static func backgroundGradient(for colorScheme: ColorScheme) -> LinearGradient {
+        switch colorScheme {
+        case .dark:
+            return LinearGradient(
+                colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .light:
+            return LinearGradient(
+                colors: [Color(hex: "f0f2f5"), Color(hex: "e8ecf1")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        @unknown default:
+            return LinearGradient(
+                colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    /// Legacy gradient. Auto-detects dark/light from the current window / system setting.
     static var backgroundGradient: LinearGradient {
-        LinearGradient(
-            colors: [background, backgroundEnd],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return backgroundGradient(for: isDark ? .dark : .light)
     }
 }
 

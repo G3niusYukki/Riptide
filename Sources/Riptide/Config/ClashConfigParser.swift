@@ -670,10 +670,38 @@ public enum ClashConfigParser {
 
         let finalPrimary = allPrimary + doqResolvers
 
+        // Parse nameserver-policy (domain pattern → resolvers)
+        var nameserverPolicies: [NameserverPolicyEntry] = []
+        if let rawPolicies = raw.nameserverPolicy {
+            for (pattern, addrs) in rawPolicies {
+                let resolvers = addrs.map { addr -> DNSResolverEndpoint in
+                    let normalized = addr.lowercased()
+                    if normalized.hasPrefix("https://") {
+                        return .doh(url: addr)
+                    } else if normalized.hasPrefix("tls://") {
+                        let stripped = String(addr.dropFirst(6))
+                        return DNSResolverEndpoint(kind: .dot, address: stripped)
+                    } else if normalized.hasPrefix("quic://") {
+                        let stripped = String(addr.dropFirst(7))
+                        return DNSResolverEndpoint(kind: .doq, address: stripped)
+                    } else if addr.contains(":") {
+                        return DNSResolverEndpoint(kind: .udp, address: addr)
+                    } else {
+                        return .udp(host: addr)
+                    }
+                }
+                nameserverPolicies.append(NameserverPolicyEntry(
+                    domainPattern: pattern,
+                    resolvers: resolvers
+                ))
+            }
+        }
+
         return DNSPolicy(
             primaryResolvers: finalPrimary,
             fallbackResolvers: fallbackResolvers,
             domainPolicies: [],
+            nameserverPolicies: nameserverPolicies,
             respectRules: raw.respectRules ?? false,
             fakeIPEnabled: raw.fakeIP ?? true,
             fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16",
@@ -778,6 +806,7 @@ private struct ClashRawDNS: Decodable {
     let respectRules: Bool?
     let defaultNameserver: [String]?
     let hosts: [String: String]?
+    let nameserverPolicy: [String: [String]]?
 
     enum CodingKeys: String, CodingKey {
         case enable
@@ -790,6 +819,7 @@ private struct ClashRawDNS: Decodable {
         case hosts
         case tlsNameserver = "tls-nameserver"
         case quicNameserver = "quic-nameserver"
+        case nameserverPolicy = "nameserver-policy"
     }
 }
 

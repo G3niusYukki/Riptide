@@ -1,0 +1,40 @@
+/* Riptide Persian Localization */
+
+/* MARK: - Tab Names */
+"tab.config" = "پیکربندی";
+"tab.proxy" = "پروکسی";
+"tab.traffic" = "ترافیک";
+"tab.rules" = "قوانین";
+"tab.logs" = "گزارش‌ها";
+
+/* MARK: - Config Tab */
+"config.mode" = "حالت";
+"config.system_proxy" = "پروکسی سیستم";
+"config.tun_mode" = "حالت TUN";
+"config.import" = "وارد کردن";
+"config.profiles" = "پروفایل‌ها";
+"config.subscriptions" = "اشتراک‌ها";
+"config.no_subscriptions" = "بدون اشتراک";
+"config.add_subscription_hint" = "برای دریافت خودکار نودهای پروکسی اشتراک اضافه کنید";
+"config.helper_installed" = "راهنما نصب شد";
+"config.helper_not_installed" = "راهنما نصب نشد";
+"config.install_helper" = "نصب راهنما";
+"config.install_helper_hint" = "حالت TUN نیاز به ابزار راهنما دارد";
+"config.mode_locked" = "حالت قفل شد";
+"config.all_configs" = "همه پیکربندی‌ها";
+
+/* MARK: - Common */
+"common.cancel" = "لغو";
+"common.confirm" = "تأیید";
+"common.add" = "افزودن";
+"common.save" = "ذخیره";
+"common.delete" = "حذف";
+"common.edit" = "ویرایش";
+"common.close" = "بستن";
+"common.loading" = "در حال بارگیری";
+"common.error" = "خطا";
+"common.unknown" = "ناشناخته";
+
+/* MARK: - App */
+"app.name" = "Riptide";
+"app.tagline" = "کلاینت پروکسی سریع و امن";

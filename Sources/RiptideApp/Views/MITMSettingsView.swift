@@ -1,244 +1,266 @@
 import SwiftUI
 import Riptide
 
-/// Settings view for MITM HTTPS interception configuration.
+// MARK: - MITM Settings View
+
+/// Settings for HTTPS interception (MITM), CA certificate management,
+/// host whitelist, and interception log.
 struct MITMSettingsView: View {
-    @StateObject private var vm: MITMSettingsViewModel
+    @Bindable var vm: AppViewModel
+    @State private var mitmEnabled = false
+    @State private var hosts: [String] = []
+    @State private var excludeHosts: [String] = []
     @State private var newHost = ""
     @State private var newExcludeHost = ""
+    @State private var isInstallingCert = false
+    @State private var interceptionLog: [String] = []
 
-    init() {
-        _vm = StateObject(wrappedValue: MITMSettingsViewModel())
-    }
+    private let mitmManager = MITMManager()
 
     var body: some View {
-        Form {
-            Section("MITM 拦截") {
-                Toggle("启用 MITM", isOn: Binding(
-                    get: { vm.enabled },
-                    set: { newValue in
-                        if newValue { vm.enableMITM() } else { vm.disableMITM() }
-                    }
-                ))
-
-                if vm.enabled {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("拦截主机模式")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if vm.hosts.isEmpty {
-                            Text("* (全部)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(vm.hosts, id: \.self) { pattern in
-                                HStack {
-                                    Text(pattern)
-                                        .font(.caption)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Button {
-                                        vm.removeHost(pattern)
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundStyle(.red)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Header toggle
+                HStack {
+                    Label("HTTPS 拦截 (MITM)", systemImage: "lock.shield")
+                        .font(.headline)
+                        .foregroundStyle(Theme.text)
+                    Spacer()
+                    Toggle("", isOn: $mitmEnabled)
+                        .onChange(of: mitmEnabled) { _, newValue in
+                            Task {
+                                var config = await mitmManager.getConfig()
+                                config.enabled = newValue
+                                await mitmManager.setConfig(config)
                             }
                         }
-
-                        HStack {
-                            TextField("*.example.com 或 example.com", text: $newHost)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit {
-                                    addHost()
-                                }
-                            Button("添加") {
-                                addHost()
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("排除主机（不拦截）")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ForEach(vm.excludeHosts, id: \.self) { pattern in
-                            HStack {
-                                Text(pattern)
-                                    .font(.caption)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Button {
-                                    vm.removeExcludeHost(pattern)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.red)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        HStack {
-                            TextField("api.example.com", text: $newExcludeHost)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit {
-                                    addExcludeHost()
-                                }
-                            Button("添加") {
-                                addExcludeHost()
-                            }
-                        }
-                    }
                 }
+
+                // CA Certificate section
+                caCertificateSection
+
+                // Host whitelist section
+                hostWhitelistSection
+
+                // Exclude list section
+                excludeHostSection
+
+                // Interception log
+                interceptionLogSection
+            }
+            .padding()
+        }
+        .background(Theme.backgroundGradient.ignoresSafeArea())
+        .task {
+            let config = await mitmManager.getConfig()
+            mitmEnabled = config.enabled
+            hosts = config.hosts
+            excludeHosts = config.excludeHosts
+        }
+    }
+
+    // MARK: - CA Certificate Section
+
+    private var caCertificateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("CA 根证书", systemImage: "certificate")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.text)
+
+            Text("MITM 需要安装 Riptide 自签名的 CA 根证书到系统钥匙串。安装后需要在「钥匙串访问」中手动信任此证书。")
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 12) {
+                Button {
+                    isInstallingCert = true
+                    Task {
+                        do {
+                            try CertificateAuthority().installCA()
+                            // Save cert data to temp file for user to inspect
+                            if let certData = CertificateAuthority().caCertificateData() {
+                                let url = FileManager.default.temporaryDirectory
+                                    .appendingPathComponent("Riptide_CA.crt")
+                                try certData.write(to: url)
+                                NSWorkspace.shared.activateFileViewerSelecting([url])
+                            }
+                        } catch {
+                            // Installation failed — user can do it manually
+                        }
+                        isInstallingCert = false
+                    }
+                } label: {
+                    Label(
+                        isInstallingCert ? "安装中…" : "安装到钥匙串",
+                        systemImage: "key"
+                    )
+                    .font(.caption)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isInstallingCert)
+
+                Button {
+                    Task {
+                        if let certData = await mitmManager.caCertificateData() {
+                            let savePanel = NSSavePanel()
+                            savePanel.nameFieldStringValue = "Riptide_CA.crt"
+                            savePanel.allowedContentTypes = [.x509Certificate]
+                            if savePanel.runModal() == .OK,
+                               let url = savePanel.url {
+                                try certData.write(to: url)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("导出证书…", systemImage: "square.and.arrow.up")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+    }
+
+    // MARK: - Host Whitelist
+
+    private var hostWhitelistSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("拦截域名", systemImage: "list.bullet.rectangle")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.text)
+
+            Text("仅对列表中的域名进行 HTTPS 解密。支持通配符 (*.example.com)。")
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+
+            // Add new host
+            HStack {
+                TextField("example.com", text: $newHost)
+                    .textFieldStyle(.roundedBorder)
+                Button("添加") {
+                    guard !newHost.isEmpty else { return }
+                    hosts.append(newHost)
+                    newHost = ""
+                    saveHosts()
+                }
+                .buttonStyle(.bordered)
+                .disabled(newHost.isEmpty)
             }
 
-            Section("CA 证书") {
+            // Existing hosts
+            ForEach(hosts, id: \.self) { host in
                 HStack {
-                    Image(systemName: vm.isCAInstalled ? "checkmark.shield.fill" : "shield.slash")
-                        .foregroundStyle(vm.isCAInstalled ? .green : .orange)
-                    Text(vm.isCAInstalled ? "证书已安装（需在钥匙串中设为始终信任）" : "证书未安装")
+                    Image(systemName: "globe")
+                        .foregroundStyle(Theme.accent)
+                    Text(host)
+                        .font(.caption)
+                        .foregroundStyle(Theme.text)
+                    Spacer()
+                    Button {
+                        hosts.removeAll { $0 == host }
+                        saveHosts()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Theme.danger)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+    }
+
+    // MARK: - Exclude List
+
+    private var excludeHostSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("排除域名", systemImage: "list.bullet.rectangle.portrait")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.text)
+
+            Text("即使匹配拦截规则，也不解密这些域名。常用于银行、政府网站。")
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+
+            HStack {
+                TextField("*.bank.com", text: $newExcludeHost)
+                    .textFieldStyle(.roundedBorder)
+                Button("添加") {
+                    guard !newExcludeHost.isEmpty else { return }
+                    excludeHosts.append(newExcludeHost)
+                    newExcludeHost = ""
+                    saveHosts()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            ForEach(excludeHosts, id: \.self) { host in
+                HStack {
+                    Image(systemName: "shield")
+                        .foregroundStyle(Theme.warning)
+                    Text(host)
                         .font(.caption)
                     Spacer()
-                    Button("安装证书") {
-                        vm.installCertificate()
+                    Button {
+                        excludeHosts.removeAll { $0 == host }
+                        saveHosts()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Theme.danger)
                     }
-                    .disabled(!vm.enabled)
-                }
-            }
-
-            if !vm.interceptLog.isEmpty {
-                Section("拦截日志") {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(vm.interceptLog.prefix(50), id: \.self) { entry in
-                                Text(entry)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 150)
-                }
-            }
-
-            if !vm.httpFlowRecords.isEmpty {
-                Section {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(Array(vm.httpFlowRecords.suffix(50).reversed())) { record in
-                                DisclosureGroup {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        headerBlock("请求头", headers: record.request.headers)
-                                        if !record.request.bodyPreview.isEmpty {
-                                            bodyPreview("请求 Body", text: record.request.bodyPreviewText)
-                                        }
-                                        if let response = record.response {
-                                            headerBlock("响应头", headers: response.headers)
-                                            if !response.bodyPreview.isEmpty {
-                                                bodyPreview("响应 Body", text: response.bodyPreviewText)
-                                            }
-                                        }
-                                    }
-                                    .padding(.top, 4)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Text(record.request.method)
-                                            .font(.system(.caption, design: .monospaced))
-                                            .fontWeight(.semibold)
-                                            .frame(width: 46, alignment: .leading)
-                                        Text(record.host + record.request.path)
-                                            .font(.caption)
-                                            .lineLimit(1)
-                                        Spacer()
-                                        if let response = record.response {
-                                            Text("\(response.statusCode)")
-                                                .font(.system(.caption, design: .monospaced))
-                                                .foregroundStyle(statusColor(response.statusCode))
-                                        } else {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                        }
-                                        Text(byteCount(record))
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 260)
-                } header: {
-                    HStack {
-                        Text("HTTP Flow")
-                        Spacer()
-                        Button("清空") {
-                            vm.clearHTTPFlowRecords()
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .formStyle(.grouped)
-        .navigationTitle("MITM 设置")
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 
-    private func addHost() {
-        let trimmed = newHost.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        vm.addHost(trimmed)
-        newHost = ""
-    }
+    // MARK: - Interception Log
 
-    private func addExcludeHost() {
-        let trimmed = newExcludeHost.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        vm.addExcludeHost(trimmed)
-        newExcludeHost = ""
-    }
+    private var interceptionLogSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("拦截日志", systemImage: "doc.text.magnifyingglass")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.text)
 
-    private func headerBlock(_ title: String, headers: [MITMHTTPHeader]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            ForEach(headers) { header in
-                Text("\(header.name): \(header.value)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .lineLimit(2)
+            if interceptionLog.isEmpty {
+                Text("暂无拦截记录。启用 MITM 后，匹配的 HTTPS 请求会显示在这里。")
+                    .font(.caption)
+                    .foregroundStyle(Theme.subtext)
+                    .padding()
+            } else {
+                ForEach(Array(interceptionLog.prefix(20)), id: \.self) { entry in
+                    Text(entry)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(Theme.subtext)
+                }
             }
         }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 
-    private func bodyPreview(_ title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(text)
-                .font(.system(.caption2, design: .monospaced))
-                .lineLimit(6)
-                .textSelection(.enabled)
+    // MARK: - Persistence
+
+    private func saveHosts() {
+        Task {
+            var config = await mitmManager.getConfig()
+            config.hosts = hosts
+            config.excludeHosts = excludeHosts
+            await mitmManager.setConfig(config)
         }
-    }
-
-    private func statusColor(_ statusCode: Int) -> Color {
-        switch statusCode {
-        case 200..<300:
-            return .green
-        case 300..<400:
-            return .blue
-        case 400..<500:
-            return .orange
-        default:
-            return .red
-        }
-    }
-
-    private func byteCount(_ record: MITMHTTPFlowRecord) -> String {
-        let total = record.request.bodySize + (record.response?.bodySize ?? 0)
-        return ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .binary)
     }
 }

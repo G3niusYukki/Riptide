@@ -1,0 +1,66 @@
+/* Riptide Korean Localization */
+
+/* MARK: - Tab Names */
+"tab.config" = "구성";
+"tab.proxy" = "프록시";
+"tab.traffic" = "트래픽";
+"tab.rules" = "규칙";
+"tab.logs" = "로그";
+
+/* MARK: - Config Tab */
+"config.mode" = "모드";
+"config.system_proxy" = "시스템 프록시";
+"config.tun_mode" = "TUN 모드";
+"config.import" = "구성 가져오기";
+"config.profiles" = "프로필";
+"config.subscriptions" = "구독";
+"config.no_subscriptions" = "구독 없음";
+"config.add_subscription_hint" = "원격 구독을 추가하여 자동으로 프록시 노드를 가져옵니다";
+"config.helper_installed" = "도우미 설치됨";
+"config.helper_not_installed" = "도우미 미설치";
+"config.install_helper" = "도우미 설치";
+"config.install_helper_hint" = "TUN 모드는 네트워크 인터페이스 구성을 위해 도우미 도구가 필요합니다";
+"config.mode_locked" = "모드 잠김";
+"config.all_configs" = "전체 구성";
+
+/* MARK: - Profile */
+"profile.active" = "활성";
+"profile.activate" = "활성화";
+"profile.delete" = "삭제";
+"profile.edit" = "편집";
+"profile.nodes" = "노드";
+"profile.rules" = "규칙";
+
+/* MARK: - Subscription */
+"subscription.add" = "구독 추가";
+"subscription.edit" = "편집";
+"subscription.update" = "업데이트";
+"subscription.updating" = "업데이트 중...";
+"subscription.never_updated" = "업데이트 없음";
+"subscription.error" = "오류";
+"subscription.configs" = "구성";
+"subscription.name" = "이름";
+"subscription.url" = "URL";
+"subscription.auto_update" = "자동 업데이트";
+"subscription.update_interval" = "업데이트 간격";
+"subscription.interval_15m" = "15분";
+"subscription.interval_30m" = "30분";
+"subscription.interval_1h" = "1시간";
+"subscription.interval_6h" = "6시간";
+"subscription.interval_24h" = "24시간";
+
+/* MARK: - Common */
+"common.cancel" = "취소";
+"common.confirm" = "확인";
+"common.add" = "추가";
+"common.save" = "저장";
+"common.delete" = "삭제";
+"common.edit" = "편집";
+"common.close" = "닫기";
+"common.loading" = "로딩 중";
+"common.error" = "오류";
+"common.unknown" = "알 수 없음";
+
+/* MARK: - App */
+"app.name" = "Riptide";
+"app.tagline" = "빠르고 안전한 프록시 클라이언트";

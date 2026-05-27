@@ -1,0 +1,40 @@
+/* Riptide Vietnamese Localization */
+
+/* MARK: - Tab Names */
+"tab.config" = "Cấu hình";
+"tab.proxy" = "Proxy";
+"tab.traffic" = "Lưu lượng";
+"tab.rules" = "Quy tắc";
+"tab.logs" = "Nhật ký";
+
+/* MARK: - Config Tab */
+"config.mode" = "Chế độ";
+"config.system_proxy" = "Proxy Hệ thống";
+"config.tun_mode" = "Chế độ TUN";
+"config.import" = "Nhập cấu hình";
+"config.profiles" = "Hồ sơ";
+"config.subscriptions" = "Đăng ký";
+"config.no_subscriptions" = "Không có đăng ký";
+"config.add_subscription_hint" = "Thêm đăng ký từ xa để tự động nhận nút proxy";
+"config.helper_installed" = "Đã cài Helper";
+"config.helper_not_installed" = "Chưa cài Helper";
+"config.install_helper" = "Cài Helper";
+"config.install_helper_hint" = "Chế độ TUN yêu cầu công cụ Helper";
+"config.mode_locked" = "Chế độ bị khóa";
+"config.all_configs" = "Tất cả cấu hình";
+
+/* MARK: - Common */
+"common.cancel" = "Hủy";
+"common.confirm" = "Xác nhận";
+"common.add" = "Thêm";
+"common.save" = "Lưu";
+"common.delete" = "Xóa";
+"common.edit" = "Sửa";
+"common.close" = "Đóng";
+"common.loading" = "Đang tải";
+"common.error" = "Lỗi";
+"common.unknown" = "Không xác định";
+
+/* MARK: - App */
+"app.name" = "Riptide";
+"app.tagline" = "Proxy Client Nhanh và An toàn";

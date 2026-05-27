@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ProxyMode: String, Equatable, Sendable {
+public enum ProxyMode: String, Equatable, Sendable, Codable {
     case rule
     case global
     case direct
@@ -208,5 +208,38 @@ public struct HealthCheckConfig: Codable, Sendable, Equatable {
         self.enable = enable
         self.url = url
         self.interval = interval
+    }
+}
+
+// MARK: - Rewrite Rule
+
+/// A URL rewrite / header modification rule, Surge-compatible format.
+public struct RewriteRule: Sendable, Equatable, Codable, Identifiable {
+    public let id: UUID
+    public let pattern: String       // regex pattern for URL matching
+    public let action: RewriteAction
+    public let enabled: Bool
+
+    public enum RewriteAction: Sendable, Equatable, Codable {
+        /// Reject the request (return 403 or empty response).
+        case reject
+        /// Redirect to a different URL.
+        case redirect(String)
+        /// Modify a request header.
+        case modifyHeader(String, String)       // key, value
+        /// Modify a response header.
+        case modifyResponseHeader(String, String) // key, value
+    }
+
+    public init(
+        id: UUID = UUID(),
+        pattern: String,
+        action: RewriteAction,
+        enabled: Bool = true
+    ) {
+        self.id = id
+        self.pattern = pattern
+        self.action = action
+        self.enabled = enabled
     }
 }

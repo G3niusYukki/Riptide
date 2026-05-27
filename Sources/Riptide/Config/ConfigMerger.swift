@@ -319,6 +319,7 @@ public struct ConfigMerger: Sendable {
                 primaryResolvers: basePolicy.primaryResolvers,
                 fallbackResolvers: basePolicy.fallbackResolvers,
                 domainPolicies: basePolicy.domainPolicies,
+                nameserverPolicies: basePolicy.nameserverPolicies,
                 respectRules: respectRules,
                 fakeIPEnabled: fakeIPEnabled,
                 fakeIPCIDR: fakeIPCIDR,

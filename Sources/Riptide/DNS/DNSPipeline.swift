@@ -15,6 +15,8 @@ public struct DNSConfig: Sendable {
     public let fakeIPCIDR: String
     public let cacheEnabled: Bool
     public let hosts: [String: String]
+    /// Per-domain nameserver routing policies (domain pattern → resolvers).
+    public let nameserverPolicies: [NameserverPolicyEntry]
 
     public init(
         remoteServers: [String] = ["8.8.8.8", "1.1.1.1"],
@@ -25,7 +27,8 @@ public struct DNSConfig: Sendable {
         mode: DNSQueryMode = .fakeIP,
         fakeIPCIDR: String = "198.18.0.0/16",
         cacheEnabled: Bool = true,
-        hosts: [String: String] = [:]
+        hosts: [String: String] = [:],
+        nameserverPolicies: [NameserverPolicyEntry] = []
     ) {
         self.remoteServers = remoteServers
         self.directServers = directServers
@@ -36,6 +39,7 @@ public struct DNSConfig: Sendable {
         self.fakeIPCIDR = fakeIPCIDR
         self.cacheEnabled = cacheEnabled
         self.hosts = hosts
+        self.nameserverPolicies = nameserverPolicies
     }
 }
 
@@ -79,7 +83,8 @@ public actor DNSPipeline {
             mode: mode,
             fakeIPCIDR: dnsPolicy.fakeIPCIDR,
             cacheEnabled: true,
-            hosts: dnsPolicy.hosts
+            hosts: dnsPolicy.hosts,
+            nameserverPolicies: dnsPolicy.nameserverPolicies
         )
         self.config = cfg
         self.cache = DNSCache()
@@ -108,8 +113,14 @@ public actor DNSPipeline {
             }
         }
 
-        let shouldUseRemote = await shouldResolveViaProxy(domain: domain)
-        let servers = shouldUseRemote ? config.remoteServers : config.directServers
+        // Check nameserver-policy: domain-specific resolver routing
+        var servers: [String]
+        if let policyResolvers = resolveNameserverPolicy(for: domain) {
+            servers = policyResolvers
+        } else {
+            let shouldUseRemote = await shouldResolveViaProxy(domain: domain)
+            servers = shouldUseRemote ? config.remoteServers : config.directServers
+        }
 
         var records: [DNSResourceRecord] = []
         var lastError: Error?
@@ -220,6 +231,33 @@ public actor DNSPipeline {
         let policy = await engine.resolve(target: target)
         if case .proxyNode = policy { return true }
         return false
+    }
+
+    /// Checks nameserver-policy entries for a matching domain pattern and returns
+    /// the corresponding resolver addresses, or nil if no policy matches.
+    private func resolveNameserverPolicy(for domain: String) -> [String]? {
+        for entry in config.nameserverPolicies {
+            if domainMatches(pattern: entry.domainPattern, domain: domain) {
+                return entry.resolvers.map { resolver in
+                    switch resolver.kind {
+                    case .doh: return resolver.dohURL ?? resolver.address
+                    default: return resolver.address
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Simple domain pattern matching. Supports exact match and wildcard prefix (`*.example.com`).
+    private func domainMatches(pattern: String, domain: String) -> Bool {
+        let lowerPattern = pattern.lowercased()
+        let lowerDomain = domain.lowercased()
+        if lowerPattern.hasPrefix("*.") {
+            let suffix = String(lowerPattern.dropFirst(2))
+            return lowerDomain.hasSuffix(suffix)
+        }
+        return lowerDomain.contains(lowerPattern) || lowerDomain == lowerPattern
     }
 
     /// Looks up a hosts entry for the given domain.

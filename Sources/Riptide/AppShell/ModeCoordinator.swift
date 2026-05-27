@@ -18,6 +18,7 @@ public actor ModeCoordinator {
     private var sleepWakeObserver: SleepWakeObserver?
     private let pathMonitor = NWPathMonitor()
     private var pathMonitorQueue: DispatchQueue?
+    private let environmentManager = NetworkEnvironmentManager()
 
     private let maxEvents = 100
 
@@ -230,20 +231,11 @@ public actor ModeCoordinator {
         }
     }
 
-    /// Gets active connections from the mihomo runtime.
-    public func getConnections() async -> [(id: String, host: String, network: String, proxy: String, upload: Int, download: Int)] {
+    /// Gets active connections from the mihomo runtime with full metadata
+    /// including rule hit info, timing, and 5-tuple addressing.
+    public func getConnections() async -> [ConnectionInfo] {
         do {
-            let connections = try await mihomoManager.getConnections()
-            return connections.map { conn in
-                (
-                    id: conn.id,
-                    host: conn.metadata.host ?? conn.metadata.destinationIP ?? "unknown",
-                    network: conn.metadata.network.uppercased(),
-                    proxy: conn.chains.last ?? "Direct",
-                    upload: conn.upload,
-                    download: conn.download
-                )
-            }
+            return try await mihomoManager.getConnections()
         } catch {
             return []
         }
@@ -447,6 +439,12 @@ public actor ModeCoordinator {
             Task { await self?.handleNetworkPathChange(path) }
         }
         pathMonitor.start(queue: queue)
+
+        // Also start SSID-based environment monitoring
+        Task { await environmentManager.setChangeHandler { [weak self] envProfile in
+            Task { await self?.handleEnvironmentChange(envProfile) }
+        }}
+        Task { await environmentManager.startMonitoring() }
     }
 
     /// Stops network path monitoring.
@@ -484,6 +482,33 @@ public actor ModeCoordinator {
             // Network is unavailable — emit degraded status
             emit(.degraded(activeMode, "network_unavailable"))
         }
+    }
+
+    /// Called when the WiFi SSID changes and a matching environment profile is found.
+    /// Automatically switches the proxy mode and optionally the active profile.
+    private func handleEnvironmentChange(_ profile: EnvironmentProfile) async {
+        guard await mihomoManager.isRunning else { return }
+
+        // Switch mode if different
+        let targetMode = profile.connectionMode
+        if targetMode != activeMode {
+            do {
+                guard let currentProfile = await mihomoManager.currentProfile else {
+                    emit(.degraded(activeMode, "env_switch_no_profile"))
+                    return
+                }
+                try await mihomoManager.start(mode: targetMode, profile: currentProfile)
+                activeMode = targetMode
+                emit(.modeChanged(targetMode))
+            } catch {
+                emit(.degraded(activeMode, "env_switch_failed: \(error.localizedDescription)"))
+                return
+            }
+        }
+
+        // Update proxy mode (rule/global/direct) if changed
+        // This is handled through the config layer
+        emit(.stateChanged(.running))
     }
 
     /// Resolves the system proxy controller, using the injected one or creating a default.

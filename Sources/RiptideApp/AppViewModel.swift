@@ -44,10 +44,12 @@ public struct SubscriptionDisplay: Identifiable, Equatable {
     public let lastUpdated: Date?
     public let lastError: String?
     public let profileCount: Int
+    public let userinfo: SubscriptionUserinfo?
 
     public init(
         id: UUID, name: String, url: String, autoUpdate: Bool,
-        lastUpdated: Date?, lastError: String?, profileCount: Int = 0
+        lastUpdated: Date?, lastError: String?, profileCount: Int = 0,
+        userinfo: SubscriptionUserinfo? = nil
     ) {
         self.id = id
         self.name = name
@@ -56,6 +58,7 @@ public struct SubscriptionDisplay: Identifiable, Equatable {
         self.lastUpdated = lastUpdated
         self.lastError = lastError
         self.profileCount = profileCount
+        self.userinfo = userinfo
     }
 }
 
@@ -111,9 +114,28 @@ public struct ConnectionInfo: Identifiable {
     public let proxyName: String
     public let connectionCount: Int
 
+    // Detail fields for connection detail panel
+    public let sourceIP: String?
+    public let sourcePort: String?
+    public let destinationIP: String?
+    public let destinationPort: String?
+    public let matchedRule: String?
+    public let rulePayload: String?
+    public let chain: [String]
+    public let startTime: String?
+    public let uploadBytes: Int
+    public let downloadBytes: Int
+    public let networkType: String?
+
     public init(
         id: UUID, backendId: String, host: String, port: Int,
-        protocol: String, proxyName: String, connectionCount: Int
+        protocol: String, proxyName: String, connectionCount: Int,
+        sourceIP: String? = nil, sourcePort: String? = nil,
+        destinationIP: String? = nil, destinationPort: String? = nil,
+        matchedRule: String? = nil, rulePayload: String? = nil,
+        chain: [String] = [], startTime: String? = nil,
+        uploadBytes: Int = 0, downloadBytes: Int = 0,
+        networkType: String? = nil
     ) {
         self.id = id
         self.backendId = backendId
@@ -122,6 +144,17 @@ public struct ConnectionInfo: Identifiable {
         self.protocol = `protocol`
         self.proxyName = proxyName
         self.connectionCount = connectionCount
+        self.sourceIP = sourceIP
+        self.sourcePort = sourcePort
+        self.destinationIP = destinationIP
+        self.destinationPort = destinationPort
+        self.matchedRule = matchedRule
+        self.rulePayload = rulePayload
+        self.chain = chain
+        self.startTime = startTime
+        self.uploadBytes = uploadBytes
+        self.downloadBytes = downloadBytes
+        self.networkType = networkType
     }
 }
 
@@ -602,7 +635,8 @@ public final class AppViewModel: @unchecked Sendable {
                 return SubscriptionDisplay(
                     id: sub.id, name: sub.name, url: sub.url,
                     autoUpdate: sub.autoUpdate, lastUpdated: sub.lastUpdated,
-                    lastError: sub.lastError, profileCount: profileCount
+                    lastError: sub.lastError, profileCount: profileCount,
+                    userinfo: sub.userinfo
                 )
             }
         }
@@ -921,16 +955,28 @@ public final class AppViewModel: @unchecked Sendable {
             totalTrafficUp += traffic.up
             totalTrafficDown += traffic.down
 
-            // Map connection tuples to ConnectionInfo
+            // Map enriched backend ConnectionInfo to app-level ConnectionInfo
             let mapped = connections.map { conn in
-                ConnectionInfo(
+                let meta = conn.metadata
+                return ConnectionInfo(
                     id: UUID(uuidString: conn.id) ?? UUID(),
-                    backendId: conn.id,  // Store raw backend ID for close operations
-                    host: conn.host,
-                    port: 0,
-                    protocol: conn.network,
-                    proxyName: conn.proxy,
-                    connectionCount: 1
+                    backendId: conn.id,
+                    host: meta.host ?? meta.destinationIP ?? "unknown",
+                    port: Int(meta.destinationPort ?? "") ?? 0,
+                    protocol: meta.network.uppercased(),
+                    proxyName: conn.chains.last ?? "Direct",
+                    connectionCount: 1,
+                    sourceIP: meta.sourceIP,
+                    sourcePort: meta.sourcePort,
+                    destinationIP: meta.destinationIP,
+                    destinationPort: meta.destinationPort,
+                    matchedRule: conn.rule,
+                    rulePayload: conn.rulePayload,
+                    chain: conn.chains,
+                    startTime: conn.start,
+                    uploadBytes: conn.upload,
+                    downloadBytes: conn.download,
+                    networkType: meta.type
                 )
             }
             activeConnections = mapped

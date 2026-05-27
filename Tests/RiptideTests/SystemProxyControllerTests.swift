@@ -333,8 +333,8 @@ struct ModeCoordinatorMihomoTests {
         try await coordinator.start(mode: .systemProxy, profile: profile)
         let connectionList = await coordinator.getConnections()
         #expect(connectionList.count == 2)
-        #expect(connectionList[0].host == "example.com")
-        #expect(connectionList[1].host == "test.com")
+        #expect(connectionList[0].metadata.host == "example.com")
+        #expect(connectionList[1].metadata.host == "test.com")
     }
 
     @Test("mode coordinator returns zero connections when not running")

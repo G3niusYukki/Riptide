@@ -33,14 +33,22 @@ public struct ConnectionMetadata: Codable, Sendable {
     public let network: String
     public let type: String
     public let sourceIP: String
+    public let sourcePort: String?
     public let destinationIP: String?
+    public let destinationPort: String?
     public let host: String?
 
-    public init(network: String, type: String, sourceIP: String, destinationIP: String? = nil, host: String? = nil) {
+    public init(
+        network: String, type: String, sourceIP: String,
+        sourcePort: String? = nil, destinationIP: String? = nil,
+        destinationPort: String? = nil, host: String? = nil
+    ) {
         self.network = network
         self.type = type
         self.sourceIP = sourceIP
+        self.sourcePort = sourcePort
         self.destinationIP = destinationIP
+        self.destinationPort = destinationPort
         self.host = host
     }
 
@@ -48,7 +56,9 @@ public struct ConnectionMetadata: Codable, Sendable {
         case network
         case type
         case sourceIP = "sourceIP"
+        case sourcePort = "sourcePort"
         case destinationIP = "destinationIP"
+        case destinationPort = "destinationPort"
         case host
     }
 }
@@ -59,13 +69,23 @@ public struct ConnectionInfo: Codable, Sendable {
     public let metadata: ConnectionMetadata
     public let upload: Int
     public let download: Int
+    public let start: String?
+    public let rule: String?
+    public let rulePayload: String?
     public let chains: [String]
 
-    public init(id: String, metadata: ConnectionMetadata, upload: Int, download: Int, chains: [String] = []) {
+    public init(
+        id: String, metadata: ConnectionMetadata, upload: Int, download: Int,
+        start: String? = nil, rule: String? = nil, rulePayload: String? = nil,
+        chains: [String] = []
+    ) {
         self.id = id
         self.metadata = metadata
         self.upload = upload
         self.download = download
+        self.start = start
+        self.rule = rule
+        self.rulePayload = rulePayload
         self.chains = chains
     }
 }

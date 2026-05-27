@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-591%20listed-blue" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-505%20passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status" />
@@ -65,19 +65,28 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 
 ### App GUI
 
+- **Dashboard** — at-a-glance status cards (mode / node / speed), subscription quota bar with expiry countdown, recent connections, one-click diagnostics button
 - Config import (file picker / drag-and-drop / subscription URL) with **import preview**
 - **Node editor** with real-time validation, protocol-specific fields, add/edit/delete/duplicate
 - **Rule editor** with drag-to-reorder, 10 rule types, policy picker
 - **Config merge UI** — add merge sources (file/manual), preview diffs, one-click apply
-- **Config backup/restore** — automatic backup on profile switch, manual backup, restore from history
+- **Config backup/restore** — automatic backup on profile switch, manual backup, restore from history (20-backup rotation)
 - **Rule set auto-update** — periodic refresh of remote rule sets with status display
 - Proxy group cards with latency testing and one-click switching
-- Real-time traffic monitor and connection list
+- Real-time traffic chart (Swift Charts, 60s/10m/1h) and connection list with **expandable detail panel** (5-tuple, rule hit tracing, proxy chain, timing)
 - Log viewer with level filter, search, and export
 - Menu bar extra with status icon and traffic speed
-- MITM 🟡 (experimental — host matching, CA/per-host certificates, CONNECT TLS termination/re-encryption, and HTTP/1.x flow logging UI are wired; flow modification is not yet implemented)
-- Theme: System / Light / Dark
+- **Subscription quota** — parse `subscription-userinfo` header, display traffic bar + expiry countdown in dashboard
+- **Nameserver-policy** — per-domain DNS routing (e.g. `geosite:cn` → domestic DNS, default → DoH)
+- **HTTP Rewrite engine** — URL regex reject/redirect/header-modify rules (Surge-compatible format)
+- **One-click diagnostics** — 6 checks: helper, core binary, connectivity, DNS, proxy ports, config integrity
+- **Sparkle auto-update** — Cmd+Shift+U or settings panel, stable/beta channels
+- **Network environment auto-switch** — detect WiFi SSID changes, auto-switch proxy mode + profile
+- MITM 🟡 (experimental — CA generation/install, per-host certificates, CONNECT TLS termination/re-encryption, host whitelist UI, interception log)
+- **Theme** — System / Light / Dark with segmented picker in Settings
+- **10 languages** — en / zh-Hans / ja / ru / es / ko / fa / pt-BR / vi + system auto-detect
 - Global hotkeys
+- **Apple Shortcuts** — SwitchProxyMode + SelectProfile Intents (Shortcuts.app discoverable)
 - **4 languages**: English · 简体中文 · 日本語 · Русский
 
 ### Infrastructure

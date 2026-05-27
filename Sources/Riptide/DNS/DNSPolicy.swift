@@ -62,6 +62,21 @@ public struct DNSDomainPolicy: Sendable, Equatable, Codable {
     }
 }
 
+/// Maps domain patterns to specific resolver lists, used for split-DNS routing.
+///
+/// Clash YAML format: `nameserver-policy` section.
+public struct NameserverPolicyEntry: Sendable, Equatable, Codable {
+    /// Domain pattern (e.g. "geosite:cn", "company.com", "*.example.com").
+    public let domainPattern: String
+    /// Resolvers to use when the domain matches this pattern.
+    public let resolvers: [DNSResolverEndpoint]
+
+    public init(domainPattern: String, resolvers: [DNSResolverEndpoint]) {
+        self.domainPattern = domainPattern
+        self.resolvers = resolvers
+    }
+}
+
 /// DNS policy describing how to resolve queries.
 public struct DNSPolicy: Sendable, Equatable, Codable {
     /// Nameservers used for normal resolution.
@@ -70,6 +85,9 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
     public let fallbackResolvers: [DNSResolverEndpoint]
     /// Per-domain policy overrides.
     public let domainPolicies: [DNSDomainPolicy]
+    /// Per-domain nameserver routing (used for split-DNS). Domains matching a pattern
+    /// are resolved using the specified resolvers instead of `primaryResolvers`.
+    public let nameserverPolicies: [NameserverPolicyEntry]
     /// If true, consult rule engine routing policy for DNS lookups.
     public let respectRules: Bool
     /// Fake-IP mode enabled.
@@ -83,6 +101,7 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
         primaryResolvers: [DNSResolverEndpoint] = [],
         fallbackResolvers: [DNSResolverEndpoint] = [],
         domainPolicies: [DNSDomainPolicy] = [],
+        nameserverPolicies: [NameserverPolicyEntry] = [],
         respectRules: Bool = false,
         fakeIPEnabled: Bool = true,
         fakeIPCIDR: String = "198.18.0.0/16",
@@ -91,10 +110,41 @@ public struct DNSPolicy: Sendable, Equatable, Codable {
         self.primaryResolvers = primaryResolvers
         self.fallbackResolvers = fallbackResolvers
         self.domainPolicies = domainPolicies
+        self.nameserverPolicies = nameserverPolicies
         self.respectRules = respectRules
         self.fakeIPEnabled = fakeIPEnabled
         self.fakeIPCIDR = fakeIPCIDR
         self.hosts = hosts
+    }
+
+    /// Finds the matching nameserver-policy entry for a given domain.
+    /// Returns the resolvers to use, or nil to use the default primary resolvers.
+    public func matchingNameserverPolicy(for domain: String) -> [DNSResolverEndpoint]? {
+        for entry in nameserverPolicies {
+            if domainMatches(pattern: entry.domainPattern, domain: domain) {
+                return entry.resolvers
+            }
+        }
+        return nil
+    }
+
+    /// Simple domain pattern matching. Supports:
+    /// - Exact match: `example.com`
+    /// - Wildcard prefix: `*.example.com`
+    /// - Suffix match: `company.com` matches `mail.company.com`
+    private func domainMatches(pattern: String, domain: String) -> Bool {
+        let lowerPattern = pattern.lowercased()
+        let lowerDomain = domain.lowercased()
+
+        if lowerPattern.hasPrefix("*.") {
+            let suffix = String(lowerPattern.dropFirst(2))
+            return lowerDomain.hasSuffix(suffix)
+        }
+        // Substring match: "company.com" in "mail.company.com"
+        if lowerDomain.contains(lowerPattern) {
+            return true
+        }
+        return lowerDomain == lowerPattern
     }
 
     /// Default DNS policy with public resolvers.

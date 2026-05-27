@@ -7,11 +7,18 @@ public struct SubscriptionUpdate: Sendable {
     public let nodes: [ProxyNode]
     public let updatedAt: Date
     public let source: URL
+    public let userinfo: SubscriptionUserinfo?
 
-    public init(nodes: [ProxyNode], updatedAt: Date = Date(), source: URL) {
+    public init(
+        nodes: [ProxyNode],
+        updatedAt: Date = Date(),
+        source: URL,
+        userinfo: SubscriptionUserinfo? = nil
+    ) {
         self.nodes = nodes
         self.updatedAt = updatedAt
         self.source = source
+        self.userinfo = userinfo
     }
 }
 
@@ -35,6 +42,7 @@ public struct Subscription: Identifiable, Codable, Sendable, Equatable {
     public var updateInterval: TimeInterval  // in seconds, default 1 hour
     public var lastUpdated: Date?
     public var lastError: String?
+    public var userinfo: SubscriptionUserinfo?
 
     public init(
         id: UUID = UUID(),
@@ -43,7 +51,8 @@ public struct Subscription: Identifiable, Codable, Sendable, Equatable {
         autoUpdate: Bool = true,
         updateInterval: TimeInterval = 3600,
         lastUpdated: Date? = nil,
-        lastError: String? = nil
+        lastError: String? = nil,
+        userinfo: SubscriptionUserinfo? = nil
     ) {
         self.id = id
         self.name = name
@@ -52,6 +61,7 @@ public struct Subscription: Identifiable, Codable, Sendable, Equatable {
         self.updateInterval = updateInterval
         self.lastUpdated = lastUpdated
         self.lastError = lastError
+        self.userinfo = userinfo
     }
 
     /// Calculates the next update time based on last update and interval
@@ -159,10 +169,13 @@ public actor SubscriptionManager {
     }
 
     /// Records a successful update
-    public func recordUpdateSuccess(id: UUID) {
+    public func recordUpdateSuccess(id: UUID, userinfo: SubscriptionUserinfo? = nil) {
         guard var subscription = subscriptions[id] else { return }
         subscription.lastUpdated = Date()
         subscription.lastError = nil
+        if let userinfo = userinfo {
+            subscription.userinfo = userinfo
+        }
         subscriptions[id] = subscription
         Task {
             await saveSubscriptions()
@@ -207,6 +220,9 @@ public actor SubscriptionManager {
             throw SubscriptionError.fetchFailed("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
         }
 
+        // Extract subscription userinfo header (quota / expiry)
+        let userinfo = SubscriptionUserinfoParser.extract(from: httpResponse)
+
         let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? ""
         let nodes: [ProxyNode]
 
@@ -224,7 +240,7 @@ public actor SubscriptionManager {
 
         guard !nodes.isEmpty else { throw SubscriptionError.noNodes }
 
-        return SubscriptionUpdate(nodes: nodes, source: url)
+        return SubscriptionUpdate(nodes: nodes, source: url, userinfo: userinfo)
     }
 
     /// Updates a subscription by fetching fresh data
@@ -239,7 +255,7 @@ public actor SubscriptionManager {
 
         do {
             let update = try await fetchSubscription(url: url)
-            await recordUpdateSuccess(id: id)
+            await recordUpdateSuccess(id: id, userinfo: update.userinfo)
             return .success(proxies: update.nodes)
         } catch let error as SubscriptionError {
             let errorMessage = String(describing: error)

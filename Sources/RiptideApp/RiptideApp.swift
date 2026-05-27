@@ -1,12 +1,22 @@
 import SwiftUI
 import AppKit
 import Riptide
+import Sparkle
 
 // Shared coordinator — holds the main window reference for the entire app
 @MainActor
 final class AppCoordinator {
     static let shared = AppCoordinator()
     var mainWindow: NSWindow?
+
+    /// Sparkle updater controller — initialized once, shared across the app.
+    lazy var updaterController: SPUStandardUpdaterController = {
+        SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }()
 
     private init() {}
 }
@@ -15,13 +25,14 @@ final class AppCoordinator {
 struct RiptideApp: App {
     @State private var appVM = AppViewModel()
     @State private var statusBar: StatusBarController?
+    @StateObject private var themeManager = ThemeManager()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some SwiftUI.Scene {
         WindowGroup {
             if hasCompletedOnboarding {
-                MainTabView(vm: appVM)
-                    .preferredColorScheme(.dark)
+                MainTabView(vm: appVM, themeManager: themeManager)
+                    .preferredColorScheme(colorScheme)
                     .frame(minWidth: 800, minHeight: 500)
                     .onAppear {
                         guard self.statusBar == nil else { return }
@@ -51,5 +62,21 @@ struct RiptideApp: App {
             }
         }
         .defaultSize(width: 900, height: 600)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("检查更新…") {
+                    AppCoordinator.shared.updaterController.checkForUpdates(nil)
+                }
+                .keyboardShortcut("u", modifiers: [.command, .shift])
+            }
+        }
+    }
+
+    private var colorScheme: ColorScheme? {
+        switch themeManager.appearanceMode {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
     }
 }

@@ -5,6 +5,7 @@ struct ConnectionListView: View {
     @Bindable var vm: AppViewModel
     @State private var searchText = ""
     @State private var isClosingAll = false
+    @State private var expandedConnectionId: UUID?
 
     private var filteredConnections: [ConnectionInfo] {
         guard !searchText.isEmpty else { return vm.activeConnections }
@@ -50,18 +51,39 @@ struct ConnectionListView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
             } else {
-                // Connection list
+                // Connection list with expandable detail
                 ScrollView {
                     LazyVStack(spacing: 4) {
                         ForEach(filteredConnections) { conn in
-                            ConnectionRow(conn: conn) {
-                                Task { await vm.closeConnection(id: conn.backendId) }
+                            ConnectionRow(
+                                conn: conn,
+                                isExpanded: expandedConnectionId == conn.id,
+                                onClose: {
+                                    Task { await vm.closeConnection(id: conn.backendId) }
+                                }
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if expandedConnectionId == conn.id {
+                                        expandedConnectionId = nil
+                                    } else {
+                                        expandedConnectionId = conn.id
+                                    }
+                                }
+                            }
+
+                            if expandedConnectionId == conn.id {
+                                ConnectionDetailView(conn: conn) {
+                                    Task { await vm.closeConnection(id: conn.backendId) }
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
                     }
                     .padding(.horizontal)
                 }
-                .frame(maxHeight: 300)
+                .frame(maxHeight: 400)
             }
         }
         .padding()
@@ -71,9 +93,10 @@ struct ConnectionListView: View {
     }
 }
 
-/// A single connection row.
+/// A single connection row with tap-to-expand support.
 struct ConnectionRow: View {
     let conn: ConnectionInfo
+    let isExpanded: Bool
     let onClose: () -> Void
     @State private var isHovered = false
 
@@ -84,6 +107,12 @@ struct ConnectionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            // Expand chevron indicator
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption)
+                .foregroundStyle(Theme.subtext)
+                .frame(width: 10)
+
             // Protocol badge
             Text(conn.`protocol`)
                 .font(.system(.caption, design: .monospaced))
@@ -107,8 +136,8 @@ struct ConnectionRow: View {
                 .font(.caption)
                 .foregroundStyle(proxyColor)
 
-            // Close button
-            if isHovered {
+            // Close button — always visible on expanded, hover for collapsed
+            if isHovered || isExpanded {
                 Button {
                     onClose()
                 } label: {
@@ -120,7 +149,7 @@ struct ConnectionRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(isHovered ? Color.white.opacity(0.05) : Color.clear)
+        .background(isExpanded ? Theme.accent.opacity(0.08) : (isHovered ? Color.white.opacity(0.05) : Color.clear))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
