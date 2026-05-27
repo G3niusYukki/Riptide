@@ -62,6 +62,9 @@ jobs:
       - name: Download mihomo binary
         run: ./Scripts/download-mihomo.sh
 
+      - name: Swift version
+        run: swift --version
+
       - name: Build
         run: swift build
 
