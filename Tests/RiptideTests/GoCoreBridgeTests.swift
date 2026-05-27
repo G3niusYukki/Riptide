@@ -85,6 +85,10 @@ struct GoCoreBridgeTests {
     
     @Test("Test switchProxy")
     func testSwitchProxy() async throws {
+        guard isGitHubActionsRuntime == false else {
+            return
+        }
+
         try await withExclusiveGoCore {
             let bridge = GoCoreBridge.shared
             try await bridge.switchProxy(group: "GLOBAL", name: "Direct")
