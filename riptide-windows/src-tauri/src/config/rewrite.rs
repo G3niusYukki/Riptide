@@ -17,15 +17,18 @@ pub struct RewriteRule {
     pub enabled: bool,
 }
 
+/// Flat action type — avoids serde enum serialization complexity.
+/// Matches the TypeScript `RewriteAction` type 1:1.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum RewriteAction {
-    Reject,
-    Redirect(String),
-    #[serde(rename = "ModifyHeader")]
-    ModifyHeader { key: String, value: String },
-    #[serde(rename = "ModifyResponseHeader")]
-    ModifyResponseHeader { key: String, value: String },
+pub struct RewriteAction {
+    /// "Reject" | "Redirect" | "ModifyHeader" | "ModifyResponseHeader"
+    pub action_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header_value: Option<String>,
 }
 
 fn path() -> PathBuf {

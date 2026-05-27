@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Save, Plus, Trash2, Power } from 'lucide-react';
 import * as tauri from '../../services/tauri';
-import type { RewriteRule, RewriteAction } from '../../types';
+import type { RewriteRule } from '../../types';
 
 export function RewriteTab() {
   const [rules, setRules] = useState<RewriteRule[]>([]);
@@ -52,20 +52,12 @@ export function RewriteTab() {
   const addRule = async () => {
     if (!newPattern.trim()) return;
 
-    let action: RewriteAction;
-    switch (newActionType) {
-      case 'Redirect':
-        action = { type: 'Redirect', value: newRedirectUrl };
-        break;
-      case 'ModifyHeader':
-        action = { type: 'ModifyHeader', key: newHeaderKey, value: newHeaderValue };
-        break;
-      case 'ModifyResponseHeader':
-        action = { type: 'ModifyResponseHeader', key: newHeaderKey, value: newHeaderValue };
-        break;
-      default:
-        action = { type: 'Reject' };
-    }
+    const action = {
+      action_type: newActionType as 'Reject' | 'Redirect' | 'ModifyHeader' | 'ModifyResponseHeader',
+      target: newActionType === 'Redirect' ? newRedirectUrl : undefined,
+      header_key: (newActionType === 'ModifyHeader' || newActionType === 'ModifyResponseHeader') ? newHeaderKey : undefined,
+      header_value: (newActionType === 'ModifyHeader' || newActionType === 'ModifyResponseHeader') ? newHeaderValue : undefined,
+    };
 
     const rule: RewriteRule = {
       id: crypto.randomUUID(),
@@ -87,17 +79,17 @@ export function RewriteTab() {
     }
   };
 
-  const actionLabel = (action: RewriteAction): string => {
-    switch (action.type) {
+  const actionLabel = (action: RewriteRule['action']): string => {
+    switch (action.action_type) {
       case 'Reject': return '拦截';
-      case 'Redirect': return `重定向 → ${action.value}`;
-      case 'ModifyHeader': return `修改请求头 ${action.key}=${action.value}`;
-      case 'ModifyResponseHeader': return `修改响应头 ${action.key}=${action.value}`;
+      case 'Redirect': return `重定向 → ${action.target || ''}`;
+      case 'ModifyHeader': return `修改请求头 ${action.header_key || ''}=${action.header_value || ''}`;
+      case 'ModifyResponseHeader': return `修改响应头 ${action.header_key || ''}=${action.header_value || ''}`;
     }
   };
 
-  const actionColor = (action: RewriteAction): string => {
-    switch (action.type) {
+  const actionColor = (action: RewriteRule['action']): string => {
+    switch (action.action_type) {
       case 'Reject': return 'text-red-400 bg-red-500/10';
       case 'Redirect': return 'text-amber-400 bg-amber-500/10';
       default: return 'text-blue-400 bg-blue-500/10';

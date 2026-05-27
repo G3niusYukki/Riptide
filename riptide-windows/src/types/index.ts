@@ -140,8 +140,9 @@ export interface RewriteRule {
   enabled: boolean;
 }
 
-export type RewriteAction =
-  | { type: 'Reject' }
-  | { type: 'Redirect'; value: string }
-  | { type: 'ModifyHeader'; key: string; value: string }
-  | { type: 'ModifyResponseHeader'; key: string; value: string };
+export interface RewriteAction {
+  action_type: 'Reject' | 'Redirect' | 'ModifyHeader' | 'ModifyResponseHeader';
+  target?: string;
+  header_key?: string;
+  header_value?: string;
+}
