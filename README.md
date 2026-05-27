@@ -43,7 +43,7 @@ This gives you:
 
 ### Proxy Protocols
 
-Shadowsocks AEAD ✅ · VMess 🟡 (no AEAD header auth) · VLESS (XTLS/Vision) ✅ · VLESS Reality ✅ · Trojan ✅ · Hysteria2 🟡 (QUIC required, TCP fallback) · TUIC 🟡 (experimental, single-stream) · WireGuard 🔧 (via mihomo) · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅
+Shadowsocks AEAD ✅ · VMess 🔧 (via mihomo — native impl incomplete) · VLESS (XTLS/Vision) ✅ · VLESS Reality ✅ · Trojan ✅ · Hysteria2 🟡 (QUIC required, TCP fallback) · TUIC 🟡 (experimental, single-stream) · WireGuard 🔧 (via mihomo) · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅
 
 ### Transport
 
