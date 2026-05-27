@@ -1,0 +1,10 @@
+{
+  "app": { "title": "Riptide", "overview": "Visão Geral", "proxies": "Proxies", "profiles": "Perfis", "rules": "Regras", "connections": "Conexões", "logs": "Logs", "settings": "Configurações" },
+  "dashboard": { "running": "Em execução", "stopped": "Parado", "status": "Status", "currentConfig": "Config Atual", "downloadSpeed": "Download", "uploadSpeed": "Upload", "total": "Total", "realtimeTraffic": "Tráfego em Tempo Real", "startToView": "Inicie o proxy para ver o tráfego", "loading": "Carregando...", "loadFailed": "Falha ao carregar tráfego", "waitingData": "Aguardando dados..." },
+  "proxies": { "title": "Nós Proxy", "startToView": "Inicie o proxy para ver os nós", "loadFailed": "Falha ao carregar proxies", "testAll": "Testar Latência", "testing": "Testando...", "testDelay": "Testar", "current": "Atual", "noGroups": "Sem grupos", "noProxies": "Sem nós", "allProxies": "Todos os Nós" },
+  "profiles": { "title": "Perfis", "importUrl": "Importar URL", "importShare": "Link Compartilhado", "newProfile": "Novo Perfil", "create": "Criar", "import": "Importar", "cancel": "Cancelar", "activate": "Ativar", "delete": "Excluir", "updated": "Atualizado", "editTitle": "Editar Perfil", "save": "Salvar", "saving": "Salvando..." },
+  "connections": { "title": "Conexões", "startToView": "Inicie o proxy para ver conexões", "loadFailed": "Falha ao carregar conexões", "activeConnections": "conexões ativas", "closeAll": "Fechar Todas", "noConnections": "Sem conexões ativas", "target": "Destino", "chain": "Cadeia", "upload": "Upload", "download": "Download", "duration": "Duração", "action": "Ação" },
+  "rules": { "title": "Regras", "type": "Tipo", "value": "Valor", "policy": "Política", "noRules": "Sem regras" },
+  "logs": { "title": "Logs", "noLogs": "Sem logs", "clear": "Limpar", "export": "Exportar" },
+  "settings": { "title": "Configurações", "network": "Rede", "dns": "DNS", "sync": "Sincronização", "assets": "Recursos", "recovery": "Recuperação", "about": "Sobre", "diagnostics": "Diagnóstico", "theme": "Tema", "language": "Idioma", "checkUpdate": "Verificar Atualização", "version": "Versão" }
+}

@@ -1,0 +1,10 @@
+{
+  "app": { "title": "Riptide", "overview": "개요", "proxies": "프록시", "profiles": "프로필", "rules": "규칙", "connections": "연결", "logs": "로그", "settings": "설정" },
+  "dashboard": { "running": "실행 중", "stopped": "중지됨", "status": "상태", "currentConfig": "현재 설정", "downloadSpeed": "다운로드", "uploadSpeed": "업로드", "total": "합계", "realtimeTraffic": "실시간 트래픽", "startToView": "프록시를 시작하면 트래픽이 표시됩니다", "loading": "로딩 중...", "loadFailed": "트래픽 데이터 로드 실패", "waitingData": "데이터 대기 중..." },
+  "proxies": { "title": "프록시 노드", "startToView": "프록시를 시작하면 노드가 표시됩니다", "loadFailed": "프록시 데이터 로드 실패", "testAll": "전체 지연 테스트", "testing": "테스트 중...", "testDelay": "지연 테스트", "current": "현재", "noGroups": "프록시 그룹 없음", "noProxies": "프록시 노드 없음", "allProxies": "전체 노드" },
+  "profiles": { "title": "프로필", "importUrl": "URL에서 가져오기", "importShare": "공유 링크", "newProfile": "새 프로필", "create": "만들기", "import": "가져오기", "cancel": "취소", "activate": "활성화", "delete": "삭제", "updated": "업데이트", "editTitle": "프로필 편집", "save": "저장", "saving": "저장 중..." },
+  "connections": { "title": "연결 목록", "startToView": "프록시를 시작하면 연결이 표시됩니다", "loadFailed": "연결 데이터 로드 실패", "activeConnections": "활성 연결", "closeAll": "전체 닫기", "noConnections": "활성 연결 없음", "target": "대상", "chain": "체인", "upload": "업로드", "download": "다운로드", "duration": "지속 시간", "action": "작업" },
+  "rules": { "title": "규칙 목록", "type": "유형", "value": "값", "policy": "정책", "noRules": "규칙 없음" },
+  "logs": { "title": "로그", "noLogs": "로그 없음", "clear": "지우기", "export": "내보내기" },
+  "settings": { "title": "설정", "network": "네트워크", "dns": "DNS", "sync": "동기화", "assets": "자산", "recovery": "복구", "about": "정보", "diagnostics": "진단", "theme": "테마", "language": "언어", "checkUpdate": "업데이트 확인", "version": "버전" }
+}

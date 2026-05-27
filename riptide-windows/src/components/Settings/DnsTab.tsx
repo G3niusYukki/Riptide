@@ -84,6 +84,28 @@ export function DnsTab() {
         </div>
 
         <div className="mt-4">
+          <label className="block text-xs text-slate-400 mb-1.5">
+            域名分流 DNS (nameserver-policy)
+            <span className="text-slate-600 ml-1">每行: domain=resolver</span>
+          </label>
+          <textarea
+            rows={4}
+            value={Object.entries(policy.nameserver_policy || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
+            onChange={(e) => {
+              const entries: Record<string, string> = {};
+              e.target.value.split('\n').forEach(line => {
+                const eq = line.indexOf('=');
+                if (eq > 0) entries[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+              });
+              update('nameserver_policy', entries);
+            }}
+            disabled={!policy.enable_override}
+            placeholder="geosite:cn=114.114.114.114&#10;geosite:gfw=https://1.1.1.1/dns-query&#10;*.company.com=tls://8.8.8.8"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50"
+          />
+        </div>
+
+        <div className="mt-4">
           <label className="block text-xs text-slate-400 mb-1.5">主 DNS（每行一个 DoH/DoT/DoQ URL）</label>
           <textarea
             rows={3}

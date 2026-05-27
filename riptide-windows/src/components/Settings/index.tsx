@@ -10,7 +10,7 @@ import { SUPPORTED_LANGUAGES } from '../../i18n';
 import i18n from '../../i18n';
 import * as tauri from '../../services/tauri';
 
-type Tab = 'network' | 'dns' | 'sync' | 'assets' | 'recovery' | 'about';
+type Tab = 'network' | 'dns' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'about';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -31,6 +31,7 @@ export function SettingsPage() {
     { id: 'sync', label: '同步' },
     { id: 'assets', label: '资源' },
     { id: 'recovery', label: '恢复' },
+    { id: 'diagnostics', label: '诊断' },
     { id: 'about', label: '关于' },
   ];
 
@@ -59,6 +60,7 @@ export function SettingsPage() {
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
+      {active === 'diagnostics' && <RecoveryTab showDiagnostics />}
       {active === 'about' && (
         <div className="space-y-3">
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">

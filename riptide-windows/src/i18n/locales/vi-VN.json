@@ -1,0 +1,10 @@
+{
+  "app": { "title": "Riptide", "overview": "Tổng quan", "proxies": "Proxy", "profiles": "Hồ sơ", "rules": "Quy tắc", "connections": "Kết nối", "logs": "Nhật ký", "settings": "Cài đặt" },
+  "dashboard": { "running": "Đang chạy", "stopped": "Đã dừng", "status": "Trạng thái", "currentConfig": "Cấu hình", "downloadSpeed": "Tải xuống", "uploadSpeed": "Tải lên", "total": "Tổng", "realtimeTraffic": "Lưu lượng", "startToView": "Khởi động proxy để xem lưu lượng", "loading": "Đang tải...", "loadFailed": "Tải dữ liệu thất bại", "waitingData": "Đang chờ dữ liệu..." },
+  "proxies": { "title": "Nút Proxy", "startToView": "Khởi động proxy để xem nút", "loadFailed": "Tải proxy thất bại", "testAll": "Kiểm tra độ trễ", "testing": "Đang kiểm tra...", "testDelay": "Kiểm tra", "current": "Hiện tại", "noGroups": "Không có nhóm", "noProxies": "Không có nút", "allProxies": "Tất cả nút" },
+  "profiles": { "title": "Hồ sơ", "importUrl": "Nhập URL", "importShare": "Liên kết", "newProfile": "Hồ sơ mới", "create": "Tạo", "import": "Nhập", "cancel": "Hủy", "activate": "Kích hoạt", "delete": "Xóa", "updated": "Đã cập nhật", "editTitle": "Sửa hồ sơ", "save": "Lưu", "saving": "Đang lưu..." },
+  "connections": { "title": "Kết nối", "startToView": "Khởi động proxy để xem kết nối", "loadFailed": "Tải kết nối thất bại", "activeConnections": "kết nối", "closeAll": "Đóng tất cả", "noConnections": "Không có kết nối", "target": "Mục tiêu", "chain": "Chuỗi", "upload": "Tải lên", "download": "Tải xuống", "duration": "Thời gian", "action": "Thao tác" },
+  "rules": { "title": "Quy tắc", "type": "Loại", "value": "Giá trị", "policy": "Chính sách", "noRules": "Không có quy tắc" },
+  "logs": { "title": "Nhật ký", "noLogs": "Không có nhật ký", "clear": "Xóa", "export": "Xuất" },
+  "settings": { "title": "Cài đặt", "network": "Mạng", "dns": "DNS", "sync": "Đồng bộ", "assets": "Tài nguyên", "recovery": "Phục hồi", "about": "Giới thiệu", "diagnostics": "Chẩn đoán", "theme": "Giao diện", "language": "Ngôn ngữ", "checkUpdate": "Kiểm tra cập nhật", "version": "Phiên bản" }
+}

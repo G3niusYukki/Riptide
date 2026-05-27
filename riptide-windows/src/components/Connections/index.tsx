@@ -1,14 +1,16 @@
 import { useConnections, useCloseConnection, useCloseAllConnections } from '../../hooks/useConnections';
 import { useRiptideStore } from '../../stores/riptide';
-import { Zap, X, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
+import { Zap, X, ArrowDown, ArrowUp, Loader2, ChevronDown, ChevronRight, Clock, Link, Target } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { useState } from 'react';
 
 export function Connections() {
   const { isRunning } = useRiptideStore();
   const { data: connections = [], isLoading, isError } = useConnections();
   const { mutate: closeConnection } = useCloseConnection();
   const { mutate: closeAllConnections } = useCloseAllConnections();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -98,43 +100,96 @@ export function Connections() {
           </div>
           
           <div className="divide-y divide-slate-800 max-h-[calc(100vh-280px)] overflow-y-auto">
-            {connections.map((conn) => (
-              <div 
-                key={conn.id}
-                className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-slate-800/40 transition-colors"
-              >
-                <div className="col-span-3 min-w-0">
-                  <div className="text-sm text-slate-200 truncate" title={`${conn.metadata.host || conn.metadata.destinationIP || 'unknown'}:${conn.metadata.destinationPort}`}>
-                    {conn.metadata.host || conn.metadata.destinationIP || 'unknown'}
-                    :{conn.metadata.destinationPort}
+            {connections.map((conn) => {
+              const isExpanded = expandedId === conn.id;
+              return (
+              <div key={conn.id}>
+                <div 
+                  className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-slate-800/40 transition-colors cursor-pointer"
+                  onClick={() => setExpandedId(isExpanded ? null : conn.id)}
+                >
+                  <div className="col-span-3 min-w-0 flex items-center gap-1.5">
+                    {isExpanded ? <ChevronDown size={14} className="text-slate-500 flex-shrink-0" /> : <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />}
+                    <div className="min-w-0">
+                      <div className="text-sm text-slate-200 truncate" title={`${conn.metadata.host || conn.metadata.destinationIP || 'unknown'}:${conn.metadata.destinationPort}`}>
+                        {conn.metadata.host || conn.metadata.destinationIP || 'unknown'}
+                        :{conn.metadata.destinationPort}
+                      </div>
+                      <div className="text-xs text-slate-500 truncate">{conn.rule || 'DIRECT'}</div>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 truncate">{conn.rule || 'DIRECT'}</div>
+                  <div className="col-span-2 text-sm text-slate-300 truncate" title={conn.chains.join(' → ')}>
+                    {conn.chains.join(' → ')}
+                  </div>
+                  <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
+                    <ArrowUp size={12} className="text-blue-400 flex-shrink-0" />
+                    <span className="truncate">{formatBytes(conn.upload)}</span>
+                  </div>
+                  <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
+                    <ArrowDown size={12} className="text-emerald-400 flex-shrink-0" />
+                    <span className="truncate">{formatBytes(conn.download)}</span>
+                  </div>
+                  <div className="col-span-2 text-sm text-slate-400">
+                    {getDuration(conn.start)}
+                  </div>
+                  <div className="col-span-1 text-right">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); closeConnection(conn.id); }}
+                      className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"
+                      title="关闭连接"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
-                <div className="col-span-2 text-sm text-slate-300 truncate" title={conn.chains.join(' -> ')}>
-                  {conn.chains.join(' -> ')}
-                </div>
-                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
-                  <ArrowUp size={12} className="text-blue-400 flex-shrink-0" />
-                  <span className="truncate">{formatBytes(conn.upload)}</span>
-                </div>
-                <div className="col-span-2 text-sm text-slate-300 flex items-center gap-1.5">
-                  <ArrowDown size={12} className="text-emerald-400 flex-shrink-0" />
-                  <span className="truncate">{formatBytes(conn.download)}</span>
-                </div>
-                <div className="col-span-2 text-sm text-slate-400">
-                  {getDuration(conn.start)}
-                </div>
-                <div className="col-span-1 text-right">
-                  <button
-                    onClick={() => closeConnection(conn.id)}
-                    className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"
-                    title="关闭连接"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+
+                {/* Expanded detail panel */}
+                {isExpanded && (
+                  <div className="px-6 py-3 bg-slate-800/30 border-t border-slate-800/50 space-y-2 text-xs">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-slate-500 flex items-center gap-1 mb-1"><Target size={12} /> 5元组</span>
+                        <div className="text-slate-300 font-mono">
+                          {conn.metadata.sourceIP}:{conn.metadata.sourcePort} → {conn.metadata.destinationIP || '?'}:{conn.metadata.destinationPort}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 flex items-center gap-1 mb-1"><Clock size={12} /> 时间</span>
+                        <div className="text-slate-300">
+                          建立于 {new Date(conn.start).toLocaleString()} · {getDuration(conn.start)}
+                        </div>
+                      </div>
+                    </div>
+                    {conn.rule && (
+                      <div>
+                        <span className="text-slate-500 flex items-center gap-1 mb-1"><Target size={12} /> 命中规则</span>
+                        <span className="inline-block px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded font-mono">{conn.rule}</span>
+                      </div>
+                    )}
+                    {conn.chains.length > 0 && (
+                      <div>
+                        <span className="text-slate-500 flex items-center gap-1 mb-1"><Link size={12} /> 代理链</span>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {conn.chains.map((node, idx) => (
+                            <span key={idx} className="flex items-center gap-1">
+                              <span className={`px-1.5 py-0.5 rounded font-mono ${idx === conn.chains.length - 1 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`}>
+                                {node}
+                              </span>
+                              {idx < conn.chains.length - 1 && <span className="text-slate-600">→</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-6 text-slate-500">
+                      <span>↑ {formatBytes(conn.upload)} 上传</span>
+                      <span>↓ {formatBytes(conn.download)} 下载</span>
+                      <span>∑ {formatBytes(conn.upload + conn.download)} 总计</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
