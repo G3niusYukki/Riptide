@@ -3,6 +3,7 @@ import Security
 import X509
 import SwiftASN1
 import Crypto
+import RiptideSecurityShim
 
 public enum MITMError: Error, Equatable, Sendable {
     case certificateGenerationFailed
@@ -154,9 +155,10 @@ public actor CertificateAuthority {
         }
 
         let privateKey = try makeSecKey(from: domainPrivateKey)
-        guard let identity = SecIdentityCreate(nil, certificate, privateKey) else {
+        guard let unmanagedIdentity = RiptideSecIdentityCreate(nil, certificate, privateKey) else {
             throw MITMError.identityCreationFailed("certificate public key does not match private key")
         }
+        let identity = unmanagedIdentity.takeRetainedValue()
 
         return MITMServerIdentity(
             domain: domain,

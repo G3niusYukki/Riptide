@@ -35,9 +35,16 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "X509", package: "swift-certificates"),
                 "GoCore",
+                "RiptideSecurityShim",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
+            ]
+        ),
+        .target(
+            name: "RiptideSecurityShim",
+            cSettings: [
+                .define("ADOPT_NEW_SecIdentityCreate")
             ]
         ),
         .executableTarget(
