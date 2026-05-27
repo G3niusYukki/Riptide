@@ -22,6 +22,7 @@ public enum ProtocolError: Error, Equatable, Sendable {
     case malformedResponse(String)
     case authenticationRejected
     case connectionRejected(String)
+    case transportUnavailable(String)
 }
 
 public protocol OutboundProxyProtocol: Sendable {

@@ -226,10 +226,11 @@ public struct ProxyConnector: Sendable {
                 try await h2Stream.connect(to: target)
                 return ConnectedProxyContext(node: node, connection: connection)
             } catch QUICTransportSession.QUICTransportError.quicNotAvailable {
-                // Fall through to TCP fallback
-                let fallbackStream = Hysteria2Stream(session: connection.session, password: password)
-                try await fallbackStream.connect(to: target)
-                return ConnectedProxyContext(node: node, connection: connection)
+                // QUIC not available — Hysteria2 requires QUIC, do not silently fall back to TCP
+                // (Hysteria2 over TCP is non-standard and violates "no silent fallbacks" principle)
+                throw ProtocolError.transportUnavailable(
+                    "Hysteria2 requires QUIC support (macOS 14+). QUIC is not available on this system."
+                )
             }
         } else {
             let fallbackStream = Hysteria2Stream(session: connection.session, password: password)
