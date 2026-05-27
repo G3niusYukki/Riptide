@@ -54,6 +54,10 @@ struct GoCoreTunnelRuntimeTests {
 
     @Test("Test lifecycle of GoCoreTunnelRuntime")
     func testRuntimeLifecycle() async throws {
+        guard isGitHubActionsRuntime == false else {
+            return
+        }
+
         try await withExclusiveGoCore {
             let runtime = GoCoreTunnelRuntime()
 

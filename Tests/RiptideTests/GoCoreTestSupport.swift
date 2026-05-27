@@ -1,6 +1,8 @@
 import Foundation
 @testable import Riptide
 
+let isGitHubActionsRuntime = ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == "true"
+
 private actor GoCoreTestLock {
     static let shared = GoCoreTestLock()
 

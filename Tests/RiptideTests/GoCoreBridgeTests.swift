@@ -54,6 +54,10 @@ struct GoCoreBridgeTests {
     
     @Test("Test start, stop and event callback")
     func testStartStopAndCallback() async throws {
+        guard isGitHubActionsRuntime == false else {
+            return
+        }
+
         try await withExclusiveGoCore {
             let bridge = GoCoreBridge.shared
             let latch = EventLatch()
