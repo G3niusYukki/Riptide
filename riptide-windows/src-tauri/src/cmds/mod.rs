@@ -4,6 +4,7 @@ pub mod proxy;
 pub mod proxy_editor;
 pub mod config;
 pub mod dns;
+#[cfg(target_os = "windows")]
 pub mod gateway;
 pub mod mode;
 pub mod rewrite;

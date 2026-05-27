@@ -1,6 +1,7 @@
 //! Core business logic modules
 
 pub mod diagnostics;
+#[cfg(target_os = "windows")]
 pub mod gateway;
 pub mod geo_assets;
 pub mod kill_switch;

@@ -212,9 +212,13 @@ pub fn run() {
             cmds::rewrite::delete_rewrite_rule,
             cmds::rewrite::toggle_rewrite_rule,
             // Gateway / ICS
+            #[cfg(target_os = "windows")]
             cmds::gateway::enable_gateway,
+            #[cfg(target_os = "windows")]
             cmds::gateway::disable_gateway,
+            #[cfg(target_os = "windows")]
             cmds::gateway::is_gateway_enabled,
+            #[cfg(target_os = "windows")]
             cmds::gateway::get_gateway_devices,
             // WebDAV sync
             cmds::webdav::webdav_get_config,
