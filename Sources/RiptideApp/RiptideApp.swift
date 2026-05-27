@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 import Riptide
-import Sparkle
+// import Sparkle  // TEMP: disabled to debug CI build failure
 
 // Shared coordinator — holds the main window reference for the entire app
 @MainActor
@@ -9,14 +9,14 @@ final class AppCoordinator {
     static let shared = AppCoordinator()
     var mainWindow: NSWindow?
 
-    /// Sparkle updater controller — initialized once, shared across the app.
-    lazy var updaterController: SPUStandardUpdaterController = {
-        SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
-    }()
+    // /// Sparkle updater controller — TEMP: disabled to debug CI build failure
+    // lazy var updaterController: SPUStandardUpdaterController = {
+    //     SPUStandardUpdaterController(
+    //         startingUpdater: true,
+    //         updaterDelegate: nil,
+    //         userDriverDelegate: nil
+    //     )
+    // }()
 
     private init() {}
 }
@@ -63,12 +63,13 @@ struct RiptideApp: App {
         }
         .defaultSize(width: 900, height: 600)
         .commands {
-            CommandGroup(after: .appInfo) {
-                Button("检查更新…") {
-                    AppCoordinator.shared.updaterController.checkForUpdates(nil)
-                }
-                .keyboardShortcut("u", modifiers: [.command, .shift])
-            }
+            // TEMP: disabled to debug CI build failure
+            // CommandGroup(after: .appInfo) {
+            //     Button("检查更新…") {
+            //         AppCoordinator.shared.updaterController.checkForUpdates(nil)
+            //     }
+            //     .keyboardShortcut("u", modifiers: [.command, .shift])
+            // }
         }
     }
 
