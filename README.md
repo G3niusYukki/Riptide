@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-562%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-208%20passing-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
@@ -43,11 +43,11 @@ This gives you:
 
 ### Proxy Protocols
 
-Shadowsocks AEAD · VMess · VLESS (XTLS/Vision) · VLESS Reality · Trojan · Hysteria2 · TUIC · WireGuard · Snell v2/v3 · SOCKS5 · HTTP CONNECT
+Shadowsocks AEAD ✅ · VMess 🟡 (no AEAD header auth) · VLESS (XTLS/Vision) ✅ · VLESS Reality ✅ · Trojan ✅ · Hysteria2 🟡 (QUIC required, TCP fallback) · TUIC 🟡 (experimental, single-stream) · WireGuard 🔧 (via mihomo) · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅
 
 ### Transport
 
-TCP (`NWConnection`) · TLS · WebSocket · HTTP/2 · QUIC (macOS 14+) · Connection Pool · Multiplex
+TCP (`NWConnection`) ✅ · TLS ✅ · WebSocket ✅ · HTTP/2 🟡 (TLS-based, true H/2 planned) · QUIC ✅ (macOS 14+) · Connection Pool ✅ · Multiplex 🟡 (client-initiated only)
 
 ### DNS (Fully Self-Developed)
 
@@ -73,7 +73,7 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 - Real-time traffic monitor and connection list
 - Log viewer with level filter, search, and export
 - Menu bar extra with status icon and traffic speed
-- MITM settings with host pattern matching
+- MITM 🟡 (scaffolded — cert generation works, TLS termination not yet implemented)
 - Theme: System / Light / Dark
 - Global hotkeys
 - **4 languages**: English · 简体中文 · 日本語 · Русский
@@ -208,7 +208,7 @@ This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for 
 # Build everything
 swift build
 
-# Run full test suite (491 tests, 76 suites)
+# Run full test suite (208 tests)
 swift test
 
 # Run a specific suite
@@ -267,7 +267,7 @@ Sources/
 │
 └── RiptideCLI/              # Command-line interface
 
-Tests/RiptideTests/          # 467 tests in 71 suites
+Tests/RiptideTests/          # 208 tests
 ```
 
 ---
@@ -287,7 +287,7 @@ Contributions are welcome! A few guidelines:
 
 1. **Library-first** — new protocol / transport logic belongs in `Sources/Riptide/`, not the app layer
 2. **Swift 6 strict concurrency** — all code must pass `Sendable` and actor isolation checks
-3. **Test coverage** — add tests for new behavior; `swift test` must pass (491 / 491)
+3. **Test coverage** — add tests for new behavior; `swift test` must pass (208 / 208)
 4. **No force unwraps** — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading
 6. **Dependency injection** — prefer injection over hard-coded global behavior
