@@ -37,28 +37,32 @@ func GoCoreStart(configJSON *C.char, cb C.EventCallback) *C.char {
 	configStr := C.GoString(configJSON)
 	var opt option.Options
 	if err := json.Unmarshal([]byte(configStr), &opt); err != nil {
-		// If it's invalid JSON, let's load a minimal working configuration
-		// so that the core starts successfully for testing/fallback.
-		opt = option.Options{
-			Log: &option.LogOptions{
-				Level: "info",
+		// If the caller passes invalid JSON, load a minimal config through
+		// sing-box's own decoder so option schema changes stay localized.
+		const fallbackConfig = `{
+			"log": {
+				"level": "info"
 			},
-			Inbounds: []option.Inbound{
+			"inbounds": [
 				{
-					Type: "mixed",
-					Tag:  "mixed-in",
-					SimpleOptions: option.SimpleListenerOptions{
-						Listen:      option.NewAddrAddress(option.ParseAddress("127.0.0.1")),
-						ListenPort: 6152,
-					},
-				},
-			},
-			Outbounds: []option.Outbound{
+					"type": "mixed",
+					"tag": "mixed-in",
+					"listen": "127.0.0.1",
+					"listen_port": 6152
+				}
+			],
+			"outbounds": [
 				{
-					Type: "direct",
-					Tag:  "direct",
-				},
-			},
+					"type": "direct",
+					"tag": "direct"
+				}
+			],
+			"route": {
+				"final": "direct"
+			}
+		}`
+		if fallbackErr := json.Unmarshal([]byte(fallbackConfig), &opt); fallbackErr != nil {
+			return C.CString(fmt.Sprintf("Failed to parse fallback config after invalid input (%v): %v", err, fallbackErr))
 		}
 	}
 
@@ -119,4 +123,3 @@ func GoCoreSwitchProxy(groupName *C.char, proxyName *C.char) *C.char {
 }
 
 func main() {}
-

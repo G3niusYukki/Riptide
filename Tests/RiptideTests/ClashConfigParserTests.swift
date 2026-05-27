@@ -220,6 +220,41 @@ struct ClashConfigParserTests {
         #expect(node.skipCertVerify == nil)
     }
 
+    @Test("parses WireGuard proxy with Clash fields")
+    func parsesWireGuardProxyWithClashFields() throws {
+        let yaml = """
+        mode: rule
+        proxies:
+          - name: "warp"
+            type: wireguard
+            server: "162.159.193.10"
+            port: 2408
+            private-key: "private-key-base64"
+            public-key: "public-key-base64"
+            pre-shared-key: "psk-base64"
+            reserved: [1, 2, 3]
+            mtu: 1280
+            ip: "172.16.0.2/32"
+        rules:
+          - MATCH,warp
+        """
+
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
+
+        #expect(config.proxies.count == 1)
+        let node = config.proxies[0]
+        #expect(node.kind == .wireguard)
+        #expect(node.name == "warp")
+        #expect(node.server == "162.159.193.10")
+        #expect(node.port == 2408)
+        #expect(node.password == "private-key-base64")
+        #expect(node.wireguardPublicKey == "public-key-base64")
+        #expect(node.wireguardPreSharedKey == "psk-base64")
+        #expect(node.wireguardReserved == [1, 2, 3])
+        #expect(node.wireguardMTU == 1280)
+        #expect(node.wireguardIP == "172.16.0.2/32")
+    }
+
     @Test("fails when Hysteria2 password is missing")
     func failsOnMissingHysteria2Password() {
         let yaml = """

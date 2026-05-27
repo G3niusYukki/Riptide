@@ -8,6 +8,10 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$(dirname "$0")"
 
 echo "Building GoCore static libraries..."
+GO_TAGS="with_gvisor,with_wireguard,with_quic"
+GO_LDFLAGS="-s -w"
+echo "Using Go build tags: ${GO_TAGS}"
+echo "Using Go linker flags: ${GO_LDFLAGS}"
 
 # Initialize Go module if not exists
 if [ ! -f go.mod ]; then
@@ -20,11 +24,11 @@ mkdir -p build/macos-arm64 build/macos-amd64
 
 # 1. Compile macOS ARM64 static library
 echo "Compiling macOS ARM64..."
-CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_CFLAGS="-mmacosx-version-min=14.0" CGO_LDFLAGS="-mmacosx-version-min=14.0" go build -buildmode=c-archive -o build/macos-arm64/libgocore.a main.go
+CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 CGO_CFLAGS="-mmacosx-version-min=14.0" CGO_LDFLAGS="-mmacosx-version-min=14.0" go build -trimpath -tags "${GO_TAGS}" -ldflags "${GO_LDFLAGS}" -buildmode=c-archive -o build/macos-arm64/libgocore.a main.go
 
 # 2. Compile macOS AMD64 (Intel) static library
 echo "Compiling macOS AMD64..."
-CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=14.0" CGO_LDFLAGS="-mmacosx-version-min=14.0" go build -buildmode=c-archive -o build/macos-amd64/libgocore.a main.go
+CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 CGO_CFLAGS="-mmacosx-version-min=14.0" CGO_LDFLAGS="-mmacosx-version-min=14.0" go build -trimpath -tags "${GO_TAGS}" -ldflags "${GO_LDFLAGS}" -buildmode=c-archive -o build/macos-amd64/libgocore.a main.go
 
 # 3. Create Lip/Universal static library
 echo "Creating universal binary..."

@@ -235,7 +235,8 @@ public enum ClashConfigParser {
                 )
 
             case .wireguard:
-                guard let password = proxy.password, !password.isEmpty else {
+                let privateKey = proxy.privateKey ?? proxy.password
+                guard let privateKey, !privateKey.isEmpty else {
                     throw ClashConfigError.invalidProxy(index: index, reason: "private-key is required for WireGuard")
                 }
                 return ProxyNode(
@@ -243,9 +244,12 @@ public enum ClashConfigParser {
                     kind: .wireguard,
                     server: proxy.server,
                     port: port,
-                    password: password
-                    // WireGuard-specific fields (public-key, pre-shared-key, reserved, mtu, ip)
-                    // are added via ProxyNode's wireguard* properties — to be wired in step 3.
+                    password: privateKey,
+                    wireguardPublicKey: proxy.publicKey,
+                    wireguardPreSharedKey: proxy.preSharedKey,
+                    wireguardReserved: proxy.reserved?.bytes,
+                    wireguardMTU: proxy.mtu,
+                    wireguardIP: proxy.ip
                 )
             }
         }
@@ -779,6 +783,12 @@ private struct ClashRawProxy: Decodable {
     let grpcOpts: GRPCOpts?
     let chain: String?
     let snellVersion: Int?
+    let privateKey: String?
+    let publicKey: String?
+    let preSharedKey: String?
+    let reserved: WireGuardReservedBytes?
+    let mtu: Int?
+    let ip: String?
 
     struct WSOpts: Codable {
         let path: String?
@@ -800,5 +810,91 @@ private struct ClashRawProxy: Decodable {
         case grpcOpts = "grpc-opts"
         case chain
         case snellVersion = "version"
+        case privateKey = "private-key"
+        case publicKey = "public-key"
+        case preSharedKey = "pre-shared-key"
+        case reserved
+        case mtu
+        case ip
+    }
+}
+
+private struct WireGuardReservedBytes: Decodable {
+    let bytes: [UInt8]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let byteArray = try? container.decode([UInt8].self) {
+            bytes = byteArray
+            return
+        }
+
+        if let intArray = try? container.decode([Int].self) {
+            bytes = try intArray.map(Self.toByte)
+            return
+        }
+
+        if let string = try? container.decode(String.self) {
+            bytes = try Self.parseString(string)
+            return
+        }
+
+        throw DecodingError.typeMismatch(
+            [UInt8].self,
+            DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "WireGuard reserved must be a byte array, comma-separated string, or base64 string"
+            )
+        )
+    }
+
+    private static func parseString(_ raw: String) throws -> [UInt8] {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return [] }
+
+        let bracketed = trimmed.hasPrefix("[") && trimmed.hasSuffix("]")
+            ? String(trimmed.dropFirst().dropLast())
+            : trimmed
+
+        if bracketed.contains(",") {
+            return try bracketed
+                .split(separator: ",")
+                .map { part in
+                    let value = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard let intValue = Int(value) else {
+                        throw DecodingError.dataCorrupted(
+                            DecodingError.Context(
+                                codingPath: [],
+                                debugDescription: "WireGuard reserved contains a non-integer byte: \(value)"
+                            )
+                        )
+                    }
+                    return try toByte(intValue)
+                }
+        }
+
+        if let data = Data(base64Encoded: trimmed) {
+            return Array(data)
+        }
+
+        throw DecodingError.dataCorrupted(
+            DecodingError.Context(
+                codingPath: [],
+                debugDescription: "WireGuard reserved string must be comma-separated bytes or base64"
+            )
+        )
+    }
+
+    private static func toByte(_ value: Int) throws -> UInt8 {
+        guard (0...255).contains(value) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "WireGuard reserved byte out of range: \(value)"
+                )
+            )
+        }
+        return UInt8(value)
     }
 }

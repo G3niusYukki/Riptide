@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-589%20listed-blue" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-591%20listed-blue" alt="Tests" />
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status" />
@@ -26,7 +26,7 @@
 
 ## Why Riptide?
 
-Most macOS proxy clients wrap a Go core (mihomo / sing-box) in Electron or Tauri. Riptide takes a different path: a **Swift-first** library implements protocol framing, DNS, rule matching, and connection orchestration natively — while the production runtime delegates to the battle-tested [mihomo](https://github.com/MetaCubeX/mihomo) sidecar for real traffic.
+Most macOS proxy clients wrap a Go core (mihomo / sing-box) in Electron or Tauri. Riptide takes a different path: a **Swift-first** library implements protocol framing, DNS, rule matching, and connection orchestration natively — while production traffic can delegate to the battle-tested [mihomo](https://github.com/MetaCubeX/mihomo) sidecar or the embedded GoCore/sing-box bridge where a protocol needs it.
 
 This gives you:
 
@@ -43,9 +43,9 @@ This gives you:
 
 ### Proxy Protocols
 
-Status key: ✅ native Swift path · 🔵 delegated to mihomo in production · 🟡 partial / experimental · 🧱 scaffold only
+Status key: ✅ native Swift path · 🔵 delegated to a production core (mihomo or embedded GoCore/sing-box) · 🟡 partial / experimental · 🧱 scaffold only
 
-Shadowsocks AEAD ✅ · VLESS / Reality ✅ · Trojan ✅ · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅ · VMess 🔵 (production via mihomo; native implementation incomplete) · Hysteria2 🔵/🟡 (production via mihomo; native QUIC path experimental and fails when QUIC is unavailable) · TUIC 🔵/🟡 (production via mihomo; native path experimental, single-stream) · WireGuard 🔵 (mihomo only; no native protocol handler)
+Shadowsocks AEAD ✅ · VLESS / Reality ✅ · Trojan ✅ · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅ · VMess 🔵 (production via mihomo; native implementation incomplete) · Hysteria2 🔵/🟡 (production via mihomo; native QUIC path experimental and fails when QUIC is unavailable) · TUIC 🔵/🟡 (production via mihomo; native path experimental, single-stream) · WireGuard 🔵/🟡 (Clash fields parsed and embedded GoCore/sing-box JSON generated; pure Swift protocol handler not implemented)
 
 ### Transport
 
@@ -250,7 +250,7 @@ Sources/
 │   ├── ProxyProvider/       # Proxy provider abstraction
 │   ├── Rules/               # Rule engine, GeoIP MMDB, GeoSite, ASN, RuleSet, scripts
 │   ├── Scripting/           # JavaScript rule evaluation engine
-│   ├── SingBox/             # sing-box interop layer
+│   ├── SingBox/             # sing-box interop layer + GoCore JSON generation
 │   ├── Subscription/        # Subscription manager, scheduler, URI parser
 │   ├── Sync/                # WebDAV config sync
 │   ├── Traffic/             # Traffic monitoring providers & view models
@@ -269,7 +269,7 @@ Sources/
 │
 └── RiptideCLI/              # Command-line interface
 
-Tests/RiptideTests/          # 589 tests listed by `swift test list`
+Tests/RiptideTests/          # 591 tests listed by `swift test list`
 ```
 
 ---

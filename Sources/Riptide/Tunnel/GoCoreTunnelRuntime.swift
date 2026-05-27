@@ -26,22 +26,38 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     public func start(mode: RuntimeMode, profile: TunnelProfile) async throws {
         self.currentMode = mode
         self.currentProfile = profile
-        self.isRunning = true
-        
-        // Render a basic config JSON for the Go core bridge
-        let mockConfigJSON = "{}"
-        
-        try await GoCoreBridge.shared.start(configJSON: mockConfigJSON) { [weak self] type, data in
-            guard let self else { return }
-            Task {
-                await self.handleCoreEvent(type: type, data: data)
-            }
+
+        let configJSON: String
+        do {
+            configJSON = try SingBoxConfigGenerator.generate(
+                config: profile.config,
+                options: SingBoxConfigGenerator.GenerationOptions(mode: mode)
+            )
+        } catch {
+            self.currentMode = nil
+            self.currentProfile = nil
+            throw TunnelRuntimeError.startFailed("Failed to generate sing-box config: \(error)")
         }
-        
+
+        do {
+            try await GoCoreBridge.shared.start(configJSON: configJSON) { [weak self] type, data in
+                guard let self else { return }
+                Task {
+                    await self.handleCoreEvent(type: type, data: data)
+                }
+            }
+        } catch {
+            self.currentMode = nil
+            self.currentProfile = nil
+            throw error
+        }
+
+        self.isRunning = true
+
         self.eventHandler?(.stateChanged(.running))
         self.eventHandler?(.modeChanged(mode))
     }
-    
+
     public func stop() async throws {
         await GoCoreBridge.shared.stop()
         self.isRunning = false

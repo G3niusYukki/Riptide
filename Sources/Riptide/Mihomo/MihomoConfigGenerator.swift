@@ -249,7 +249,7 @@ public enum MihomoConfigGenerator {
     /// - password → private-key (required)
     /// - wireguardPublicKey → public-key (optional, for peer)
     /// - wireguardPreSharedKey → pre-shared-key (optional)
-    /// - wireguardReserved → reserved (optional, base64 encoded)
+    /// - wireguardReserved → reserved (optional byte array)
     /// - wireguardMTU → mtu (optional, default 1420)
     private static func appendWireGuardFields(proxy: ProxyNode, to lines: inout [String]) {
         // Private key (mapped from password field)
@@ -264,9 +264,9 @@ public enum MihomoConfigGenerator {
         if let psk = proxy.wireguardPreSharedKey {
             lines.append("    pre-shared-key: \(yamlEscape(psk))")
         }
-        // Optional reserved bytes (base64)
+        // Optional reserved bytes
         if let reserved = proxy.wireguardReserved {
-            lines.append("    reserved: \(yamlEscape(reserved))")
+            lines.append("    reserved: [\(reserved.map(String.init).joined(separator: ", "))]")
         }
         // MTU
         if let mtu = proxy.wireguardMTU {

@@ -46,7 +46,7 @@ public struct ProxyNode: Equatable, Sendable {
     public let realityFingerprint: String?
     public let wireguardPublicKey: String?
     public let wireguardPreSharedKey: String?
-    public let wireguardReserved: String?
+    public let wireguardReserved: [UInt8]?
     public let wireguardMTU: Int?
     public let wireguardIP: String?
 
@@ -76,7 +76,7 @@ public struct ProxyNode: Equatable, Sendable {
         realityFingerprint: String? = nil,
         wireguardPublicKey: String? = nil,
         wireguardPreSharedKey: String? = nil,
-        wireguardReserved: String? = nil,
+        wireguardReserved: [UInt8]? = nil,
         wireguardMTU: Int? = nil,
         wireguardIP: String? = nil
     ) {
