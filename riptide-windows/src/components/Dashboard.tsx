@@ -1,8 +1,8 @@
 import { useTraffic } from '../hooks/useTraffic';
 import { useRiptideStore } from '../stores/riptide';
-import { Activity, ArrowDown, ArrowUp, Clock, Cloud, Download, Wifi } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, Clock, Cloud, Wifi } from 'lucide-react';
 import { TrafficChart } from './Dashboard/TrafficChart';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 
 export function Dashboard() {
   const { isRunning, traffic, activeProfile, profiles, connections } = useRiptideStore();
@@ -35,13 +35,9 @@ export function Dashboard() {
           <h2 className="text-2xl font-bold text-slate-100 tracking-tight">概览</h2>
           <p className="text-xs text-slate-500 mt-1">实时流量与连接状态一览</p>
         </div>
-        <button
-          onClick={() => useRiptideStore.getState().setActiveTab?.('diagnostics')}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
-          title="网络诊断"
-        >
-          <Activity size={14} /> 诊断
-        </button>
+        <span className="text-[10px] text-slate-600">
+          {isRunning ? '● 运行中' : '○ 已停止'}
+        </span>
       </div>
 
       {/* Status cards */}

@@ -68,7 +68,7 @@ export function SettingsPage() {
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
-      {active === 'diagnostics' && <RecoveryTab showDiagnostics />}
+      {active === 'diagnostics' && <RecoveryTab />}
       {active === 'appearance' && <AppearanceSettings />}
       {active === 'about' && (
         <div className="space-y-3">
