@@ -132,3 +132,16 @@ export interface AppState {
   silentStart: boolean;
   theme: 'light' | 'dark' | 'system';
 }
+
+export interface RewriteRule {
+  id: string;
+  pattern: string;
+  action: RewriteAction;
+  enabled: boolean;
+}
+
+export type RewriteAction =
+  | { type: 'Reject' }
+  | { type: 'Redirect'; value: string }
+  | { type: 'ModifyHeader'; key: string; value: string }
+  | { type: 'ModifyResponseHeader'; key: string; value: string };

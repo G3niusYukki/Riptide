@@ -9,6 +9,7 @@ import type {
   TrafficData,
   RuleInfo,
   ProfileMetadata,
+  RewriteRule,
 } from '../types';
 
 // Proxy commands
@@ -259,6 +260,17 @@ export interface DnsPolicy {
 export const getDnsPolicy = () => invoke<DnsPolicy>('get_dns_policy');
 export const setDnsPolicy = (policy: DnsPolicy) =>
   invoke<void>('set_dns_policy', { policy });
+
+// Rewrite rules
+export const getRewriteRules = () => invoke<RewriteRule[]>('get_rewrite_rules');
+export const setRewriteRules = (rules: RewriteRule[]) =>
+  invoke<void>('set_rewrite_rules', { rules });
+export const addRewriteRule = (rule: RewriteRule) =>
+  invoke<void>('add_rewrite_rule', { rule });
+export const deleteRewriteRule = (id: string) =>
+  invoke<void>('delete_rewrite_rule', { id });
+export const toggleRewriteRule = (id: string, enabled: boolean) =>
+  invoke<void>('toggle_rewrite_rule', { id, enabled });
 
 // WebDAV sync
 export interface WebDAVConfigDto {

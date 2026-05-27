@@ -5,12 +5,13 @@ import { DnsTab } from './DnsTab';
 import { SyncTab } from './SyncTab';
 import { AssetsTab } from './AssetsTab';
 import { RecoveryTab } from './RecoveryTab';
+import { RewriteTab } from './RewriteTab';
 import { useRiptideStore } from '../../stores/riptide';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import i18n from '../../i18n';
 import * as tauri from '../../services/tauri';
 
-type Tab = 'network' | 'dns' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'about';
+type Tab = 'network' | 'dns' | 'rewrite' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'about';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export function SettingsPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'network', label: '网络' },
     { id: 'dns', label: 'DNS' },
+    { id: 'rewrite', label: '重写' },
     { id: 'sync', label: '同步' },
     { id: 'assets', label: '资源' },
     { id: 'recovery', label: '恢复' },
@@ -57,6 +59,7 @@ export function SettingsPage() {
 
       {active === 'network' && <NetworkTab />}
       {active === 'dns' && <DnsTab />}
+      {active === 'rewrite' && <RewriteTab />}
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}

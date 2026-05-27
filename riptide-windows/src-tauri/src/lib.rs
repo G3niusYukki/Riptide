@@ -60,6 +60,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(autostart_plugin())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .manage(AppState::new())
         .setup(|app| {
@@ -204,6 +205,12 @@ pub fn run() {
             // DNS policy
             cmds::dns::get_dns_policy,
             cmds::dns::set_dns_policy,
+            // Rewrite rules
+            cmds::rewrite::get_rewrite_rules,
+            cmds::rewrite::set_rewrite_rules,
+            cmds::rewrite::add_rewrite_rule,
+            cmds::rewrite::delete_rewrite_rule,
+            cmds::rewrite::toggle_rewrite_rule,
             // WebDAV sync
             cmds::webdav::webdav_get_config,
             cmds::webdav::webdav_set_config,

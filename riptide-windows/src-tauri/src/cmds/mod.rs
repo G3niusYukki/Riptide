@@ -5,6 +5,7 @@ pub mod proxy_editor;
 pub mod config;
 pub mod dns;
 pub mod mode;
+pub mod rewrite;
 pub mod system;
 pub mod webdav;
 
