@@ -106,25 +106,25 @@ public struct DiffView: View {
 
 // MARK: - Preview
 
-#Preview {
-    let sampleDiff = """
-    --- original
-    +++ merged
-    @@ -1,5 +1,7 @@
-     mode: rule
-     proxies:
-       - name: proxy1
-    +  - name: proxy2
-    +    type: ss
-    +    server: 1.2.3.4
-         port: 443
-     rules:
-    -  - MATCH,DIRECT
-    +  - DOMAIN-SUFFIX,google.com,PROXY
-    +  - MATCH,DIRECT
-    """
+private let diffViewPreviewSample = """
+--- original
++++ merged
+@@ -1,5 +1,7 @@
+ mode: rule
+ proxies:
+   - name: proxy1
++  - name: proxy2
++    type: ss
++    server: 1.2.3.4
+     port: 443
+ rules:
+-  - MATCH,DIRECT
++  - DOMAIN-SUFFIX,google.com,PROXY
++  - MATCH,DIRECT
+"""
 
-    DiffView(diffText: sampleDiff)
+#Preview("Diff View") {
+    DiffView(diffText: diffViewPreviewSample)
         .frame(width: 500, height: 300)
         .padding()
 }
