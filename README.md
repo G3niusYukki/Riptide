@@ -2,9 +2,9 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
   <img src="https://img.shields.io/badge/tests-505%20passed-brightgreen" alt="Tests" />
-  <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.1.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
-  <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status" />
+  <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
 </p>
 
 <h1 align="center">⚡ Riptide</h1>
