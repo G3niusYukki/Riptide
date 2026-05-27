@@ -57,19 +57,40 @@ public final class QUICTransportSession: TransportSession, @unchecked Sendable {
     // MARK: - Connection
 
     public func connect() async throws {
+        try await connect(timeout: .seconds(15))
+    }
+
+    public func connect(timeout: Duration) async throws {
         try await withCheckedThrowingContinuation { continuation in
-            connection.stateUpdateHandler = { [weak self] state in
+            let gate = QUICVoidGate(continuation: continuation)
+            let timeoutTask = Task {
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled else { return }
+                connection.stateUpdateHandler = nil
+                connection.cancel()
+                gate.fail(QUICTransportError.connectionFailed("connection timeout"))
+            }
+
+            connection.stateUpdateHandler = { [weak self, timeoutTask] state in
                 guard let self else { return }
                 switch state {
                 case .ready:
+                    timeoutTask.cancel()
                     self.connection.stateUpdateHandler = nil
-                    continuation.resume()
+                    gate.succeed()
                 case .failed(let error):
+                    timeoutTask.cancel()
                     self.connection.stateUpdateHandler = nil
-                    continuation.resume(throwing: QUICTransportError.connectionFailed(error.localizedDescription))
+                    gate.fail(QUICTransportError.connectionFailed(error.localizedDescription))
                 case .cancelled:
+                    timeoutTask.cancel()
                     self.connection.stateUpdateHandler = nil
-                    continuation.resume(throwing: QUICTransportError.streamClosed)
+                    gate.fail(QUICTransportError.streamClosed)
+                case .waiting(let error):
+                    timeoutTask.cancel()
+                    self.connection.stateUpdateHandler = nil
+                    self.connection.cancel()
+                    gate.fail(QUICTransportError.connectionFailed("connection waiting: \(error)"))
                 default:
                     break
                 }
@@ -81,38 +102,64 @@ public final class QUICTransportSession: TransportSession, @unchecked Sendable {
     // MARK: - TransportSession
 
     public func send(_ data: Data) async throws {
+        try await send(data, timeout: .seconds(15))
+    }
+
+    public func send(_ data: Data, timeout: Duration) async throws {
         guard connection.state == .ready else {
             throw QUICTransportError.connectionFailed("connection not ready: \(connection.state)")
         }
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let gate = QUICVoidGate(continuation: continuation)
+            let timeoutTask = Task {
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled else { return }
+                connection.cancel()
+                gate.fail(QUICTransportError.sendFailed("send timeout"))
+            }
+
             connection.send(content: data, completion: .contentProcessed { error in
+                timeoutTask.cancel()
                 if let error {
-                    continuation.resume(throwing: QUICTransportError.sendFailed(error.localizedDescription))
+                    gate.fail(QUICTransportError.sendFailed(error.localizedDescription))
                 } else {
-                    continuation.resume()
+                    gate.succeed()
                 }
             })
         }
     }
 
     public func receive() async throws -> Data {
+        try await receive(timeout: .seconds(15))
+    }
+
+    public func receive(timeout: Duration) async throws -> Data {
         guard connection.state == .ready else {
             throw QUICTransportError.connectionFailed("connection not ready: \(connection.state)")
         }
 
         return try await withCheckedThrowingContinuation { continuation in
+            let gate = QUICDataGate(continuation: continuation)
+            let timeoutTask = Task {
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled else { return }
+                connection.cancel()
+                gate.fail(QUICTransportError.receiveFailed("receive timeout"))
+            }
+
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { content, _, isComplete, error in
+                timeoutTask.cancel()
                 if let error {
-                    continuation.resume(throwing: QUICTransportError.receiveFailed(error.localizedDescription))
+                    gate.fail(QUICTransportError.receiveFailed(error.localizedDescription))
                     return
                 }
                 if let content {
-                    continuation.resume(returning: content)
+                    gate.succeed(content)
                 } else if isComplete {
-                    continuation.resume(throwing: QUICTransportError.streamClosed)
+                    gate.fail(QUICTransportError.streamClosed)
                 } else {
-                    continuation.resume(throwing: QUICTransportError.receiveFailed("empty content"))
+                    gate.fail(QUICTransportError.receiveFailed("empty content"))
                 }
             }
         }
@@ -132,5 +179,67 @@ public final class QUICTransportSession: TransportSession, @unchecked Sendable {
         skipVerify: Bool = false
     ) -> QUICTransportSession {
         QUICTransportSession(host: host, port: port, alpn: alpn, skipVerify: skipVerify)
+    }
+}
+
+private final class QUICVoidGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func succeed() {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume()
+    }
+
+    func fail(_ error: Error) {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume(throwing: error)
+    }
+}
+
+private final class QUICDataGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Data, Error>?
+
+    init(continuation: CheckedContinuation<Data, Error>) {
+        self.continuation = continuation
+    }
+
+    func succeed(_ data: Data) {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume(returning: data)
+    }
+
+    func fail(_ error: Error) {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume(throwing: error)
     }
 }

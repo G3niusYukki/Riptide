@@ -6,10 +6,12 @@ import Security
 public actor MITMManager {
     private var config: MITMConfig
     private let ca: CertificateAuthority
+    private var httpFlowRecords: [MITMHTTPFlowRecord] = []
 
     /// Callback invoked when an intercepted connection's headers are parsed.
     /// Can be used for logging, filtering, or modifying requests.
     public var onRequestIntercepted: ((String, String) -> Void)?
+    public var onHTTPFlowUpdated: ((MITMHTTPFlowRecord) -> Void)?
 
     public init(config: MITMConfig = MITMConfig(), ca: CertificateAuthority = CertificateAuthority()) {
         self.config = config
@@ -46,6 +48,10 @@ public actor MITMManager {
         onRequestIntercepted = handler
     }
 
+    public func setOnHTTPFlowUpdated(_ handler: @escaping @Sendable (MITMHTTPFlowRecord) -> Void) {
+        onHTTPFlowUpdated = handler
+    }
+
     // MARK: - Interception Decision
 
     /// Returns whether a given host should be intercepted based on current config.
@@ -55,23 +61,41 @@ public actor MITMManager {
 
     // MARK: - Certificate Management
 
-    /// Returns the CA certificate for installation in the system keychain.
-    public func caCertificate() -> SecCertificate? {
-        // In production, this would return the actual CA cert
-        // For now, the CertificateAuthority needs to generate one first
-        return nil
+    /// Ensures the in-memory CA certificate exists and returns DER-encoded data.
+    @discardableResult
+    public func ensureCACertificate() async throws -> Data {
+        if let data = await ca.caCertificateData() {
+            return data
+        }
+
+        try await ca.generateCertificate()
+        guard let data = await ca.caCertificateData() else {
+            throw MITMError.certificateGenerationFailed
+        }
+        return data
     }
 
-    /// Checks if the CA certificate is trusted in the system keychain.
-    public func isCATrusted() -> Bool {
-        // Use the same label that CertificateAuthority uses
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassCertificate,
-            kSecAttrLabel as String: "com.riptide.mitm.ca",
-            kSecReturnRef as String: true,
-        ]
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        return status == errSecSuccess
+    /// Returns the generated CA certificate for installation in the system keychain.
+    public func caCertificate() async -> SecCertificate? {
+        guard let data = await ca.caCertificateData() else { return nil }
+        return SecCertificateCreateWithData(nil, data as CFData)
+    }
+
+    /// Generates a per-host server identity signed by Riptide's in-memory CA.
+    public func serverIdentity(for host: String) async throws -> MITMServerIdentity {
+        try await ensureCACertificate()
+        return try await ca.generateIdentity(for: host)
+    }
+
+    /// Checks if the CA certificate is installed in the keychain.
+    public func isCAInstalled() async -> Bool {
+        await ca.isCAInstalled()
+    }
+
+    /// Compatibility alias for older app code. This only confirms installation;
+    /// trust settings still need to be verified in Keychain Access.
+    public func isCATrusted() async -> Bool {
+        await isCAInstalled()
     }
 
     // MARK: - Interception Hooks
@@ -89,5 +113,37 @@ public actor MITMManager {
     /// Records an intercepted request for logging/analysis.
     public func recordInterception(host: String, method: String, path: String) {
         onRequestIntercepted?("\(method) \(path)", host)
+    }
+
+    @discardableResult
+    public func recordHTTPRequest(host: String, port: Int, request: MITMHTTPRequest) -> UUID {
+        let record = MITMHTTPFlowRecord(host: host, port: port, request: request)
+        httpFlowRecords.append(record)
+        trimHTTPFlowRecords()
+        onHTTPFlowUpdated?(record)
+        return record.id
+    }
+
+    public func recordHTTPResponse(flowID: UUID, response: MITMHTTPResponse) {
+        guard let index = httpFlowRecords.firstIndex(where: { $0.id == flowID }) else {
+            return
+        }
+
+        let updated = httpFlowRecords[index].attaching(response: response)
+        httpFlowRecords[index] = updated
+        onHTTPFlowUpdated?(updated)
+    }
+
+    public func recentHTTPFlowRecords(limit: Int = 200) -> [MITMHTTPFlowRecord] {
+        Array(httpFlowRecords.suffix(limit))
+    }
+
+    public func clearHTTPFlowRecords() {
+        httpFlowRecords.removeAll()
+    }
+
+    private func trimHTTPFlowRecords(maxRecords: Int = 500) {
+        guard httpFlowRecords.count > maxRecords else { return }
+        httpFlowRecords.removeFirst(httpFlowRecords.count - maxRecords)
     }
 }

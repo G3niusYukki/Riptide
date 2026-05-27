@@ -446,14 +446,14 @@ struct DOQResolverTests {
 
     @Test("DOQResolver query handles platform limitations")
     func doqQueryHandlesPlatform() async {
-        let resolver = DOQResolver(serverHost: "dns.adguard.com", serverPort: 784)
-        // On macOS 14+ with QUIC available, this may succeed or fail with network error.
-        // We just verify it doesn't crash.
+        let resolver = DOQResolver(serverHost: "192.0.2.1", serverPort: 784, timeout: .milliseconds(100))
+        // Use TEST-NET-1 so this never depends on a public resolver being reachable.
+        // The assertion is that the configured timeout/error path returns promptly.
         do {
             _ = try await resolver.query(name: "example.com", type: .a)
+            Issue.record("Expected an unreachable DoQ endpoint to fail")
         } catch {
-            // Expected: network errors, QUIC errors, etc.
-            #expect(true)
+            #expect(error is DOQResolver.DOQError)
         }
     }
 }
@@ -600,4 +600,3 @@ mode: direct
         #expect(resolvers.contains { $0.kind == .udp })
     }
 }
-

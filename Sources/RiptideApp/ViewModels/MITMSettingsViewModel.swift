@@ -9,8 +9,9 @@ public final class MITMSettingsViewModel: ObservableObject {
     @Published public var enabled: Bool = false
     @Published public var hosts: [String] = []
     @Published public var excludeHosts: [String] = []
-    @Published public var isCATrusted: Bool = false
+    @Published public var isCAInstalled: Bool = false
     @Published public var interceptLog: [String] = []
+    @Published public var httpFlowRecords: [MITMHTTPFlowRecord] = []
 
     private let mitmManager: MITMManager
 
@@ -24,7 +25,8 @@ public final class MITMSettingsViewModel: ObservableObject {
         enabled = config.enabled
         hosts = config.hosts
         excludeHosts = config.excludeHosts
-        isCATrusted = await mitmManager.isCATrusted()
+        isCAInstalled = await mitmManager.isCAInstalled()
+        httpFlowRecords = await mitmManager.recentHTTPFlowRecords()
 
         // Set up interception logging
         await mitmManager.setOnRequestIntercepted { [weak self] method, host in
@@ -34,6 +36,12 @@ public final class MITMSettingsViewModel: ObservableObject {
                 if self?.interceptLog.count ?? 0 > 200 {
                     self?.interceptLog.removeFirst(50)
                 }
+            }
+        }
+
+        await mitmManager.setOnHTTPFlowUpdated { [weak self] record in
+            Task { @MainActor in
+                self?.upsertHTTPFlowRecord(record)
             }
         }
     }
@@ -82,5 +90,24 @@ public final class MITMSettingsViewModel: ObservableObject {
 
     public func installCertificate() {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Utilities/Keychain Access.app"))
+    }
+
+    public func clearHTTPFlowRecords() {
+        Task {
+            await mitmManager.clearHTTPFlowRecords()
+            httpFlowRecords.removeAll()
+        }
+    }
+
+    private func upsertHTTPFlowRecord(_ record: MITMHTTPFlowRecord) {
+        if let index = httpFlowRecords.firstIndex(where: { $0.id == record.id }) {
+            httpFlowRecords[index] = record
+        } else {
+            httpFlowRecords.append(record)
+        }
+
+        if httpFlowRecords.count > 200 {
+            httpFlowRecords.removeFirst(httpFlowRecords.count - 200)
+        }
     }
 }

@@ -57,7 +57,7 @@ public final class DOQResolver: Sendable {
                 port: serverPort,
                 alpn: [alpn]
             )
-            try await s.connect()
+            try await s.connect(timeout: timeout)
             session = s
         } catch QUICTransportSession.QUICTransportError.quicNotAvailable {
             throw DOQError.quicNotAvailable
@@ -74,7 +74,7 @@ public final class DOQResolver: Sendable {
         sendData.append(queryMessage)
 
         do {
-            try await session.send(sendData)
+            try await session.send(sendData, timeout: timeout)
         } catch {
             await session.close()
             throw DOQError.sendFailed(error.localizedDescription)
@@ -83,7 +83,7 @@ public final class DOQResolver: Sendable {
         // Receive response
         let responseData: Data
         do {
-            responseData = try await session.receive()
+            responseData = try await session.receive(timeout: timeout)
         } catch {
             await session.close()
             throw DOQError.receiveFailed(error.localizedDescription)

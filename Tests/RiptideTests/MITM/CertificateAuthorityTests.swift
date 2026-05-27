@@ -1,3 +1,5 @@
+import Foundation
+import Security
 import Testing
 import X509
 @testable import Riptide
@@ -25,9 +27,7 @@ struct CertificateAuthorityTests {
 
         // Verify is CA certificate
         let basicConstraints = try cert.extensions.basicConstraints
-        if case .isCertificateAuthority = basicConstraints {
-            #expect(true)
-        } else {
+        if case .isCertificateAuthority = basicConstraints {} else {
             Issue.record("Certificate should be a CA")
         }
     }
@@ -39,6 +39,33 @@ struct CertificateAuthorityTests {
         
         let domainCert = try Certificate(derEncoded: Array(domainCertDER))
         #expect(domainCert.subject.description.contains("example.com"))
+
+        #expect(try domainCert.extensions.basicConstraints == .notCertificateAuthority)
+        #expect(try domainCert.extensions.extendedKeyUsage == ExtendedKeyUsage([.serverAuth]))
+        #expect(String(describing: try domainCert.extensions.subjectAlternativeNames).contains("example.com"))
+    }
+
+    @Test("generateIdentity creates matching SecIdentity for domain")
+    func testGenerateIdentityForDomain() async throws {
+        try await ca.generateCertificate()
+
+        let serverIdentity = try await ca.generateIdentity(for: "example.com")
+        var certificate: SecCertificate?
+        let certificateStatus = SecIdentityCopyCertificate(serverIdentity.identity, &certificate)
+        var privateKey: SecKey?
+        let privateKeyStatus = SecIdentityCopyPrivateKey(serverIdentity.identity, &privateKey)
+
+        #expect(serverIdentity.domain == "example.com")
+        #expect(certificateStatus == errSecSuccess)
+        #expect(certificate != nil)
+        #expect(privateKeyStatus == errSecSuccess)
+        #expect(privateKey != nil)
+
+        guard let certificate else {
+            Issue.record("SecIdentity should expose a certificate")
+            return
+        }
+        #expect(serverIdentity.certificateData == SecCertificateCopyData(certificate) as Data)
     }
     
     @Test("hasKey returns true after generation")

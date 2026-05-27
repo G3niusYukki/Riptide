@@ -51,7 +51,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         """
 
         let context = ScriptContext(name: "test", source: script, type: .profileScript)
-        try engine.loadScript(context)
+        try await engine.loadScript(context)
 
         let configJSON = """
         {"mode":"rule","proxies":[],"rules":["MATCH,DIRECT"]}
@@ -77,7 +77,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         """
 
         let context = ScriptContext(name: "test", source: script, type: .profileScript)
-        try engine.loadScript(context)
+        try await engine.loadScript(context)
 
         let configJSON = """
         {"mode":"rule","proxies":[],"rules":["MATCH,DIRECT"]}
@@ -175,7 +175,7 @@ final class ConfigMergerScriptTests: XCTestCase {
 
     func testVisualDiffWithIdenticalContent() {
         let content = "line1\nline2\nline3"
-        let diff = ConfigMergeViewModel.computeUnifiedDiff(original: content, merged: content)
+        let diff = ConfigDiff.computeUnifiedDiff(original: content, merged: content)
         XCTAssertNil(diff)
     }
 
@@ -183,7 +183,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         let original = "line1\nline2\nline3"
         let merged = "line1\nline2-modified\nline3\nline4"
 
-        let diff = ConfigMergeViewModel.computeUnifiedDiff(original: original, merged: merged)
+        let diff = ConfigDiff.computeUnifiedDiff(original: original, merged: merged)
 
         XCTAssertNotNil(diff)
         XCTAssertTrue(diff!.contains("-line2"))
@@ -195,7 +195,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         let original = ""
         let merged = "line1\nline2"
 
-        let diff = ConfigMergeViewModel.computeUnifiedDiff(original: original, merged: merged)
+        let diff = ConfigDiff.computeUnifiedDiff(original: original, merged: merged)
 
         XCTAssertNotNil(diff)
         XCTAssertTrue(diff!.contains("+line1"))
@@ -206,7 +206,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         let original = "line1\nline2"
         let merged = ""
 
-        let diff = ConfigMergeViewModel.computeUnifiedDiff(original: original, merged: merged)
+        let diff = ConfigDiff.computeUnifiedDiff(original: original, merged: merged)
 
         XCTAssertNotNil(diff)
         XCTAssertTrue(diff!.contains("-line1"))
@@ -221,7 +221,7 @@ final class ConfigMergerScriptTests: XCTestCase {
         let original = "proxies:\n  - name: p1\nrules:\n  - MATCH,DIRECT"
         let merged = "proxies:\n  - name: p1\n  - name: p2\nrules:\n  - MATCH,DIRECT"
 
-        let diff = ConfigMergeViewModel.computeUnifiedDiff(original: original, merged: merged)
+        let diff = ConfigDiff.computeUnifiedDiff(original: original, merged: merged)
 
         XCTAssertNotNil(diff)
         XCTAssertTrue(diff!.contains("+  - name: p2"))

@@ -1,16 +1,16 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue?logo=apple" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/tests-208%20passing-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-589%20listed-blue" alt="Tests" />
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
-  <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
+  <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status" />
 </p>
 
 <h1 align="center">⚡ Riptide</h1>
 
 <p align="center">
-  <strong>A native macOS proxy client built entirely in Swift 6.</strong><br/>
+  <strong>A native macOS proxy client built with SwiftUI and a Swift-first core.</strong><br/>
   Library-first architecture · Clash-compatible · mihomo-powered runtime
 </p>
 
@@ -26,14 +26,14 @@
 
 ## Why Riptide?
 
-Most macOS proxy clients wrap a Go core (mihomo / sing-box) in Electron or Tauri. Riptide takes a different path: a **pure Swift** library implements protocol framing, DNS, rule matching, and connection orchestration natively — while the production runtime delegates to the battle-tested [mihomo](https://github.com/MetaCubeX/mihomo) sidecar for real traffic.
+Most macOS proxy clients wrap a Go core (mihomo / sing-box) in Electron or Tauri. Riptide takes a different path: a **Swift-first** library implements protocol framing, DNS, rule matching, and connection orchestration natively — while the production runtime delegates to the battle-tested [mihomo](https://github.com/MetaCubeX/mihomo) sidecar for real traffic.
 
 This gives you:
 
 - **Native look & feel** — SwiftUI interface, ~15 MB bundle, instant startup
 - **Library-first** — the `Riptide` Swift package is usable standalone, independent of the GUI
 - **Clash-compatible** — drop in your existing `.yaml` configs and subscriptions
-- **Transparent** — every line is Swift, no opaque binary blobs beyond mihomo itself
+- **Transparent boundaries** — Swift-native code and delegated sidecar/runtime paths are called out explicitly
 
 > **Unsigned builds:** TUN mode is the recommended path — it intercepts all traffic at the packet level via mihomo's gVisor stack and does not require the privileged helper.
 
@@ -43,11 +43,13 @@ This gives you:
 
 ### Proxy Protocols
 
-Shadowsocks AEAD ✅ · VMess 🔧 (via mihomo — native impl incomplete) · VLESS (XTLS/Vision) ✅ · VLESS Reality ✅ · Trojan ✅ · Hysteria2 🟡 (QUIC required, TCP fallback) · TUIC 🟡 (experimental, single-stream) · WireGuard 🔧 (via mihomo) · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅
+Status key: ✅ native Swift path · 🔵 delegated to mihomo in production · 🟡 partial / experimental · 🧱 scaffold only
+
+Shadowsocks AEAD ✅ · VLESS / Reality ✅ · Trojan ✅ · Snell v2/v3 ✅ · SOCKS5 ✅ · HTTP CONNECT ✅ · VMess 🔵 (production via mihomo; native implementation incomplete) · Hysteria2 🔵/🟡 (production via mihomo; native QUIC path experimental and fails when QUIC is unavailable) · TUIC 🔵/🟡 (production via mihomo; native path experimental, single-stream) · WireGuard 🔵 (mihomo only; no native protocol handler)
 
 ### Transport
 
-TCP (`NWConnection`) ✅ · TLS ✅ · WebSocket ✅ · HTTP/2 🟡 (TLS-based, true H/2 planned) · QUIC ✅ (macOS 14+) · Connection Pool ✅ · Multiplex 🟡 (client-initiated only)
+TCP (`NWConnection`) ✅ · TLS ✅ · WebSocket ✅ · HTTP/2 🟡 (URLSession stream / TLS wrapper; true H/2 CONNECT and multiplexing planned) · QUIC ✅ (macOS 14+) · Connection Pool ✅ · Multiplex 🟡 (client-initiated only)
 
 ### DNS (Fully Self-Developed)
 
@@ -73,7 +75,7 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
 - Real-time traffic monitor and connection list
 - Log viewer with level filter, search, and export
 - Menu bar extra with status icon and traffic speed
-- MITM 🟡 (scaffolded — cert generation works, TLS termination not yet implemented)
+- MITM 🟡 (experimental — host matching, CA/per-host certificates, CONNECT TLS termination/re-encryption, and HTTP/1.x flow logging UI are wired; flow modification is not yet implemented)
 - Theme: System / Light / Dark
 - Global hotkeys
 - **4 languages**: English · 简体中文 · 日本語 · Русский
@@ -129,7 +131,7 @@ DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD · IP-CIDR / IP-CIDR6 · SRC-IP-CIDR · 
   └──────────────┘
 
   ┌─────────────────────────────────────────────────────┐
-  │            Riptide Library (pure Swift)               │
+  │            Riptide Library (Swift-first)              │
   │                                                       │
   │  Protocols  ·  Transport  ·  DNS  ·  Rules           │
   │  Connection ·  Tunnel     ·  MITM ·  Control         │
@@ -153,8 +155,8 @@ Local Proxy / TUN packet
 
 | Mode | Status | Description |
 |------|--------|-------------|
-| **System Proxy** | Stable | mihomo sidecar + macOS system proxy configuration with auto-guard (guard requires signed helper) |
-| **TUN Mode** | Stable | Full traffic interception via mihomo gVisor TUN + auto-recovery — recommended for unsigned builds. Requires sudo, no Apple Developer account needed |
+| **System Proxy** | Beta | mihomo sidecar + macOS system proxy configuration with auto-guard (guard requires signed helper) |
+| **TUN Mode** | Beta | Full traffic interception via mihomo gVisor TUN + auto-recovery — recommended for unsigned builds. Requires sudo, no Apple Developer account needed |
 
 ---
 
@@ -208,7 +210,7 @@ This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for 
 # Build everything
 swift build
 
-# Run full test suite (208 tests)
+# Run full test suite (589 tests listed by `swift test list`)
 swift test
 
 # Run a specific suite
@@ -230,7 +232,7 @@ swift run RiptideApp
 
 ```
 Sources/
-├── Riptide/                 # Core library (pure Swift)
+├── Riptide/                 # Core library (Swift-first)
 │   ├── AppShell/            # App coordinators: mode, profile, system proxy, import
 │   ├── Config/              # Clash YAML parsing & deep merge
 │   ├── Connection/          # Proxy connection orchestration
@@ -241,7 +243,7 @@ Sources/
 │   ├── LocalProxy/          # HTTP CONNECT ingress with domain sniffing
 │   ├── Logging/             # Structured log types
 │   ├── Mihomo/              # Sidecar integration: API, config gen, runtime, logs
-│   ├── MITM/                # HTTPS interception: config, manager, CA scaffolding
+│   ├── MITM/                # HTTPS interception: config, CA, TLS termination
 │   ├── Models/              # Core data models: ProxyNode, ProxyRule, RoutingPolicy
 │   ├── NodeEditor/          # Proxy node editing with validation
 │   ├── Protocols/           # Protocol framing: SS, VMess, VLESS, Trojan, Hy2, Snell, SOCKS5
@@ -267,7 +269,7 @@ Sources/
 │
 └── RiptideCLI/              # Command-line interface
 
-Tests/RiptideTests/          # 208 tests
+Tests/RiptideTests/          # 589 tests listed by `swift test list`
 ```
 
 ---
@@ -287,7 +289,7 @@ Contributions are welcome! A few guidelines:
 
 1. **Library-first** — new protocol / transport logic belongs in `Sources/Riptide/`, not the app layer
 2. **Swift 6 strict concurrency** — all code must pass `Sendable` and actor isolation checks
-3. **Test coverage** — add tests for new behavior; `swift test` must pass (208 / 208)
+3. **Test coverage** — add tests for new behavior; `swift test` must pass
 4. **No force unwraps** — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading
 6. **Dependency injection** — prefer injection over hard-coded global behavior

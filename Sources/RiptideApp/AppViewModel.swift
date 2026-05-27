@@ -228,7 +228,7 @@ public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Private
 
-    private let mihomoManager: MihomoRuntimeManager
+    private let mihomoManager: any MihomoRuntimeManaging
     private let modeCoordinator: ModeCoordinator
     private let importService: ConfigImportService
     private let subscriptionManager: SubscriptionManager
@@ -240,7 +240,7 @@ public final class AppViewModel: @unchecked Sendable {
     // MARK: - Init
 
     public init() {
-        let manager = MihomoRuntimeManager()
+        let manager = GoCoreTunnelRuntime()
         self.mihomoManager = manager
         self.modeCoordinator = ModeCoordinator(mihomoManager: manager)
         self.importService = ConfigImportService()

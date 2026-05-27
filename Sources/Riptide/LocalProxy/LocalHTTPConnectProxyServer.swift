@@ -127,11 +127,13 @@ public enum HTTPConnectRequestParser {
 
 public actor LocalHTTPConnectProxyServer {
     private let runtime: LiveTunnelRuntime
+    private let mitmInterceptor: MITMHTTPSInterceptor?
     private var listener: NWListener?
     private var endpoint: LocalProxyEndpoint?
 
-    public init(runtime: LiveTunnelRuntime) {
+    public init(runtime: LiveTunnelRuntime, mitmInterceptor: MITMHTTPSInterceptor? = nil) {
         self.runtime = runtime
+        self.mitmInterceptor = mitmInterceptor
     }
 
     public func start(host: String = "127.0.0.1", port: UInt16 = 0) async throws -> LocalProxyEndpoint {
@@ -193,6 +195,30 @@ public actor LocalHTTPConnectProxyServer {
 
             do {
                 try await inboundSession.send(successResponse())
+                if let mitmInterceptor, await mitmInterceptor.shouldIntercept(
+                    host: request.target.sniffedDomain ?? request.target.host,
+                    port: request.target.port
+                ) {
+                    let clientSession: any TransportSession = request.remainingData.isEmpty
+                        ? inboundSession
+                        : PrebufferedTransportSession(prefix: request.remainingData, inner: inboundSession)
+                    let upstreamSession: any TransportSession
+                    if let encryptedStream = context.encryptedStream {
+                        upstreamSession = ShadowsocksStreamTransportSession(stream: encryptedStream)
+                    } else {
+                        upstreamSession = context.connection.session
+                    }
+
+                    try await mitmInterceptor.handleConnection(
+                        clientSession: clientSession,
+                        target: request.target,
+                        upstreamSession: upstreamSession,
+                        connectionID: context.connection.id,
+                        runtime: runtime
+                    )
+                    return
+                }
+
                 if !request.remainingData.isEmpty {
                     if let encryptedStream = context.encryptedStream {
                         try await encryptedStream.send(request.remainingData)
@@ -265,6 +291,26 @@ public actor LocalHTTPConnectProxyServer {
 
     private func badGatewayResponse() -> Data {
         Data("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n".utf8)
+    }
+}
+
+private actor ShadowsocksStreamTransportSession: TransportSession {
+    private let stream: ShadowsocksStream
+
+    init(stream: ShadowsocksStream) {
+        self.stream = stream
+    }
+
+    func send(_ data: Data) async throws {
+        try await stream.send(data)
+    }
+
+    func receive() async throws -> Data {
+        try await stream.receive()
+    }
+
+    func close() async {
+        await stream.close()
     }
 }
 

@@ -94,7 +94,7 @@ public final class ConfigMergeViewModel: @unchecked Sendable {
             let diff = computeDiff(base: baseConfig, merged: mergedConfig)
 
             // Compute unified diff
-            let unifiedDiff = Self.computeUnifiedDiff(original: currentYAML, merged: mergedYAML)
+            let unifiedDiff = ConfigDiff.computeUnifiedDiff(original: currentYAML, merged: mergedYAML)
 
             previewResult = MergePreview(
                 mergedConfig: mergedConfig,
@@ -226,48 +226,7 @@ public final class ConfigMergeViewModel: @unchecked Sendable {
     ///   - merged: The merged YAML string
     /// - Returns: Unified diff string, or nil if diff is not available
     public static func computeUnifiedDiff(original: String, merged: String) -> String? {
-        // Create temporary files for diff input
-        let tempDir = FileManager.default.temporaryDirectory
-        let originalFile = tempDir.appendingPathComponent("original_\(UUID().uuidString).yaml")
-        let mergedFile = tempDir.appendingPathComponent("merged_\(UUID().uuidString).yaml")
-
-        do {
-            try original.write(to: originalFile, atomically: true, encoding: .utf8)
-            try merged.write(to: mergedFile, atomically: true, encoding: .utf8)
-
-            // Run diff command
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/diff")
-            process.arguments = ["-u", originalFile.path, mergedFile.path]
-
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let diff = String(data: data, encoding: .utf8)
-
-            // Cleanup
-            try? FileManager.default.removeItem(at: originalFile)
-            try? FileManager.default.removeItem(at: mergedFile)
-
-            // diff returns 0 if files are identical, 1 if different, 2 on error
-            if process.terminationStatus == 1 {
-                return diff
-            } else if process.terminationStatus == 0 {
-                return nil // Files are identical
-            } else {
-                return nil // Error running diff
-            }
-        } catch {
-            // Cleanup on error
-            try? FileManager.default.removeItem(at: originalFile)
-            try? FileManager.default.removeItem(at: mergedFile)
-            return nil
-        }
+        ConfigDiff.computeUnifiedDiff(original: original, merged: merged)
     }
 }
 

@@ -1,0 +1,4 @@
+module GoCore {
+    header "libgocore.h"
+    export *
+}

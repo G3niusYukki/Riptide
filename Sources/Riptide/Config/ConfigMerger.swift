@@ -390,8 +390,19 @@ public struct ConfigMerger: Sendable {
 
     // swiftlint:disable:next cyclomatic_complexity
     private static func parseRule(parts: [String]) -> ProxyRule? {
-        guard parts.count >= 3 else { return nil }
+        guard !parts.isEmpty else { return nil }
         let ruleType = parts[0].uppercased()
+
+        if ruleType == "REJECT" {
+            return .reject
+        }
+
+        if ruleType == "MATCH" || ruleType == "FINAL" {
+            guard parts.count >= 2 else { return nil }
+            return .final(policy: parsePolicy(parts[1]))
+        }
+
+        guard parts.count >= 3 else { return nil }
         let policyName = parts[2]
         let policy = parsePolicy(policyName)
 
@@ -431,10 +442,6 @@ public struct ConfigMerger: Sendable {
             return .script(code: parts[1], policy: policy)
         case "NOT":
             return .not(ruleType: parts[1], value: parts[2], policy: policy)
-        case "REJECT":
-            return .reject
-        case "MATCH", "FINAL":
-            return .final(policy: policy)
         default:
             return nil
         }

@@ -34,6 +34,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "X509", package: "swift-certificates"),
+                "GoCore",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
@@ -55,6 +56,9 @@ let package = Package(
                 "Riptide",
                 .product(name: "Yams", package: "Yams"),
             ],
+            resources: [
+                .process("Assets.xcassets"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
@@ -75,6 +79,10 @@ let package = Package(
                 "Riptide",
                 "RiptideCLI",
             ]
+        ),
+        .binaryTarget(
+            name: "GoCore",
+            path: "Frameworks/GoCore.xcframework"
         ),
     ]
 )

@@ -9,6 +9,14 @@ public enum MITMError: Error, Equatable, Sendable {
     case caNotTrusted
     case signFailed(String)
     case invalidDERData
+    case privateKeyExportFailed(String)
+    case identityCreationFailed(String)
+    case tlsContextCreationFailed
+    case tlsConfigurationFailed(String, OSStatus)
+    case tlsHandshakeFailed(OSStatus)
+    case tlsReadFailed(OSStatus)
+    case tlsWriteFailed(OSStatus)
+    case tlsIOFailed(String)
 
     public var localizedDescription: String {
         switch self {
@@ -20,8 +28,32 @@ public enum MITMError: Error, Equatable, Sendable {
             return "Failed to sign certificate: \(reason)"
         case .invalidDERData:
             return "Invalid DER-encoded certificate data"
+        case .privateKeyExportFailed(let reason):
+            return "Failed to export private key: \(reason)"
+        case .identityCreationFailed(let reason):
+            return "Failed to create TLS identity: \(reason)"
+        case .tlsContextCreationFailed:
+            return "Failed to create TLS context"
+        case .tlsConfigurationFailed(let operation, let status):
+            return "Failed to configure TLS (\(operation)): \(status)"
+        case .tlsHandshakeFailed(let status):
+            return "TLS handshake failed: \(status)"
+        case .tlsReadFailed(let status):
+            return "TLS read failed: \(status)"
+        case .tlsWriteFailed(let status):
+            return "TLS write failed: \(status)"
+        case .tlsIOFailed(let reason):
+            return "TLS transport I/O failed: \(reason)"
         }
     }
+}
+
+public struct MITMServerIdentity: @unchecked Sendable {
+    public let domain: String
+    public let certificateData: Data
+    public let certificate: SecCertificate
+    public let privateKey: SecKey
+    public let identity: SecIdentity
 }
 
 /// Certificate Authority for MITM HTTPS interception.
@@ -108,6 +140,34 @@ public actor CertificateAuthority {
     /// - Parameter domain: The domain name (e.g., "example.com")
     /// - Returns: DER-encoded certificate data
     public func generateCertificate(for domain: String) throws -> Data {
+        let (_, certificateData) = try generateDomainCertificateMaterial(for: domain)
+        return certificateData
+    }
+
+    /// Generates a complete TLS server identity for a domain.
+    /// The returned identity is used by `MITMTLSSession` for the client-facing
+    /// side of MITM TLS termination.
+    public func generateIdentity(for domain: String) throws -> MITMServerIdentity {
+        let (domainPrivateKey, certificateData) = try generateDomainCertificateMaterial(for: domain)
+        guard let certificate = SecCertificateCreateWithData(nil, certificateData as CFData) else {
+            throw MITMError.invalidDERData
+        }
+
+        let privateKey = try makeSecKey(from: domainPrivateKey)
+        guard let identity = SecIdentityCreate(nil, certificate, privateKey) else {
+            throw MITMError.identityCreationFailed("certificate public key does not match private key")
+        }
+
+        return MITMServerIdentity(
+            domain: domain,
+            certificateData: certificateData,
+            certificate: certificate,
+            privateKey: privateKey,
+            identity: identity
+        )
+    }
+
+    private func generateDomainCertificateMaterial(for domain: String) throws -> (P384.Signing.PrivateKey, Data) {
         guard let caPrivateKey = privateKey else {
             throw MITMError.certificateGenerationFailed
         }
@@ -125,8 +185,9 @@ public actor CertificateAuthority {
         }
 
         // Generate domain key pair
-        let domainPrivateKey = Certificate.PrivateKey(P384.Signing.PrivateKey())
-        let domainPublicKey = domainPrivateKey.publicKey
+        let domainPrivateKey = P384.Signing.PrivateKey()
+        let certificatePrivateKey = Certificate.PrivateKey(domainPrivateKey)
+        let domainPublicKey = certificatePrivateKey.publicKey
 
         // Compute public key bytes for SKI
         let domainPublicKeyBytes = try derBytes(for: domainPublicKey)
@@ -135,9 +196,11 @@ public actor CertificateAuthority {
         // Build extensions for domain certificate
         let extensions = try Certificate.Extensions {
             Critical(
-                BasicConstraints.isCertificateAuthority(maxPathLength: nil)
+                BasicConstraints.notCertificateAuthority
             )
-            KeyUsage(digitalSignature: true)
+            KeyUsage(digitalSignature: true, keyEncipherment: true)
+            try ExtendedKeyUsage([.serverAuth])
+            SubjectAlternativeNames([.dnsName(domain)])
             SubjectKeyIdentifier(keyIdentifier: ski)
         }
 
@@ -157,7 +220,24 @@ public actor CertificateAuthority {
         // DER encode
         var serializer = DER.Serializer()
         try domainCertificate.serialize(into: &serializer)
-        return Data(serializer.serializedBytes)
+        return (domainPrivateKey, Data(serializer.serializedBytes))
+    }
+
+    private func makeSecKey(from privateKey: P384.Signing.PrivateKey) throws -> SecKey {
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrKeySizeInBits as String: 384,
+            kSecAttrIsPermanent as String: false,
+        ]
+
+        var error: Unmanaged<CFError>?
+        guard let secKey = SecKeyCreateWithData(privateKey.x963Representation as CFData, attributes as CFDictionary, &error) else {
+            let reason = error?.takeRetainedValue().localizedDescription ?? "SecKeyCreateWithData returned nil"
+            throw MITMError.privateKeyExportFailed(reason)
+        }
+
+        return secKey
     }
 
     // MARK: - Installation

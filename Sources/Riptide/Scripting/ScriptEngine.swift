@@ -124,8 +124,12 @@ public actor ScriptEngine {
 
         let jsContext = wrapper.context
 
-        // Parse the config JSON and set it as a global variable
-        let parseScript = "var config = JSON.parse('\(configJSON.replacingOccurrences(of: "'", with: "\\'"))');"
+        // Parse the config JSON and set it as a global variable.
+        let jsonLiteralData = try JSONEncoder().encode(configJSON)
+        guard let jsonLiteral = String(data: jsonLiteralData, encoding: .utf8) else {
+            throw ScriptError.runtimeError("failed to encode config JSON literal")
+        }
+        let parseScript = "var config = JSON.parse(\(jsonLiteral));"
         jsContext.evaluateScript(parseScript)
         if let exception = jsContext.exception {
             throw ScriptError.runtimeError("failed to parse config JSON: \(exception.toString() ?? "unknown error")")
@@ -137,7 +141,7 @@ public actor ScriptEngine {
             throw ScriptError.runtimeError("transform failed: \(exception.toString() ?? "unknown error")")
         }
 
-        guard let jsonResult = result as? String else {
+        guard let jsonResult = result?.toString() else {
             throw ScriptError.runtimeError("transform did not return a valid JSON string")
         }
 
