@@ -65,8 +65,11 @@ jobs:
       - name: Build
         run: swift build
 
-      - name: Test
-        run: swift test --parallel --num-workers 1
+      - name: Test XCTest
+        run: swift test --disable-swift-testing
+
+      - name: Test Swift Testing suites
+        run: bash Scripts/ci-swift-testing-suites.sh
 
   # ── Windows: Frontend ─────────────────────────────────────────
 
