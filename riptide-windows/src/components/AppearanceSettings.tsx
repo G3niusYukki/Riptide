@@ -1,5 +1,4 @@
-import React from 'react';
-import { useTheme, ThemeName } from '../hooks/useTheme';
+import { useTheme, type ThemeName } from '../hooks/useTheme';
 
 const THEME_PREVIEWS: Record<ThemeName, { bg: string; text: string; accent: string }> = {
   dark: { bg: '#0f172a', text: '#f1f5f9', accent: '#3b82f6' },
@@ -30,7 +29,6 @@ export function AppearanceSettings() {
             {availableThemes.map((themeName) => (
               <ThemeCard
                 key={themeName}
-                name={themeName}
                 label={getThemeLabel(themeName)}
                 description={getThemeDescription(themeName)}
                 preview={THEME_PREVIEWS[themeName]}
@@ -52,7 +50,6 @@ export function AppearanceSettings() {
 }
 
 interface ThemeCardProps {
-  name: ThemeName;
   label: string;
   description: string;
   preview: { bg: string; text: string; accent: string };
@@ -60,7 +57,7 @@ interface ThemeCardProps {
   onSelect: () => void;
 }
 
-function ThemeCard({ name, label, description, preview, isSelected, onSelect }: ThemeCardProps) {
+function ThemeCard({ label, description, preview, isSelected, onSelect }: ThemeCardProps) {
   return (
     <button
       onClick={onSelect}

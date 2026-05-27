@@ -275,8 +275,8 @@ public enum MihomoConfigGenerator {
             lines.append("    mtu: 1420")
         }
         // IP address(es) assigned to this peer
-        if let ip = proxy.wireguardIP {
-            lines.append("    ip: \(yamlEscape(ip))")
+        if let wireguardAddress = proxy.wireguardIP {
+            lines.append("    ip: \(yamlEscape(wireguardAddress))")
         }
     }
 

@@ -91,8 +91,8 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     }
     
     public func getTraffic() async throws -> (up: Int, down: Int) {
-        let (up, down) = await GoCoreBridge.shared.getTraffic()
-        return (Int(up), Int(down))
+        let (uploadBytes, downloadBytes) = await GoCoreBridge.shared.getTraffic()
+        return (Int(uploadBytes), Int(downloadBytes))
     }
     
     public func testProxyDelay(name: String, url: String?, timeout: Int) async throws -> Int {

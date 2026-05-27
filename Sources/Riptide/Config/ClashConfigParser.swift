@@ -93,166 +93,207 @@ public enum ClashConfigParser {
             }
             let port = proxy.port ?? 0
 
-            switch kind {
-            case .shadowsocks:
-                guard let cipher = proxy.cipher, !cipher.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "cipher is required for Shadowsocks")
-                }
-                guard let password = proxy.password, !password.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Shadowsocks")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .shadowsocks,
-                    server: proxy.server,
-                    port: port,
-                    cipher: cipher,
-                    password: password
-                )
-
-            case .vless:
-                guard let uuid = proxy.uuid, !uuid.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VLESS")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .vless,
-                    server: proxy.server,
-                    port: port,
-                    uuid: uuid,
-                    flow: proxy.flow,
-                    sni: proxy.sni,
-                    alpn: proxy.alpn,
-                    skipCertVerify: proxy.skipCertVerify,
-                    network: proxy.network,
-                    wsPath: proxy.wsOpts?.path,
-                    wsHost: proxy.wsOpts?.headers?["Host"],
-                    grpcServiceName: proxy.grpcOpts?.grpcServiceName
-                )
-
-            case .trojan:
-                guard let password = proxy.password, !password.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Trojan")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .trojan,
-                    server: proxy.server,
-                    port: port,
-                    password: password,
-                    sni: proxy.sni,
-                    alpn: proxy.alpn,
-                    skipCertVerify: proxy.skipCertVerify,
-                    network: proxy.network
-                )
-
-            case .vmess:
-                guard let uuid = proxy.uuid, !uuid.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VMess")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .vmess,
-                    server: proxy.server,
-                    port: port,
-                    uuid: uuid,
-                    alterId: proxy.alterId,
-                    security: proxy.security,
-                    sni: proxy.sni,
-                    alpn: proxy.alpn,
-                    skipCertVerify: proxy.skipCertVerify,
-                    network: proxy.network,
-                    wsPath: proxy.wsOpts?.path,
-                    wsHost: proxy.wsOpts?.headers?["Host"]
-                )
-
-            case .socks5, .http:
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: kind,
-                    server: proxy.server,
-                    port: port,
-                    cipher: proxy.cipher,
-                    password: proxy.password
-                )
-
-            case .hysteria2:
-                guard let password = proxy.password, !password.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Hysteria2")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .hysteria2,
-                    server: proxy.server,
-                    port: port,
-                    password: password,
-                    sni: proxy.sni,
-                    skipCertVerify: proxy.skipCertVerify
-                )
-
-            case .tuic:
-                guard let uuid = proxy.uuid, !uuid.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for TUIC")
-                }
-                guard let password = proxy.password, !password.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "password is required for TUIC")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .tuic,
-                    server: proxy.server,
-                    port: port,
-                    password: password,
-                    uuid: uuid,
-                    sni: proxy.sni,
-                    alpn: proxy.alpn,
-                    skipCertVerify: proxy.skipCertVerify
-                )
-
-            case .relay:
-                guard let chainName = proxy.chain, !chainName.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "chain proxy name is required for relay")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .relay,
-                    server: proxy.server,
-                    port: port,
-                    chainProxyName: chainName
-                )
-
-            case .snell:
-                guard let password = proxy.password, !password.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "psk is required for Snell")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .snell,
-                    server: proxy.server,
-                    port: port,
-                    password: password,
-                    snellVersion: proxy.snellVersion
-                )
-
-            case .wireguard:
-                let privateKey = proxy.privateKey ?? proxy.password
-                guard let privateKey, !privateKey.isEmpty else {
-                    throw ClashConfigError.invalidProxy(index: index, reason: "private-key is required for WireGuard")
-                }
-                return ProxyNode(
-                    name: proxy.name,
-                    kind: .wireguard,
-                    server: proxy.server,
-                    port: port,
-                    password: privateKey,
-                    wireguardPublicKey: proxy.publicKey,
-                    wireguardPreSharedKey: proxy.preSharedKey,
-                    wireguardReserved: proxy.reserved?.bytes,
-                    wireguardMTU: proxy.mtu,
-                    wireguardIP: proxy.ip
-                )
-            }
+            return try parseProxyNode(proxy, kind: kind, port: port, index: index)
         }
+    }
+
+    private static func parseProxyNode(
+        _ proxy: ClashRawProxy,
+        kind: ProxyKind,
+        port: Int,
+        index: Int
+    ) throws -> ProxyNode {
+        switch kind {
+        case .shadowsocks:
+            return try shadowsocksProxyNode(proxy, port: port, index: index)
+
+        case .vless:
+            return try vlessProxyNode(proxy, port: port, index: index)
+
+        case .trojan:
+            return try trojanProxyNode(proxy, port: port, index: index)
+
+        case .vmess:
+            return try vmessProxyNode(proxy, port: port, index: index)
+
+        case .socks5, .http:
+            return ProxyNode(
+                name: proxy.name,
+                kind: kind,
+                server: proxy.server,
+                port: port,
+                cipher: proxy.cipher,
+                password: proxy.password
+            )
+
+        case .hysteria2:
+            return try hysteria2ProxyNode(proxy, port: port, index: index)
+
+        case .tuic:
+            return try tuicProxyNode(proxy, port: port, index: index)
+
+        case .relay:
+            guard let chainName = proxy.chain, !chainName.isEmpty else {
+                throw ClashConfigError.invalidProxy(index: index, reason: "chain proxy name is required for relay")
+            }
+            return ProxyNode(
+                name: proxy.name,
+                kind: .relay,
+                server: proxy.server,
+                port: port,
+                chainProxyName: chainName
+            )
+
+        case .snell:
+            return try snellProxyNode(proxy, port: port, index: index)
+
+        case .wireguard:
+            return try wireGuardProxyNode(proxy, port: port, index: index)
+        }
+    }
+
+    private static func shadowsocksProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let cipher = proxy.cipher, !cipher.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "cipher is required for Shadowsocks")
+        }
+        guard let password = proxy.password, !password.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Shadowsocks")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .shadowsocks,
+            server: proxy.server,
+            port: port,
+            cipher: cipher,
+            password: password
+        )
+    }
+
+    private static func vlessProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VLESS")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .vless,
+            server: proxy.server,
+            port: port,
+            uuid: uuid,
+            flow: proxy.flow,
+            sni: proxy.sni,
+            alpn: proxy.alpn,
+            skipCertVerify: proxy.skipCertVerify,
+            network: proxy.network,
+            wsPath: proxy.wsOpts?.path,
+            wsHost: proxy.wsOpts?.headers?["Host"],
+            grpcServiceName: proxy.grpcOpts?.grpcServiceName
+        )
+    }
+
+    private static func trojanProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let password = proxy.password, !password.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Trojan")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .trojan,
+            server: proxy.server,
+            port: port,
+            password: password,
+            sni: proxy.sni,
+            alpn: proxy.alpn,
+            skipCertVerify: proxy.skipCertVerify,
+            network: proxy.network
+        )
+    }
+
+    private static func vmessProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for VMess")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .vmess,
+            server: proxy.server,
+            port: port,
+            uuid: uuid,
+            alterId: proxy.alterId,
+            security: proxy.security,
+            sni: proxy.sni,
+            alpn: proxy.alpn,
+            skipCertVerify: proxy.skipCertVerify,
+            network: proxy.network,
+            wsPath: proxy.wsOpts?.path,
+            wsHost: proxy.wsOpts?.headers?["Host"]
+        )
+    }
+
+    private static func hysteria2ProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let password = proxy.password, !password.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "password is required for Hysteria2")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .hysteria2,
+            server: proxy.server,
+            port: port,
+            password: password,
+            sni: proxy.sni,
+            skipCertVerify: proxy.skipCertVerify
+        )
+    }
+
+    private static func tuicProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "uuid is required for TUIC")
+        }
+        guard let password = proxy.password, !password.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "password is required for TUIC")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .tuic,
+            server: proxy.server,
+            port: port,
+            password: password,
+            uuid: uuid,
+            sni: proxy.sni,
+            alpn: proxy.alpn,
+            skipCertVerify: proxy.skipCertVerify
+        )
+    }
+
+    private static func snellProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        guard let password = proxy.password, !password.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "psk is required for Snell")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .snell,
+            server: proxy.server,
+            port: port,
+            password: password,
+            snellVersion: proxy.snellVersion
+        )
+    }
+
+    private static func wireGuardProxyNode(_ proxy: ClashRawProxy, port: Int, index: Int) throws -> ProxyNode {
+        let privateKey = proxy.privateKey ?? proxy.password
+        guard let privateKey, !privateKey.isEmpty else {
+            throw ClashConfigError.invalidProxy(index: index, reason: "private-key is required for WireGuard")
+        }
+        return ProxyNode(
+            name: proxy.name,
+            kind: .wireguard,
+            server: proxy.server,
+            port: port,
+            password: privateKey,
+            wireguardPublicKey: proxy.publicKey,
+            wireguardPreSharedKey: proxy.preSharedKey,
+            wireguardReserved: proxy.reserved?.bytes,
+            wireguardMTU: proxy.mtu,
+            wireguardIP: proxy.wireguardIP
+        )
     }
 
     private static func parseProxyKind(_ rawType: String?, index: Int) throws -> ProxyKind {
@@ -284,6 +325,7 @@ public enum ClashConfigParser {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private static func parseRules(
         _ rawRules: [String]?,
         mode: ProxyMode,
@@ -494,8 +536,8 @@ public enum ClashConfigParser {
                 throw ClashConfigError.invalidProxy(index: index, reason: "unsupported proxy-group type: \(typeStr)")
             }
             let strategy: LBStrategy?
-            if let s = group.strategy {
-                strategy = (s == "consistent-hashing") ? .consistentHashing : .roundRobin
+            if let strategyName = group.strategy {
+                strategy = (strategyName == "consistent-hashing") ? .consistentHashing : .roundRobin
             } else {
                 strategy = nil
             }
@@ -529,14 +571,15 @@ public enum ClashConfigParser {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private static func parseDNSPolicy(_ raw: ClashRawDNS?) -> DNSPolicy {
         guard let raw else {
             return .default
         }
 
         let primary: [DNSResolverEndpoint]
-        if let ns = raw.nameserver, !ns.isEmpty {
-            primary = ns.map { addr in
+        if let nameservers = raw.nameserver, !nameservers.isEmpty {
+            primary = nameservers.map { addr in
                 let normalized = addr.lowercased()
                 if normalized.hasPrefix("https://") {
                     return .doh(url: addr)
@@ -564,9 +607,9 @@ public enum ClashConfigParser {
             primary = []
         }
 
-        let fb: [DNSResolverEndpoint]
+        let fallbackResolvers: [DNSResolverEndpoint]
         if let fallback = raw.fallback, !fallback.isEmpty {
-            fb = fallback.map { addr in
+            fallbackResolvers = fallback.map { addr in
                 if addr.contains(":") {
                     return DNSResolverEndpoint(kind: .udp, address: addr)
                 } else {
@@ -574,7 +617,7 @@ public enum ClashConfigParser {
                 }
             }
         } else {
-            fb = []
+            fallbackResolvers = []
         }
 
         // Parse tls-nameserver (DoT entries) — add to primary resolvers.
@@ -629,7 +672,7 @@ public enum ClashConfigParser {
 
         return DNSPolicy(
             primaryResolvers: finalPrimary,
-            fallbackResolvers: fb,
+            fallbackResolvers: fallbackResolvers,
             domainPolicies: [],
             respectRules: raw.respectRules ?? false,
             fakeIPEnabled: raw.fakeIP ?? true,
@@ -688,11 +731,11 @@ public enum ClashConfigParser {
 
             let healthCheckDict = dict["health-check"] as? [String: Any]
             let healthCheck: HealthCheckConfig?
-            if let hc = healthCheckDict {
+            if let healthCheckDetails = healthCheckDict {
                 healthCheck = HealthCheckConfig(
-                    enable: (hc["enable"] as? Bool) ?? false,
-                    url: hc["url"] as? String,
-                    interval: hc["interval"] as? Int
+                    enable: (healthCheckDetails["enable"] as? Bool) ?? false,
+                    url: healthCheckDetails["url"] as? String,
+                    interval: healthCheckDetails["interval"] as? Int
                 )
             } else {
                 healthCheck = nil
@@ -779,8 +822,8 @@ private struct ClashRawProxy: Decodable {
     let sni: String?
     let alpn: [String]?
     let skipCertVerify: Bool?
-    let wsOpts: WSOpts?
-    let grpcOpts: GRPCOpts?
+    let wsOpts: ClashRawWSOpts?
+    let grpcOpts: ClashRawGRPCOpts?
     let chain: String?
     let snellVersion: Int?
     let privateKey: String?
@@ -788,19 +831,7 @@ private struct ClashRawProxy: Decodable {
     let preSharedKey: String?
     let reserved: WireGuardReservedBytes?
     let mtu: Int?
-    let ip: String?
-
-    struct WSOpts: Codable {
-        let path: String?
-        let headers: [String: String]?
-    }
-
-    struct GRPCOpts: Codable {
-        let grpcServiceName: String?
-        private enum CodingKeys: String, CodingKey {
-            case grpcServiceName = "grpc-service-name"
-        }
-    }
+    let wireguardIP: String?
 
     private enum CodingKeys: String, CodingKey {
         case name, type, server, port, cipher, password
@@ -815,7 +846,20 @@ private struct ClashRawProxy: Decodable {
         case preSharedKey = "pre-shared-key"
         case reserved
         case mtu
-        case ip
+        case wireguardIP = "ip"
+    }
+}
+
+private struct ClashRawWSOpts: Codable {
+    let path: String?
+    let headers: [String: String]?
+}
+
+private struct ClashRawGRPCOpts: Codable {
+    let grpcServiceName: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case grpcServiceName = "grpc-service-name"
     }
 }
 

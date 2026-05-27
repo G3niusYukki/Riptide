@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { yaml } from '@codemirror/lang-yaml';
@@ -10,9 +10,12 @@ export interface YamlEditorProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
   height?: string;
-  placeholder?: string;
   className?: string;
 }
+
+type YamlParseError = Error & {
+  pos?: [number, number];
+};
 
 // YAML linter that checks for syntax errors
 const yamlLinter = linter((view) => {
@@ -22,15 +25,16 @@ const yamlLinter = linter((view) => {
   if (doc.trim()) {
     try {
       YAML.parse(doc);
-    } catch (e) {
-      if (e instanceof YAML.YAMLError && e.pos) {
-        const from = Math.min(e.pos[0], doc.length);
-        const to = Math.min(e.pos[1] || from + 1, doc.length);
+    } catch (error) {
+      const yamlError = error as YamlParseError;
+      if (yamlError.pos) {
+        const from = Math.min(yamlError.pos[0], doc.length);
+        const to = Math.min(yamlError.pos[1] || from + 1, doc.length);
         diagnostics.push({
           from,
           to,
           severity: 'error',
-          message: e.message,
+          message: yamlError.message,
         });
       }
     }
@@ -122,7 +126,6 @@ export function YamlEditor({
   onChange,
   readOnly = false,
   height = '300px',
-  placeholder = 'Enter YAML...',
   className = '',
 }: YamlEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);

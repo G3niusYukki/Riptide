@@ -1,5 +1,10 @@
 import Foundation
 
+private enum SingBoxRouteAction {
+    case append([String: Any])
+    case updateFinal(String)
+}
+
 public enum SingBoxConfigGeneratorError: Error, Equatable, Sendable, CustomStringConvertible {
     case missingRequiredField(proxyName: String, field: String)
     case unsupportedProxyKind(proxyName: String, kind: ProxyKind)
@@ -194,13 +199,13 @@ public enum SingBoxConfigGenerator {
         guard let publicKey = proxy.wireguardPublicKey, !publicKey.isEmpty else {
             throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "public-key")
         }
-        guard let ip = proxy.wireguardIP, !ip.isEmpty else {
+        guard let localAddress = proxy.wireguardIP, !localAddress.isEmpty else {
             throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "ip")
         }
 
         var outbound = baseServerOutbound(proxy: proxy, type: "wireguard")
         outbound["system_interface"] = false
-        outbound["local_address"] = [ip]
+        outbound["local_address"] = [localAddress]
         outbound["private_key"] = privateKey
         outbound["peer_public_key"] = publicKey
         if let psk = proxy.wireguardPreSharedKey, !psk.isEmpty {
@@ -229,44 +234,11 @@ public enum SingBoxConfigGenerator {
         var final = defaultOutbound(for: config)
 
         for rule in config.rules {
-            switch rule {
-            case .domain(let domain, let policy):
-                rules.append(["domain": [domain], "outbound": outboundTag(for: policy)])
-            case .domainSuffix(let suffix, let policy):
-                rules.append(["domain_suffix": [suffix], "outbound": outboundTag(for: policy)])
-            case .domainKeyword(let keyword, let policy):
-                rules.append(["domain_keyword": [keyword], "outbound": outboundTag(for: policy)])
-            case .ipCIDR(let cidr, let policy), .ipCIDR6(let cidr, let policy):
-                rules.append(["ip_cidr": [cidr], "outbound": outboundTag(for: policy)])
-            case .srcIPCIDR(let cidr, let policy):
-                rules.append(["source_ip_cidr": [cidr], "outbound": outboundTag(for: policy)])
-            case .srcPort(let port, let policy):
-                rules.append(["source_port": [port], "outbound": outboundTag(for: policy)])
-            case .dstPort(let port, let policy):
-                rules.append(["port": [port], "outbound": outboundTag(for: policy)])
-            case .processName(let name, let policy):
-                rules.append(["process_name": [name], "outbound": outboundTag(for: policy)])
-            case .geoIP(let countryCode, let policy):
-                rules.append(["geoip": [countryCode], "outbound": outboundTag(for: policy)])
-            case .geoSite(let code, _, let policy):
-                rules.append(["geosite": [code], "outbound": outboundTag(for: policy)])
-            case .ruleSet(let name, let policy):
-                rules.append(["rule_set": [name], "outbound": outboundTag(for: policy)])
-            case .not(let ruleType, let value, let policy):
-                guard let nested = invertedRule(ruleType: ruleType, value: value, outbound: outboundTag(for: policy)) else {
-                    throw SingBoxConfigGeneratorError.unsupportedRule("NOT,\(ruleType),\(value)")
-                }
-                rules.append(nested)
-            case .reject:
-                final = "block"
-            case .matchAll:
-                final = "direct"
-            case .final(let policy):
-                final = outboundTag(for: policy)
-            case .ipASN(let asn, _):
-                throw SingBoxConfigGeneratorError.unsupportedRule("IP-ASN,\(asn)")
-            case .script:
-                throw SingBoxConfigGeneratorError.unsupportedRule("SCRIPT")
+            switch try routeAction(for: rule) {
+            case .append(let routeRule):
+                rules.append(routeRule)
+            case .updateFinal(let outbound):
+                final = outbound
             }
         }
 
@@ -290,6 +262,72 @@ public enum SingBoxConfigGenerator {
             return config.proxies.first?.name ?? "direct"
         case .rule:
             return "direct"
+        }
+    }
+
+    private static func routeAction(for rule: ProxyRule) throws -> SingBoxRouteAction {
+        if let routeRule = simpleRouteRule(for: rule) {
+            return .append(routeRule)
+        }
+
+        switch rule {
+        case .not(let ruleType, let value, let policy):
+            guard let nested = invertedRule(ruleType: ruleType, value: value, outbound: outboundTag(for: policy)) else {
+                throw SingBoxConfigGeneratorError.unsupportedRule("NOT,\(ruleType),\(value)")
+            }
+            return .append(nested)
+        case .reject:
+            return .updateFinal("block")
+        case .matchAll:
+            return .updateFinal("direct")
+        case .final(let policy):
+            return .updateFinal(outboundTag(for: policy))
+        case .ipASN(let asn, _):
+            throw SingBoxConfigGeneratorError.unsupportedRule("IP-ASN,\(asn)")
+        case .script:
+            throw SingBoxConfigGeneratorError.unsupportedRule("SCRIPT")
+        case .domain,
+             .domainSuffix,
+             .domainKeyword,
+             .ipCIDR,
+             .ipCIDR6,
+             .srcIPCIDR,
+             .srcPort,
+             .dstPort,
+             .processName,
+             .geoIP,
+             .geoSite,
+             .ruleSet:
+            preconditionFailure("simple route rules are handled before routeAction switch")
+        }
+    }
+
+    private static func simpleRouteRule(for rule: ProxyRule) -> [String: Any]? {
+        switch rule {
+        case .domain(let domain, let policy):
+            return ["domain": [domain], "outbound": outboundTag(for: policy)]
+        case .domainSuffix(let suffix, let policy):
+            return ["domain_suffix": [suffix], "outbound": outboundTag(for: policy)]
+        case .domainKeyword(let keyword, let policy):
+            return ["domain_keyword": [keyword], "outbound": outboundTag(for: policy)]
+        case .ipCIDR(let cidr, let policy), .ipCIDR6(let cidr, let policy):
+            return ["ip_cidr": [cidr], "outbound": outboundTag(for: policy)]
+        case .srcIPCIDR(let cidr, let policy):
+            return ["source_ip_cidr": [cidr], "outbound": outboundTag(for: policy)]
+        case .srcPort(let port, let policy):
+            return ["source_port": [port], "outbound": outboundTag(for: policy)]
+        case .dstPort(let port, let policy):
+            return ["port": [port], "outbound": outboundTag(for: policy)]
+        case .processName(let name, let policy):
+            return ["process_name": [name], "outbound": outboundTag(for: policy)]
+        case .geoIP(let countryCode, let policy):
+            return ["geoip": [countryCode], "outbound": outboundTag(for: policy)]
+        case .geoSite(let code, _, let policy):
+            return ["geosite": [code], "outbound": outboundTag(for: policy)]
+        case .ruleSet(let name, let policy):
+            return ["rule_set": [name], "outbound": outboundTag(for: policy)]
+        case .not, .reject, .matchAll, .final, .ipASN, .script:
+            return nil
         }
     }
 
