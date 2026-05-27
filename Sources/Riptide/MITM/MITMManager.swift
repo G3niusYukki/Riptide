@@ -5,7 +5,7 @@ import Security
 /// Controls which hosts are intercepted and provides hooks for inspection/modification.
 public actor MITMManager {
     private var config: MITMConfig
-    private let ca: CertificateAuthority
+    private let certificateAuthority: CertificateAuthority
     private var httpFlowRecords: [MITMHTTPFlowRecord] = []
 
     /// Callback invoked when an intercepted connection's headers are parsed.
@@ -13,9 +13,9 @@ public actor MITMManager {
     public var onRequestIntercepted: ((String, String) -> Void)?
     public var onHTTPFlowUpdated: ((MITMHTTPFlowRecord) -> Void)?
 
-    public init(config: MITMConfig = MITMConfig(), ca: CertificateAuthority = CertificateAuthority()) {
+    public init(config: MITMConfig = MITMConfig(), certificateAuthority: CertificateAuthority = CertificateAuthority()) {
         self.config = config
-        self.ca = ca
+        self.certificateAuthority = certificateAuthority
     }
 
     // MARK: - Configuration
@@ -64,32 +64,37 @@ public actor MITMManager {
     /// Ensures the in-memory CA certificate exists and returns DER-encoded data.
     @discardableResult
     public func ensureCACertificate() async throws -> Data {
-        if let data = await ca.caCertificateData() {
+        if let data = await certificateAuthority.caCertificateData() {
             return data
         }
 
-        try await ca.generateCertificate()
-        guard let data = await ca.caCertificateData() else {
+        try await certificateAuthority.generateCertificate()
+        guard let data = await certificateAuthority.caCertificateData() else {
             throw MITMError.certificateGenerationFailed
         }
         return data
     }
 
     /// Returns the generated CA certificate for installation in the system keychain.
+    public func caCertificateData() async -> Data? {
+        await certificateAuthority.caCertificateData()
+    }
+
+    /// Returns the generated CA certificate for installation in the system keychain.
     public func caCertificate() async -> SecCertificate? {
-        guard let data = await ca.caCertificateData() else { return nil }
+        guard let data = await certificateAuthority.caCertificateData() else { return nil }
         return SecCertificateCreateWithData(nil, data as CFData)
     }
 
     /// Generates a per-host server identity signed by Riptide's in-memory CA.
     public func serverIdentity(for host: String) async throws -> MITMServerIdentity {
         try await ensureCACertificate()
-        return try await ca.generateIdentity(for: host)
+        return try await certificateAuthority.generateIdentity(for: host)
     }
 
     /// Checks if the CA certificate is installed in the keychain.
     public func isCAInstalled() async -> Bool {
-        await ca.isCAInstalled()
+        await certificateAuthority.isCAInstalled()
     }
 
     /// Compatibility alias for older app code. This only confirms installation;

@@ -9,9 +9,11 @@ struct MITMManagerTests {
         let manager = MITMManager()
 
         let data = try await manager.ensureCACertificate()
-        let certificate = await manager.caCertificate()
+        let certificateData = await manager.caCertificateData()
+        let certificate = certificateData.flatMap { SecCertificateCreateWithData(nil, $0 as CFData) }
 
         #expect(!data.isEmpty)
+        #expect(certificateData == data)
         #expect(certificate != nil)
     }
 
@@ -19,8 +21,8 @@ struct MITMManagerTests {
     func caCertificateNilBeforeGeneration() async {
         let manager = MITMManager()
 
-        let certificate = await manager.caCertificate()
+        let certificateData = await manager.caCertificateData()
 
-        #expect(certificate == nil)
+        #expect(certificateData == nil)
     }
 }
