@@ -150,14 +150,13 @@ async fn probe(client: &MihomoApiClient) -> bool {
 /// Best-effort — returns `None` on parse failure. We compare consecutive reads
 /// for equality, so transient parse blips just look like one missed tick.
 fn read_default_gateway() -> Option<String> {
-    use std::os::windows::process::CommandExt;
+    use crate::utils::process::CommandExt;
     use std::process::Command;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     let output = Command::new("route")
         .arg("print")
         .arg("0.0.0.0")
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .output()
         .ok()?;
     if !output.status.success() {

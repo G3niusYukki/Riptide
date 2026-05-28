@@ -12,7 +12,7 @@
 //! crash that triggered the switch is visible across app restarts.
 
 use serde::{Deserialize, Serialize};
-use std::os::windows::process::CommandExt;
+use crate::utils::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -63,7 +63,7 @@ pub fn arm() -> Result<(), String> {
     log::warn!("Arming kill switch — installing blackhole default route");
     let output = Command::new("route")
         .args(["add", "0.0.0.0", "mask", "0.0.0.0", "127.0.0.1", "metric", "1"])
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .output()
         .map_err(|e| format!("Failed to run route.exe: {}", e))?;
 
@@ -92,7 +92,7 @@ pub fn release() -> Result<(), String> {
     log::info!("Releasing kill switch — removing blackhole default route");
     let output = Command::new("route")
         .args(["delete", "0.0.0.0", "mask", "0.0.0.0", "127.0.0.1"])
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .output()
         .map_err(|e| format!("Failed to run route.exe: {}", e))?;
 

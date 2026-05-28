@@ -16,7 +16,7 @@
 //!   - Active connections (leaks visited hosts)
 //!   - WebDAV credentials
 
-use std::os::windows::process::CommandExt;
+use crate::utils::process::CommandExt;
 use std::process::Command;
 
 use serde::Serialize;
@@ -148,7 +148,7 @@ fn os_version_string() -> String {
     // for triage. Avoid an extra winapi crate dependency just for this.
     Command::new("cmd")
         .args(["/C", "ver"])
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .output()
         .ok()
         .and_then(|out| {
@@ -164,7 +164,7 @@ fn os_version_string() -> String {
 fn query_mihomo_version(path: &str) -> Option<String> {
     let out = Command::new(path)
         .arg("-v")
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .output()
         .ok()?;
     if !out.status.success() {

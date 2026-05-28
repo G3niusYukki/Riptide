@@ -12,6 +12,7 @@
 
 use crate::cmds::config::AppState;
 use crate::config::parser::ClashRawProxy;
+#[cfg(target_os = "windows")]
 use crate::config::profiles::storage;
 use serde_yaml::Value;
 use tauri::State;

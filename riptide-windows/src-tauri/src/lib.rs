@@ -13,6 +13,7 @@ use crate::core::mihomo::MihomoManager;
 use crate::core::mode_coordinator::ModeCoordinator;
 use crate::core::sysproxy::SystemProxyController;
 use crate::cmds::config::AppState;
+#[cfg(target_os = "windows")]
 use crate::utils::hotkeys::init_hotkeys;
 
 fn autostart_args() -> Option<Vec<&'static str>> {

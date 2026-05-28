@@ -29,8 +29,6 @@ impl LinuxTun {
 
         let config = tokio_tun::TunBuilder::new()
             .name(name)
-            .tap(false)
-            .packet_info(false)
             .mtu(mtu as i32)
             .address(ip)
             .netmask(netmask_from_prefix(prefix_len))
