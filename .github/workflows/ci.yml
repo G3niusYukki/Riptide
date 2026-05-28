@@ -7,9 +7,6 @@ on:
     branches: [master]
   workflow_dispatch:
 
-env:
-  SWIFT_VERSION: "6.2"
-
 jobs:
   # ── macOS: Swift ──────────────────────────────────────────────
 
@@ -41,16 +38,16 @@ jobs:
 
   swift-build-test:
     name: Swift Build & Test
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     needs: swift-lint
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Swift
-        uses: swift-actions/setup-swift@v2
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
         with:
-          swift-version: ${{ env.SWIFT_VERSION }}
+          xcode-version: latest-stable
 
       - name: Cache Swift packages
         uses: actions/cache@v5
@@ -59,11 +56,14 @@ jobs:
           key: ${{ runner.os }}-swift-${{ hashFiles('Package.resolved') }}
           restore-keys: ${{ runner.os }}-swift-
 
-      - name: Download mihomo binary
-        run: ./Scripts/download-mihomo.sh
+      - name: Disk space
+        run: df -h /
 
       - name: Swift version
         run: swift --version
+
+      - name: Download mihomo binary
+        run: ./Scripts/download-mihomo.sh
 
       - name: Build
         run: swift build
