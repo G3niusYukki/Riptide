@@ -511,7 +511,7 @@ public actor DiagnosticsRunner {
                 try trustProcess.run()
                 trustProcess.waitUntilExit()
                 let trustData = trustPipe.fileHandleForReading.readDataToEndOfFile()
-                let trustOutput = String(data: trustData, encoding: .utf8) ?? ""
+                _ = String(data: trustData, encoding: .utf8) ?? ""
 
                 return DiagnosticCheck(
                     id: "mitm_cert",

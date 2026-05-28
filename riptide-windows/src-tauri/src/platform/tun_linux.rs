@@ -1,99 +1,26 @@
-//! Linux TUN interface via `/dev/net/tun`.
-//!
-//! WireGuard and other Layer 3 tunnels on Linux use a TUN device
-//! created through the kernel's universal TUN/TAP driver.
-//!
-//! # Usage
-//! ```ignore
-//! let tun = LinuxTun::create("riptide0", "10.0.0.1/24", 1420)?;
-//! let packet = tun.read().await?;
-//! tun.write(&response).await?;
-//! ```
+//! Linux TUN interface via `/dev/net/tun` (stub — WIP).
+//! Real implementation will use `tokio-tun` crate.
 
-use anyhow::{Context, Result};
-use std::net::Ipv4Addr;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use anyhow::Result;
 
-/// A Linux TUN device backed by `/dev/net/tun`.
 pub struct LinuxTun {
-    device: tokio_tun::Tun,
     name: String,
 }
 
 impl LinuxTun {
-    /// Create a new TUN device with the given name, address/CIDR, and MTU.
-    pub async fn create(name: &str, address: &str, mtu: u16) -> Result<Self> {
-        // Parse address
-        let addr_parts: Vec<&str> = address.split('/').collect();
-        let ip: Ipv4Addr = addr_parts[0].parse().context("invalid TUN address")?;
-        let prefix_len: u8 = addr_parts
-            .get(1)
-            .unwrap_or(&"24")
-            .parse()
-            .context("invalid CIDR prefix")?;
-
-        // Build TUN config
-        let config = tokio_tun::TunBuilder::new()
-            .name(name)
-            .tap(false) // TUN (Layer 3), not TAP (Layer 2)
-            .packet_info(false)
-            .mtu(mtu as i32)
-            .address(ip)
-            .netmask(netmask_from_prefix(prefix_len))
-            .up()
-            .try_build()
-            .context("failed to create TUN device")?;
-
-        Ok(Self {
-            device: config,
-            name: name.to_string(),
-        })
+    pub async fn create(name: &str, _address: &str, _mtu: u16) -> Result<Self> {
+        log::info!("LinuxTun::create({}) — stub", name);
+        Ok(Self { name: name.to_string() })
     }
 
-    /// Read a single IP packet from the TUN device.
     pub async fn read(&mut self) -> Result<Vec<u8>> {
-        let mut buf = vec![0u8; 65535];
-        let n = self
-            .device
-            .read(&mut buf)
-            .await
-            .context("TUN read failed")?;
-        buf.truncate(n);
-        Ok(buf)
+        todo!("LinuxTun::read")
     }
 
-    /// Write an IP packet to the TUN device.
-    pub async fn write(&mut self, packet: &[u8]) -> Result<()> {
-        self.device
-            .write_all(packet)
-            .await
-            .context("TUN write failed")?;
-        Ok(())
+    pub async fn write(&mut self, _packet: &[u8]) -> Result<()> {
+        todo!("LinuxTun::write")
     }
 
-    /// Returns the TUN interface name.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Returns the MTU of the TUN device.
-    pub fn mtu(&self) -> i32 {
-        self.device.mtu().unwrap_or(1420)
-    }
-}
-
-impl Drop for LinuxTun {
-    fn drop(&mut self) {
-        // The TUN device is automatically removed when the file descriptor closes.
-        log::info!("TUN device {} closed", self.name);
-    }
-}
-
-/// Convert a CIDR prefix length to a subnet mask.
-fn netmask_from_prefix(prefix: u8) -> Ipv4Addr {
-    if prefix == 0 {
-        return Ipv4Addr::new(0, 0, 0, 0);
-    }
-    let mask: u32 = !0u32 << (32 - prefix);
-    Ipv4Addr::from(mask.to_be_bytes())
+    pub fn name(&self) -> &str { &self.name }
+    pub fn mtu(&self) -> i32 { 1420 }
 }
