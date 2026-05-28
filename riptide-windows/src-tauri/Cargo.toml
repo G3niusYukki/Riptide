@@ -75,10 +75,7 @@ winapi = { version = "0.3", features = [
 # ── Linux platform dependencies ──────────────────────────────────
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# Linux-specific deps — currently stubbed; uncomment when implementing:
-# tokio-tun = "0.12"
-# zbus = { version = "5", default-features = false, features = ["tokio"] }
-# tray-icon = { version = "0.19", features = ["libxdo"] }
+tokio-tun = "0.12"
 
 [profile.release]
 strip = true
