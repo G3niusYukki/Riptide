@@ -14,7 +14,14 @@ pub mod region_presets;
 pub mod secrets;
 pub mod subscription_scheduler;
 pub mod sysproxy;
+#[cfg(target_os = "windows")]
 pub mod service;
+#[cfg(not(target_os = "windows"))]
+pub mod service {
+    pub use super::service_linux::*;
+}
+#[cfg(not(target_os = "windows"))]
+mod service_linux;
 pub mod tls_tricks;
 pub mod tray;
 pub mod warp;

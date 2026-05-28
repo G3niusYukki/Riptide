@@ -526,7 +526,7 @@ public actor DiagnosticsRunner {
                     name: "MITM 证书",
                     status: .warning,
                     detail: "Riptide CA 未找到或未安装",
-                    suggestion: "在设置 → MITM 中生成并安装 CA 证书，然后在钥匙串中标记为"始终信任""
+                    suggestion: "在设置 → MITM 中生成并安装 CA 证书，然后在钥匙串中标记为「始终信任」"
                 )
             }
         } catch {

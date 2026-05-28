@@ -10,10 +10,6 @@ default-run = "riptide-windows"
 name = "riptide_windows_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[[bin]]
-name = "riptide-tun-service"
-path = "src/bin/tun_service.rs"
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -25,7 +21,6 @@ tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-updater = "2"
-sysproxy = "0.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -38,7 +33,6 @@ tracing-appender = "0.2"
 tracing-log = "0.2"
 anyhow = "1"
 thiserror = "2"
-windows-service = "0.7"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -62,6 +56,8 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-deep-link = "2"
 
 [target.'cfg(windows)'.dependencies]
+sysproxy = "0.3"
+windows-service = "0.7"
 winapi = { version = "0.3", features = [
     "wininet",
     "minwindef",
