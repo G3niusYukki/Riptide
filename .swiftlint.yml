@@ -39,6 +39,29 @@ large_tuple:
   warning: 6
   error: 8
 
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  allowed_symbols: [_]
+  excluded:
+    - id
+    - vm
+    - ip
+    - cc
+    - kw
+    - ms
+    - sa
+    - tv
+    - x
+    - y
+    - z
+    - i
+    - j
+    - k
+    - dx
+    - dy
+
 excluded:
   - vendor/
   - .build/

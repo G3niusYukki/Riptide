@@ -36,3 +36,9 @@ create-pr.sh
 Resources/mihomo
 Resources/mihomo-*
 *.gz
+
+# Node / frontend
+node_modules/
+
+# Reasonix artifacts
+.reasonix/
