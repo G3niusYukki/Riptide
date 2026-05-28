@@ -1,0 +1,53 @@
+# Riptide Community Rules — Index
+
+version: 1
+updated: "2026-01-01T00:00:00Z"
+
+rulesets:
+  - id: reject-ads
+    name: "广告拦截 (Ad Block)"
+    description: "Block ads and tracking domains. 拦截常见广告与用户追踪域名。"
+    category: privacy
+    behavior: domain
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/reject-ads.yaml"
+    count: 50
+
+  - id: cn-domain
+    name: "国内直连域名 (CN Direct Domains)"
+    description: "Route Chinese websites directly. 国内常用网站直连。"
+    category: routing
+    behavior: domain
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/cn-domain.yaml"
+    count: 50
+
+  - id: geoip-cn
+    name: "国内 IP 直连 (CN GeoIP)"
+    description: "Route Chinese IPs directly via MaxMind/GeoLite2. 中国大陆 IP 直连。"
+    category: routing
+    behavior: ipcidr
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/geoip-cn.yaml"
+    count: 8000
+
+  - id: apple-services
+    name: "Apple 服务分流 (Apple Services)"
+    description: "Route Apple services for best performance in mainland China. 优化 Apple 服务连接。"
+    category: routing
+    behavior: domain
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/apple-services.yaml"
+    count: 38
+
+  - id: openai
+    name: "AI 服务 (AI Services)"
+    description: "OpenAI, Claude, Gemini API domains. AI 服务域名。"
+    category: routing
+    behavior: domain
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/ai-services.yaml"
+    count: 15
+
+  - id: streaming-us
+    name: "流媒体 (US Streaming)"
+    description: "Netflix, Disney+, HBO Max, Hulu, YouTube. 美国流媒体域名。"
+    category: media
+    behavior: domain
+    url: "https://raw.githubusercontent.com/riptide/riptide-rules/main/streaming-us.yaml"
+    count: 25

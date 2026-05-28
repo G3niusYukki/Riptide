@@ -76,6 +76,13 @@ winapi = { version = "0.3", features = [
     "wincrypt",
 ] }
 
+# ── Linux platform dependencies ──────────────────────────────────
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tokio-tun = "0.12"                     # /dev/net/tun
+zbus = { version = "5", default-features = false, features = ["tokio"] }  # D-Bus for system proxy
+tray-icon = { version = "0.19", features = ["libxdo"] }  # system tray on Linux
+
 [profile.release]
 strip = true
 lto = true

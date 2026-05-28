@@ -1,0 +1,113 @@
+// swift-tools-version: 6.0
+// Package.swift — post M1.4 module split
+// Preview: replace Package.swift after file migration.
+// See docs/MODULE-SPLIT.md for migration steps.
+
+import PackageDescription
+
+let package = Package(
+    name: "Riptide",
+    defaultLocalization: "en",
+    platforms: [
+        .macOS(.v14),
+        .iOS(.v17),        // ← NEW: iOS support
+    ],
+    products: [
+        .library(name: "RiptideCore", targets: ["RiptideCore"]),
+        .library(name: "RiptideMac", targets: ["RiptideMac"]),
+        .executable(name: "riptide", targets: ["RiptideCLI"]),
+        .executable(name: "RiptideApp", targets: ["RiptideApp"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.1"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+    ],
+    targets: [
+        // ── Cross-platform core library ──────────────────────────
+
+        .target(
+            name: "RiptideCore",
+            dependencies: [
+                .product(name: "Yams", package: "Yams"),
+                .product(name: "X509", package: "swift-certificates"),
+                "GoCore",
+                "RiptideSecurityShim",
+            ],
+            path: "Sources/RiptideCore",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+
+        // ── macOS-specific library ────────────────────────────────
+
+        .target(
+            name: "RiptideMac",
+            dependencies: [
+                "RiptideCore",
+            ],
+            path: "Sources/RiptideMac",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+
+        // ── Security shim ─────────────────────────────────────────
+
+        .target(name: "RiptideSecurityShim"),
+
+        // ── CLI ───────────────────────────────────────────────────
+
+        .executableTarget(
+            name: "RiptideCLI",
+            dependencies: [
+                "RiptideCore",
+                "RiptideMac",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
+        ),
+
+        // ── macOS App ─────────────────────────────────────────────
+
+        .executableTarget(
+            name: "RiptideApp",
+            dependencies: [
+                "RiptideCore",
+                "RiptideMac",
+                .product(name: "Yams", package: "Yams"),
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
+            resources: [.process("Assets.xcassets")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+
+        // ── TUN Extension (macOS) ─────────────────────────────────
+
+        .target(
+            name: "RiptideTunnel",
+            dependencies: [
+                "RiptideCore",
+                "RiptideMac",
+            ],
+            path: "Sources/RiptideTunnel",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+
+        // ── Tests ─────────────────────────────────────────────────
+
+        .testTarget(
+            name: "RiptideTests",
+            dependencies: [
+                "RiptideCore",
+                "RiptideMac",
+                "RiptideCLI",
+            ]
+        ),
+
+        // ── Binary dependency ─────────────────────────────────────
+
+        .binaryTarget(
+            name: "GoCore",
+            path: "Frameworks/GoCore.xcframework"
+        ),
+    ]
+)

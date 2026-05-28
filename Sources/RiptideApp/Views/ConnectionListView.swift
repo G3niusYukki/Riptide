@@ -1,20 +1,68 @@
 import SwiftUI
 
-/// Real-time view of active connections with search and close support.
+/// Filter mode for connection list.
+enum ConnectionFilter: String, CaseIterable {
+    case all = "全部"
+    case proxied = "代理"
+    case direct = "直连"
+
+    func matches(_ conn: ConnectionInfo) -> Bool {
+        switch self {
+        case .all: return true
+        case .proxied: return conn.proxyName != "Direct"
+        case .direct: return conn.proxyName == "Direct"
+        }
+    }
+}
+
+/// Sort order for connection list.
+enum ConnectionSort: String, CaseIterable {
+    case newest = "最新"
+    case host = "域名"
+    case traffic = "流量"
+
+    func comparator() -> (ConnectionInfo, ConnectionInfo) -> Bool {
+        switch self {
+        case .newest:
+            return { ($0.startTime ?? "") > ($1.startTime ?? "") }
+        case .host:
+            return { $0.host.localizedCompare($1.host) == .orderedAscending }
+        case .traffic:
+            return { ($0.uploadBytes + $0.downloadBytes) > ($1.uploadBytes + $1.downloadBytes) }
+        }
+    }
+}
+
+/// Real-time view of active connections with search, filter, sort, and close support.
 struct ConnectionListView: View {
     @Bindable var vm: AppViewModel
     @State private var searchText = ""
     @State private var isClosingAll = false
     @State private var expandedConnectionId: UUID?
+    @State private var selectedFilter: ConnectionFilter = .all
+    @State private var selectedSort: ConnectionSort = .newest
 
     private var filteredConnections: [ConnectionInfo] {
-        guard !searchText.isEmpty else { return vm.activeConnections }
-        let query = searchText.lowercased()
-        return vm.activeConnections.filter { conn in
-            conn.host.lowercased().contains(query)
-            || conn.proxyName.lowercased().contains(query)
-            || conn.`protocol`.lowercased().contains(query)
+        var result = vm.activeConnections.filter { selectedFilter.matches($0) }
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter { conn in
+                conn.host.lowercased().contains(query)
+                || conn.proxyName.lowercased().contains(query)
+                || conn.`protocol`.lowercased().contains(query)
+                || (conn.matchedRule?.lowercased().contains(query) ?? false)
+            }
         }
+        result.sort(by: selectedSort.comparator())
+        return result
+    }
+
+    private var filterCounts: [ConnectionFilter: Int] {
+        [
+            .all: vm.activeConnections.count,
+            .proxied: vm.activeConnections.filter { $0.proxyName != "Direct" }.count,
+            .direct: vm.activeConnections.filter { $0.proxyName == "Direct" }.count,
+        ]
     }
 
     var body: some View {
@@ -37,6 +85,45 @@ struct ConnectionListView: View {
                             .font(.caption)
                     }
                     .disabled(isClosingAll)
+                }
+            }
+
+            // Filter + Sort toolbar
+            if !vm.activeConnections.isEmpty {
+                HStack(spacing: 8) {
+                    // Filter chips
+                    ForEach(ConnectionFilter.allCases, id: \.self) { filter in
+                        let count = filterCounts[filter] ?? 0
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedFilter = filter
+                                expandedConnectionId = nil
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(filter.rawValue)
+                                Text("(\(count))")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.subtext)
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(selectedFilter == filter ? Theme.accent : Color.white.opacity(0.05))
+                            .foregroundStyle(selectedFilter == filter ? .black : Theme.text)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                    // Sort picker
+                    Picker("排序", selection: $selectedSort) {
+                        ForEach(ConnectionSort.allCases, id: \.self) { sort in
+                            Text(sort.rawValue).tag(sort)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
                 }
             }
 

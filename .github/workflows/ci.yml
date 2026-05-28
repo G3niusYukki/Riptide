@@ -134,3 +134,45 @@ jobs:
 
       - name: Cargo test (compile only — wintun.dll required at runtime)
         run: cargo test --no-run --verbose
+
+  # ── Linux: Rust check ─────────────────────────────────────────
+
+  linux-check:
+    name: Linux (cargo check)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ./riptide-windows/src-tauri
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js (for Tauri runtime dep)
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./riptide-windows/src-tauri
+
+      - name: Cargo check (Linux target)
+        run: cargo check --target x86_64-unknown-linux-gnu

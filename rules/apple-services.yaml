@@ -1,0 +1,54 @@
+# Riptide Community Rules
+# Category: Apple services (China mainland)
+# Behavior: domain
+# Updated: auto
+
+payload:
+  # Apple core
+  - DOMAIN-SUFFIX,apple.com
+  - DOMAIN-SUFFIX,apple.com.cn
+  - DOMAIN-SUFFIX,icloud.com
+  - DOMAIN-SUFFIX,icloud.com.cn
+  - DOMAIN-SUFFIX,icloud-content.com
+  - DOMAIN-SUFFIX,me.com
+  - DOMAIN-SUFFIX,mzstatic.com
+  - DOMAIN-SUFFIX,aaplimg.com
+  - DOMAIN-SUFFIX,cdn-apple.com
+  - DOMAIN-SUFFIX,apple-dns.net
+  - DOMAIN-SUFFIX,apple.news
+
+  # App Store
+  - DOMAIN-SUFFIX,itunes.apple.com
+  - DOMAIN-SUFFIX,apps.apple.com
+  - DOMAIN-SUFFIX,purchase.apple.com
+
+  # Apple Music
+  - DOMAIN-SUFFIX,music.apple.com
+  - DOMAIN-SUFFIX,apple-music.com
+
+  # iMessage / FaceTime
+  - DOMAIN-SUFFIX,appleid.apple.com
+  - DOMAIN-SUFFIX,gs.apple.com
+  - DOMAIN-SUFFIX,push.apple.com
+  - DOMAIN-SUFFIX,courier.push.apple.com
+  - DOMAIN-SUFFIX,ess.apple.com
+
+  # Software Update
+  - DOMAIN-SUFFIX,swcdn.apple.com
+  - DOMAIN-SUFFIX,swdist.apple.com
+  - DOMAIN-SUFFIX,updates-http.cdn-apple.com
+  - DOMAIN-SUFFIX,mesu.apple.com
+  - DOMAIN-SUFFIX,gdmf.apple.com
+
+  # Developer
+  - DOMAIN-SUFFIX,developer.apple.com
+  - DOMAIN-SUFFIX,devimages-cdn.apple.com
+  - DOMAIN-SUFFIX,devstreaming-cdn.apple.com
+
+  # Map
+  - DOMAIN-SUFFIX,gspe1-ssl.ls.apple.com
+  - DOMAIN-SUFFIX,map.apple.com
+
+  # Siri / Apple Intelligence
+  - DOMAIN-SUFFIX,siri.apple.com
+  - DOMAIN-SUFFIX,smoot.apple.com

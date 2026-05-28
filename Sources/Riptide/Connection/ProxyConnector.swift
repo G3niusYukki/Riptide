@@ -58,9 +58,7 @@ public struct ProxyConnector: Sendable {
             case .tuic:
                 return try await performTUICConnect(connection: connection, node: node, target: target)
             case .wireguard:
-                // WireGuard is handled by mihomo sidecar; the library does not
-                // implement a native WireGuard protocol handler.
-                throw ProtocolError.connectionRejected("WireGuard requires mihomo runtime")
+                return try await performWireGuardConnect(connection: connection, node: node, target: target)
             case .relay:
                 // Relay is handled at the LiveTunnelRuntime level where the full proxy
                 // profile is available to resolve the chain. A relay node should never
@@ -276,6 +274,46 @@ public struct ProxyConnector: Sendable {
         let version = node.snellVersion ?? 2
         let snellStream = SnellStream(session: connection.session, password: password, version: version)
         try await snellStream.connect(to: target)
+        return ConnectedProxyContext(node: node, connection: connection)
+    }
+
+    /// Native WireGuard connection via the Swift implementation.
+    ///
+    /// WireGuard is a Layer 3 tunnel, so this method wraps the connection
+    /// target's IP packets through the WireGuard UDP tunnel.
+    /// In production, this integrates with the `WireGuardStream` and
+    /// reuses the `WireGuardHandshake` state for the given peer.
+    private func performWireGuardConnect(
+        connection: PooledTransportConnection,
+        node: ProxyNode,
+        target: ConnectionTarget
+    ) async throws -> ConnectedProxyContext {
+        // Build WireGuard configuration from ProxyNode fields
+        guard let privateKey = node.wireguardPrivateKey,
+              let localAddress = node.wireguardIP,
+              let peerPublicKey = node.wireguardPublicKey else {
+            throw ProtocolError.connectionRejected("WireGuard node missing keys or address")
+        }
+
+        let wgConfig = WireGuardConfig(
+            privateKey: privateKey,
+            localAddress: localAddress,
+            mtu: node.wireguardMTU ?? WireGuardConstants.defaultMTU,
+            peers: [
+                WireGuardConfig.WireGuardPeer(
+                    publicKey: peerPublicKey,
+                    preSharedKey: node.wireguardPreSharedKey,
+                    endpoint: "\(node.host):\(node.port)",
+                    allowedIPs: ["0.0.0.0/0"],
+                    persistentKeepalive: 25,
+                    reserved: node.wireguardReserved.flatMap { Data($0) }
+                )
+            ]
+        )
+
+        let handshake = try WireGuardHandshake(config: wgConfig)
+        let wgStream = WireGuardStream(config: wgConfig, handshake: handshake)
+        try await wgStream.connect(to: target.host, port: target.port)
         return ConnectedProxyContext(node: node, connection: connection)
     }
 

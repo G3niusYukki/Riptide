@@ -3,6 +3,7 @@ import Riptide
 
 struct RulesTabView: View {
     @Bindable var vm: AppViewModel
+    @State private var showRuleMarket = false
 
     var body: some View {
         ScrollView {
@@ -35,6 +36,14 @@ struct RulesTabView: View {
                             .font(.headline)
                             .foregroundStyle(Theme.text)
                         Spacer()
+                        Button {
+                            showRuleMarket = true
+                        } label: {
+                            Label("规则市场", systemImage: "cart")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                         Text("共 \(vm.rules.count) 条")
                             .font(.caption)
                             .foregroundStyle(Theme.subtext)
@@ -52,6 +61,9 @@ struct RulesTabView: View {
             .padding()
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
+        .sheet(isPresented: $showRuleMarket) {
+            RuleMarketView()
+        }
     }
 }
 

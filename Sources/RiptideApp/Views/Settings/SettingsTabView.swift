@@ -26,6 +26,28 @@ struct SettingsTabView: View {
                         }
 
                         NavigationLink {
+                            SceneEditorView(vm: vm)
+                        } label: {
+                            SettingsRow(
+                                icon: "wifi.circle",
+                                title: "场景管理",
+                                subtitle: "创建 WiFi 场景，自动切换代理模式和节点",
+                                accent: Theme.success
+                            )
+                        }
+
+                        NavigationLink {
+                            PerAppRuleEditor(vm: vm)
+                        } label: {
+                            SettingsRow(
+                                icon: "square.grid.3x3.topleft.filled",
+                                title: "应用分流",
+                                subtitle: "为不同 App 设置独立的代理策略",
+                                accent: Theme.accent
+                            )
+                        }
+
+                        NavigationLink {
                             // Gateway settings placeholder — backend ready
                             GatewaySettingsPlaceholderView()
                         } label: {
