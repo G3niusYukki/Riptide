@@ -370,7 +370,8 @@ public actor DiagnosticsRunner {
                     let ret = connect(sock, &sa, socklen_t(MemoryLayout<sockaddr_in>.size))
                     if ret < 0 && errno == EINPROGRESS {
                         var tv = timeval(tv_sec: 2, tv_usec: 0)
-                        var wfds = fd_set(fds_bits: (0, 0))
+                        var wfds = fd_set()
+                        // Set the bit for this socket in the fd_set
                         wfds.fds_bits.0 = 1 << Int32(sock % 32)
                         let selRet = select(sock + 1, nil, &wfds, nil, &tv)
                         if selRet > 0 {

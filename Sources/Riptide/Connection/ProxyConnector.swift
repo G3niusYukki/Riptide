@@ -288,33 +288,12 @@ public struct ProxyConnector: Sendable {
         node: ProxyNode,
         target: ConnectionTarget
     ) async throws -> ConnectedProxyContext {
-        // Build WireGuard configuration from ProxyNode fields
-        guard let privateKey = node.wireguardPrivateKey,
-              let localAddress = node.wireguardIP,
-              let peerPublicKey = node.wireguardPublicKey else {
-            throw ProtocolError.connectionRejected("WireGuard node missing keys or address")
-        }
-
-        let wgConfig = WireGuardConfig(
-            privateKey: privateKey,
-            localAddress: localAddress,
-            mtu: node.wireguardMTU ?? WireGuardConstants.defaultMTU,
-            peers: [
-                WireGuardConfig.WireGuardPeer(
-                    publicKey: peerPublicKey,
-                    preSharedKey: node.wireguardPreSharedKey,
-                    endpoint: "\(node.host):\(node.port)",
-                    allowedIPs: ["0.0.0.0/0"],
-                    persistentKeepalive: 25,
-                    reserved: node.wireguardReserved.flatMap { Data($0) }
-                )
-            ]
+        // WireGuard native implementation scheduled for M3.2.
+        // Currently delegates to mihomo sidecar; see Sources/RiptideCore/Protocols/WireGuard/
+        // for the in-progress Swift implementation.
+        throw ProtocolError.connectionRejected(
+            "WireGuard native transport not yet integrated. Use mihomo runtime for WireGuard nodes."
         )
-
-        let handshake = try WireGuardHandshake(config: wgConfig)
-        let wgStream = WireGuardStream(config: wgConfig, handshake: handshake)
-        try await wgStream.connect(to: target.host, port: target.port)
-        return ConnectedProxyContext(node: node, connection: connection)
     }
 
 }
