@@ -1,6 +1,14 @@
 //! Riptide Windows - A native Windows proxy client
 
+#[cfg(target_os = "windows")]
 pub mod cli;
+
+// Re-export OneShotResult for main.rs on all platforms
+#[cfg(not(target_os = "windows"))]
+pub mod cli {
+    pub enum OneShotResult { Continue }
+    pub fn handle_one_shot_cli() -> OneShotResult { OneShotResult::Continue }
+}
 pub mod cmds;
 pub mod config;
 pub mod core;
@@ -189,8 +197,11 @@ pub fn run() {
             cmds::config::validate_config,
             cmds::config::get_active_profile,
             cmds::config::set_active_profile,
+            #[cfg(target_os = "windows")]
             cmds::config::refresh_profile,
+            #[cfg(target_os = "windows")]
             cmds::config::set_profile_subscription,
+            #[cfg(target_os = "windows")]
             cmds::config::get_profile_metadata,
             // Per-proxy editor (in-profile CRUD)
             cmds::proxy_editor::list_profile_proxies,
@@ -245,17 +256,24 @@ pub fn run() {
             cmds::mode::mode_switch_to_system_proxy,
             cmds::mode::mode_switch_to_tun,
             cmds::mode::mode_switch_off,
-            // System commands
+            // System commands (cross-platform)
             cmds::system::enable_system_proxy,
             cmds::system::disable_system_proxy,
             cmds::system::get_system_proxy_status,
-            cmds::system::install_tun_service,
-            cmds::system::uninstall_tun_service,
-            cmds::system::start_tun_service,
-            cmds::system::stop_tun_service,
-            cmds::system::get_tun_service_status,
-            cmds::system::is_elevated,
             cmds::system::check_update,
+            // System commands (Windows-only — require SCM / elevation)
+            #[cfg(target_os = "windows")]
+            cmds::system::install_tun_service,
+            #[cfg(target_os = "windows")]
+            cmds::system::uninstall_tun_service,
+            #[cfg(target_os = "windows")]
+            cmds::system::start_tun_service,
+            #[cfg(target_os = "windows")]
+            cmds::system::stop_tun_service,
+            #[cfg(target_os = "windows")]
+            cmds::system::get_tun_service_status,
+            #[cfg(target_os = "windows")]
+            cmds::system::is_elevated,
             // Windows-specific commands
             #[cfg(target_os = "windows")]
             cmds::windows::start_windows_proxy,
