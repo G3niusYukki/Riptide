@@ -6,7 +6,7 @@ pub mod cli;
 // Re-export OneShotResult for main.rs on all platforms
 #[cfg(not(target_os = "windows"))]
 pub mod cli {
-    pub enum OneShotResult { Continue }
+    pub enum OneShotResult { Continue, Exit(i32) }
     pub fn handle_one_shot_cli() -> OneShotResult { OneShotResult::Continue }
 }
 pub mod cmds;
