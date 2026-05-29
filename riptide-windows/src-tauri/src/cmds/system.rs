@@ -118,7 +118,7 @@ pub async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, St
         .map_err(|e| format!("Failed to parse release info: {}", e))?;
     let latest = release.tag_name.trim_start_matches('v');
     Ok(UpdateInfo {
-        current_version,
+        current_version: current_version.clone(),
         latest_version: latest.to_string(),
         update_available: latest != current_version,
         release_url: release.html_url,

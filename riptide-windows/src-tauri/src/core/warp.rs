@@ -15,7 +15,9 @@
 //! gets a real signal rather than a generic "registration failed".
 
 use crate::cmds::config::AppState;
-use crate::config::profiles::{storage, Profile};
+#[cfg(target_os = "windows")]
+use crate::config::profiles::storage;
+use crate::config::profiles::Profile;
 use base64::Engine;
 use rand::rngs::OsRng;
 use serde::Deserialize;
@@ -245,6 +247,7 @@ pub async fn register_warp_profile(
 
     let mut profile = Profile::new(profile_name.clone(), yaml);
     profile.set_node_count(1);
+    #[cfg(target_os = "windows")]
     storage::save_profile(&mut profile)
         .map_err(|e| format!("Failed to save WARP profile: {}", e))?;
 
