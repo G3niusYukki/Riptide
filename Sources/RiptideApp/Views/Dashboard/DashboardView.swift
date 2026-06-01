@@ -58,6 +58,7 @@ struct DashboardView: View {
                 value: modeDisplayName,
                 subtitle: vm.activeProfile?.name ?? "无配置"
             )
+            .accessibilityIdentifier(A11yID.Dashboard.modeCard)
 
             // Node Card
             StatusCard(
@@ -67,6 +68,7 @@ struct DashboardView: View {
                 value: currentSelectedNode,
                 subtitle: proxyModeDisplay
             )
+            .accessibilityIdentifier(A11yID.Dashboard.nodeCard)
 
             // Uptime / State Card
             StatusCard(
@@ -94,6 +96,8 @@ struct DashboardView: View {
                 color: .green
             )
         }
+        .accessibilityIdentifier(A11yID.Dashboard.speedCard)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Subscription Section
@@ -136,6 +140,7 @@ struct DashboardView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier(A11yID.Dashboard.diagnosticsButton)
             }
                 .font(.headline)
                 .foregroundStyle(Theme.text)
