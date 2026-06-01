@@ -81,6 +81,11 @@ struct RiptideApp: App {
                 let bar = StatusBarController()
                 bar.setup(vm: appVM)
                 self.statusBar = bar
+
+                // Install the Touch Bar (only visible on Touch Bar hardware —
+                // 2016-2021 MacBook Pros). No-op elsewhere.
+                TouchBarProvider.shared.appViewModel = appVM
+                AppCoordinator.shared.mainWindow?.touchBar = TouchBarProvider.shared.makeTouchBar()
             }
         }
         .defaultSize(width: 900, height: 600)
