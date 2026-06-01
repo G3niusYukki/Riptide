@@ -43,6 +43,11 @@ struct LogTabView: View {
 
                 Spacer()
 
+                TextField("搜索日志", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 240)
+                    .accessibilityIdentifier(A11yID.Logs.searchField)
+
                 Button("清空") {
                     vm.clearLogs()
                 }
@@ -92,8 +97,6 @@ struct LogTabView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "搜索日志")
-        .accessibilityIdentifier(A11yID.Logs.searchField)
         .background(Theme.backgroundGradient.ignoresSafeArea())
     }
 }
