@@ -56,6 +56,8 @@ RiptideApp   RiptideCLI   RiptideTunnel
 
 For iOS: `RiptideApp_iOS` → `RiptideCore` + `RiptideTunnel_iOS` (no `RiptideMac`).
 
+> **Note:** The iOS split above was planned for cross-platform code sharing, but iOS is **out of scope for v3.0.0**. The `RiptideCore` / `RiptideMac` split itself remains useful for separating platform-specific code on macOS. Archived iOS stubs live in `docs/_archive/riptide-ios-stub/`.
+
 ## Migration Steps
 
 1. Create `Sources/RiptideCore/` and `Sources/RiptideMac/` directories
