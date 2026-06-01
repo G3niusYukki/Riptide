@@ -9,6 +9,7 @@ struct ProxyTabView: View {
             LazyVStack(spacing: 12) {
                 ForEach(vm.proxyGroups) { group in
                     ProxyGroupCard(group: group, vm: vm)
+                        .accessibilityIdentifier(A11yID.Proxy.groupCard + ".\(group.name)")
                 }
             }
             .padding()
@@ -26,6 +27,7 @@ struct ProxyTabView: View {
                     Label("延迟测试", systemImage: "speedometer")
                 }
                 .disabled(isTestingAll)
+                .accessibilityIdentifier(A11yID.Proxy.testDelayButton)
             }
         }
     }
@@ -69,6 +71,7 @@ struct ProxyGroupCard: View {
                             await vm.selectProxy(groupID: group.id, nodeName: node.name)
                         }
                     }
+                    .accessibilityIdentifier(A11yID.Proxy.nodeRow + ".\(node.name)")
                 }
             }
         }
