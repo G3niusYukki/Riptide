@@ -477,11 +477,21 @@ public final class AppViewModel: @unchecked Sendable {
                 await MainActor.run {
                     self.updateProxyDelay(proxyName: proxyName, delay: delay)
                 }
+                // Notify when latency exceeds the 5s timeout threshold — the
+                // user is likely to want to switch to a healthier node.
+                if delay > 5000 {
+                    await UserNotificationManager.shared.notifyNodeFailure(
+                        nodeName: proxyName, latencyMs: delay
+                    )
+                }
             } else {
                 // Mark as timeout/error
                 await MainActor.run {
                     self.updateProxyDelay(proxyName: proxyName, delay: nil)
                 }
+                await UserNotificationManager.shared.notifyNodeFailure(
+                    nodeName: proxyName, latencyMs: 0
+                )
             }
             // Small delay between tests to avoid overwhelming the API
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
@@ -639,6 +649,22 @@ public final class AppViewModel: @unchecked Sendable {
                     userinfo: sub.userinfo
                 )
             }
+        }
+        await notifyExpiringSubscriptions(subs)
+    }
+
+    /// Surfaces a system notification for any subscription that is within
+    /// 3 days of expiry. Called whenever the subscription list is reloaded.
+    private func notifyExpiringSubscriptions(_ subs: [Riptide.Subscription]) async {
+        for sub in subs {
+            guard let userinfo = sub.userinfo,
+                  let expiry = userinfo.expireDate else { continue }
+            let secondsRemaining = expiry.timeIntervalSinceNow
+            guard secondsRemaining > 0, secondsRemaining <= 3 * 24 * 3600 else { continue }
+            let days = max(1, Int((secondsRemaining / 86_400).rounded(.up)))
+            await UserNotificationManager.shared.notifySubscriptionExpiring(
+                name: sub.name, daysRemaining: days
+            )
         }
     }
 

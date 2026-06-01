@@ -27,6 +27,13 @@ public actor SystemProxyMonitor {
                 let hasViolation = await proxyGuard.checkForViolation()
                 if hasViolation {
                     try? await proxyGuard.restore()
+                    // Notify the user that another process tampered with the
+                    // system proxy settings. Best-effort: a denial of
+                    // notification permission just means the user doesn't see
+                    // the banner.
+                    await UserNotificationManager.shared.notifySystemProxyChanged(
+                        autoRestored: true
+                    )
                 }
 
                 // Wait for next check

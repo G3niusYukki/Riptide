@@ -64,6 +64,13 @@ struct RiptideApp: App {
             .onAppear {
                 guard self.statusBar == nil else { return }
 
+                // Request notification permission on first launch — only prompts
+                // when the user has not yet made a decision in System Settings.
+                let notifManager = UserNotificationManager.shared
+                Task { @MainActor in
+                    await notifManager.requestAuthorizationIfNeeded()
+                }
+
                 // Center window on screen
                 if let window = NSApp.windows.first,
                    let screen = NSScreen.main ?? NSScreen.screens.first {
