@@ -8,33 +8,43 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             DashboardView(vm: vm)
-                .tabItem { Label("概览", systemImage: "square.grid.2x2") }
+                .tabItem {
+                    Label("概览", systemImage: "square.grid.2x2")
+                        .accessibilityIdentifier(A11yID.Tab.dashboard)
+                }
                 .tag(0)
-                .accessibilityIdentifier(A11yID.Tab.dashboard)
 
             ConfigTabView(vm: vm)
-                .tabItem { Label("配置", systemImage: "doc.text") }
+                .tabItem {
+                    Label("配置", systemImage: "doc.text")
+                        .accessibilityIdentifier(A11yID.Tab.config)
+                }
                 .tag(1)
-                .accessibilityIdentifier(A11yID.Tab.config)
 
             ProxyTabView(vm: vm)
-                .tabItem { Label("代理", systemImage: "server.rack") }
+                .tabItem {
+                    Label("代理", systemImage: "server.rack")
+                        .accessibilityIdentifier(A11yID.Tab.proxy)
+                }
                 .tag(2)
-                .accessibilityIdentifier(A11yID.Tab.proxy)
 
             TrafficTabView(vm: vm)
-                .tabItem { Label("流量", systemImage: "chart.bar") }
+                .tabItem {
+                    Label("流量", systemImage: "chart.bar")
+                        .accessibilityIdentifier(A11yID.Tab.traffic)
+                }
                 .tag(3)
-                .accessibilityIdentifier(A11yID.Tab.traffic)
 
             RulesTabView(vm: vm)
                 .tabItem { Label("规则", systemImage: "list.bullet") }
                 .tag(4)
 
             LogTabView(vm: vm)
-                .tabItem { Label("日志", systemImage: "terminal") }
+                .tabItem {
+                    Label("日志", systemImage: "terminal")
+                        .accessibilityIdentifier(A11yID.Tab.logs)
+                }
                 .tag(5)
-                .accessibilityIdentifier(A11yID.Tab.logs)
 
             SettingsTabView(vm: vm, themeManager: themeManager)
                 .tabItem { Label("设置", systemImage: "gearshape") }

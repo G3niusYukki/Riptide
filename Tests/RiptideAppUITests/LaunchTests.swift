@@ -1,10 +1,10 @@
 import XCTest
-@testable import RiptideApp
+import RiptideApp
 
 final class LaunchTests: RiptideUITestCase {
 
     func testAppLaunchesAndShowsMainWindow() {
-        let window = app.windows["app.main-window"]
+        let window = app.windows[A11yID.App.mainWindow]
         waitForElement(window)
         XCTAssertTrue(window.exists, "Main window should be visible after launch")
     }

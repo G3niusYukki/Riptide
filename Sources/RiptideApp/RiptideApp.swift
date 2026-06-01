@@ -28,11 +28,18 @@ struct RiptideApp: App {
     @StateObject private var themeManager = ThemeManager()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
+    private var shouldShowMainUI: Bool {
+        if ProcessInfo.processInfo.environment["RIPTIDE_UI_TEST"] == "1" {
+            return true
+        }
+        return hasCompletedOnboarding
+    }
+
     var body: some SwiftUI.Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
+            if shouldShowMainUI {
                 MainTabView(vm: appVM, themeManager: themeManager)
-                    .accessibilityIdentifier("app.main-window")
+                    .accessibilityIdentifier(A11yID.App.mainWindow)
                     .preferredColorScheme(colorScheme)
                     .frame(minWidth: 800, minHeight: 500)
                     .onAppear {
@@ -46,6 +53,7 @@ struct RiptideApp: App {
                             let centerX = screenFrame.origin.x + (screenFrame.width - windowSize.width) / 2
                             let centerY = screenFrame.origin.y + (screenFrame.height - windowSize.height) / 2
                             window.setFrameOrigin(NSPoint(x: centerX, y: centerY))
+                            window.setAccessibilityIdentifier(A11yID.App.mainWindow)
                             AppCoordinator.shared.mainWindow = window
                             appVM.mainWindow = window
                         }

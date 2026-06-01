@@ -3,6 +3,10 @@ import Foundation
 /// 集中定义所有 UI 测试可访问性标识符。
 /// 视图代码通过 `.accessibilityIdentifier(...)` 引用这些常量。
 public enum A11yID {
+    public enum App {
+        public static let mainWindow = "app.main-window"
+    }
+
     public enum Tab {
         public static let dashboard = "tab.dashboard"
         public static let config = "tab.config"
