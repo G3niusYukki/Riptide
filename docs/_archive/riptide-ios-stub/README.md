@@ -12,3 +12,9 @@ To revive:
 3. Add NetworkExtension entitlement and tunnel provider
 4. Implement PacketTunnelProvider (currently TODO)
 5. Estimate 6-8 weeks of focused work for production-quality
+
+## Tunnel Provider Stub
+
+The PacketTunnelProvider in `Tunnel/` is also a stub with 4 TODO comments.
+The Riptide macOS PacketTunnelProvider in `Sources/Riptide/VPN/PacketTunnelProvider.swift` is
+the production implementation and can be used as reference.
