@@ -91,11 +91,23 @@ let package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .target(
+            name: "RiptideWidget",
+            dependencies: [
+                "Riptide",
+            ],
+            path: "Sources/RiptideWidget",
+            exclude: ["INSTALLATION.md"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
+        ),
         .testTarget(
             name: "RiptideTests",
             dependencies: [
                 "Riptide",
                 "RiptideCLI",
+                "RiptideWidget",
             ]
         ),
         .binaryTarget(
