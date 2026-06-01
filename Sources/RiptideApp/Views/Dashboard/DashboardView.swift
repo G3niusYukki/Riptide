@@ -97,7 +97,6 @@ struct DashboardView: View {
             )
         }
         .accessibilityIdentifier(A11yID.Dashboard.speedCard)
-        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Subscription Section

@@ -10,7 +10,7 @@ final class DashboardSnapshotTests: RiptideUITestCase {
         waitForElement(app.buttons[A11yID.Dashboard.diagnosticsButton])
     }
 
-    func testDiagnosticsButtonTriggersSheet() throws {
+    func testDiagnosticsButtonTriggersSheet() {
         let button = app.buttons[A11yID.Dashboard.diagnosticsButton]
         waitForElement(button)
         button.tap()
@@ -28,7 +28,11 @@ final class DashboardSnapshotTests: RiptideUITestCase {
     func testModeCardShowsCurrentMode() {
         let modeCard = app.otherElements[A11yID.Dashboard.modeCard]
         waitForElement(modeCard)
-        let label = modeCard.staticTexts.firstMatch.label
-        XCTAssertFalse(label.isEmpty, "Mode card should display the current mode label")
+        // Element 0 = title "运行模式", 1 = value (mode name), 2 = subtitle.
+        let valueLabel = modeCard.staticTexts.element(boundBy: 1).label
+        XCTAssertTrue(
+            valueLabel == "系统代理" || valueLabel == "TUN 模式",
+            "Mode card value should show the current connection mode, got: \(valueLabel)"
+        )
     }
 }
