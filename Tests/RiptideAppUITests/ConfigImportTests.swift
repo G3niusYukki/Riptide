@@ -18,7 +18,7 @@ final class ConfigImportTests: RiptideUITestCase {
         waitForElement(addSubButton)
     }
 
-    func testImportFilePickerOpens() throws {
+    func testImportFilePickerOpens() {
         let importButton = app.buttons[A11yID.Config.importButton]
         waitForElement(importButton)
         importButton.tap()
