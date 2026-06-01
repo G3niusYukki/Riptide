@@ -289,8 +289,11 @@ public struct ProxyConnector: Sendable {
         target: ConnectionTarget
     ) async throws -> ConnectedProxyContext {
         // WireGuard native implementation scheduled for M3.2.
-        // Currently delegates to mihomo sidecar; see Sources/RiptideCore/Protocols/WireGuard/
-        // for the in-progress Swift implementation.
+        // Currently delegates to mihomo sidecar. The earlier Swift prototype
+        // (Noise IK + ChaCha20-Poly1305) was archived in
+        // docs/_archive/riptide-core-stub/Protocols/WireGuard/ as it is not
+        // production-grade (BLAKE2s replaced with HMAC-SHA256, simplified
+        // Noise IK). See docs/_archive/riptide-core-stub/README.md.
         throw ProtocolError.connectionRejected(
             "WireGuard native transport not yet integrated. Use mihomo runtime for WireGuard nodes."
         )
