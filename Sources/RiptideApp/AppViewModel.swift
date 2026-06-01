@@ -477,11 +477,21 @@ public final class AppViewModel: @unchecked Sendable {
                 await MainActor.run {
                     self.updateProxyDelay(proxyName: proxyName, delay: delay)
                 }
+                // Notify when latency exceeds the 5s timeout threshold — the
+                // user is likely to want to switch to a healthier node.
+                if delay > 5000 {
+                    await UserNotificationManager.shared.notifyNodeFailure(
+                        nodeName: proxyName, latencyMs: delay
+                    )
+                }
             } else {
                 // Mark as timeout/error
                 await MainActor.run {
                     self.updateProxyDelay(proxyName: proxyName, delay: nil)
                 }
+                await UserNotificationManager.shared.notifyNodeFailure(
+                    nodeName: proxyName, latencyMs: 0
+                )
             }
             // Small delay between tests to avoid overwhelming the API
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
@@ -639,6 +649,22 @@ public final class AppViewModel: @unchecked Sendable {
                     userinfo: sub.userinfo
                 )
             }
+        }
+        await notifyExpiringSubscriptions(subs)
+    }
+
+    /// Surfaces a system notification for any subscription that is within
+    /// 3 days of expiry. Called whenever the subscription list is reloaded.
+    private func notifyExpiringSubscriptions(_ subs: [Riptide.Subscription]) async {
+        for sub in subs {
+            guard let userinfo = sub.userinfo,
+                  let expiry = userinfo.expireDate else { continue }
+            let secondsRemaining = expiry.timeIntervalSinceNow
+            guard secondsRemaining > 0, secondsRemaining <= 3 * 24 * 3600 else { continue }
+            let days = max(1, Int((secondsRemaining / 86_400).rounded(.up)))
+            await UserNotificationManager.shared.notifySubscriptionExpiring(
+                name: sub.name, daysRemaining: days
+            )
         }
     }
 
@@ -1192,6 +1218,100 @@ public final class AppViewModel: @unchecked Sendable {
     public func listLocalMihomoVersions() -> [String] {
         let downloader = MihomoDownloader()
         return downloader.listLocalVersions()
+    }
+
+    // MARK: - URL Scheme Support
+    //
+    // Properties and methods below are entry points used by
+    // `URLSchemeHandler` to route `riptide://...` commands delivered by
+    // LaunchServices. They are intentionally minimal — they delegate to
+    // existing runtime APIs rather than introducing new orchestration.
+
+    /// URL string pre-filled into the import dialog when a
+    /// `riptide://import?url=...` command is delivered. The UI watches this
+    /// property and clears it after consumption.
+    public var pendingImportURL: String?
+
+    /// Last error from URL-scheme routing (e.g. unrecognized URL, missing
+    /// group). Distinct from `lastError` so URL failures don't pollute the
+    /// proxy-runner error stream.
+    public var urlSchemeError: String?
+
+    /// Activates the proxy group with the given id and selects its first
+    /// available node. Fails explicitly (via `urlSchemeError`) if the group
+    /// is not present in the active profile — no silent fallback.
+    public func selectGroup(named name: String) async {
+        guard let profile = activeProfile else {
+            urlSchemeError = "Cannot switch group: no active profile"
+            return
+        }
+        guard let group = profile.config.proxyGroups.first(where: { $0.id == name }) else {
+            urlSchemeError = "Proxy group '\(name)' not found"
+            return
+        }
+        guard let firstNode = group.proxies.first else {
+            urlSchemeError = "Proxy group '\(name)' has no nodes"
+            return
+        }
+        await selectProxy(groupID: group.id, nodeName: firstNode)
+    }
+
+    /// Selects a node by name in whichever group contains it. Fails
+    /// explicitly if the node is not present in the active profile.
+    public func selectNode(named name: String) async {
+        guard let profile = activeProfile else {
+            urlSchemeError = "Cannot select node: no active profile"
+            return
+        }
+        guard let group = profile.config.proxyGroups.first(where: { $0.proxies.contains(name) }) else {
+            urlSchemeError = "Node '\(name)' not found in any group"
+            return
+        }
+        await selectProxy(groupID: group.id, nodeName: name)
+    }
+
+    /// Switches the connection mode from a URL value. Accepts
+    /// `"tun"`, `"system"`, and `"off"`. If the tunnel is currently running
+    /// and a non-`off` value is given, the runtime is restarted in the new
+    /// mode. Unknown values set `urlSchemeError` and are otherwise ignored.
+    public func setMode(fromString value: String) async {
+        let normalized = value.lowercased()
+        let wasRunning = tunnelState == .running
+        switch normalized {
+        case "tun":
+            connectionMode = .tun
+        case "system":
+            connectionMode = .systemProxy
+        case "off":
+            if wasRunning {
+                await stop()
+            }
+            return
+        default:
+            urlSchemeError = "Unknown mode '\(value)' (expected: tun, system, off)"
+            return
+        }
+        if wasRunning {
+            await stop()
+            await start()
+        }
+    }
+
+    /// Generates a diagnostic report from the runtime and stores it in
+    /// `lastError` for now (a dedicated diagnostics sheet can be wired up
+    /// later by the UI layer). Returns the JSON-encoded report.
+    @discardableResult
+    public func runDiagnostics() async -> String {
+        let report = await modeCoordinator.generateDiagnosticReport()
+        // Surface a concise one-line summary so the UI shows something even
+        // before a dedicated diagnostics sheet is implemented.
+        let summary = "diagnostics: mihomo=\(report.mihomoRunning ? "running" : "stopped")"
+        lastError = summary
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return (try? encoder.encode(report))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? summary
     }
 }
 

@@ -12,7 +12,9 @@ public enum A11yID {
         public static let config = "tab.config"
         public static let proxy = "tab.proxy"
         public static let traffic = "tab.traffic"
+        public static let rules = "tab.rules"
         public static let logs = "tab.logs"
+        public static let settings = "tab.settings"
     }
 
     public enum Dashboard {
@@ -44,5 +46,21 @@ public enum A11yID {
         public static let levelFilter = "logs.level-filter"
         public static let searchField = "logs.search-field"
         public static let exportButton = "logs.export-button"
+    }
+
+    public enum Settings {
+        public static let launchAtLogin = "settings.launch-at-login"
+    }
+
+    public enum MenuBar {
+        public static let popover = "menubar.popover"
+        public static let modePicker = "menubar.mode-picker"
+        public static let toggleButton = "menubar.toggle-button"
+        public static let groupCard = "menubar.group-card"
+        public static let groupSelector = "menubar.group-selector"
+        public static let speedCard = "menubar.speed-card"
+        public static let shortcutsCard = "menubar.shortcuts-card"
+        public static let openMainWindowButton = "menubar.open-main-window"
+        public static let quitButton = "menubar.quit-button"
     }
 }

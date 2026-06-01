@@ -67,6 +67,8 @@ public enum RiptideError: Error, LocalizedError, Sendable {
     case systemProxy(SystemProxyError)
     /// Keychain / secure storage error.
     case keychain(KeychainError)
+    /// LaunchAgent (login item) registration error.
+    case launchAgentRegistrationFailed(String)
 
     // MARK: - Generic
 
@@ -115,6 +117,8 @@ public enum RiptideError: Error, LocalizedError, Sendable {
         case .subscription(let error):      return error.localizedDescription
         case .systemProxy(let error):       return error.localizedDescription
         case .keychain(let error):          return error.localizedDescription
+        case .launchAgentRegistrationFailed(let reason):
+            return "启动项注册失败: \(reason)"
 
         // Generic
         case .underlying(_, let ctx):   return ctx
@@ -137,6 +141,7 @@ public enum RiptideError: Error, LocalizedError, Sendable {
         case .profile:          return "请检查配置文件是否完整"
         case .subscription:     return "请检查订阅 URL 是否有效"
         case .systemProxy:      return "请检查系统代理设置权限"
+        case .launchAgentRegistrationFailed: return "请检查 ~/Library/LaunchAgents 目录权限"
         case .timeout:          return "操作耗时过长，请稍后重试"
         case .cancelled:        return nil
         default:                return nil
@@ -169,6 +174,7 @@ extension RiptideError {
         case .vpn, .tunnelRouting, .tunnel:            return "VPN"
         case .xpc, .xpcConnection:                    return "XPC"
         case .profile, .subscription, .systemProxy, .keychain: return "应用"
+        case .launchAgentRegistrationFailed:                return "应用"
         case .underlying:                             return "底层"
         case .timeout:                                return "超时"
         case .cancelled:                              return "取消"

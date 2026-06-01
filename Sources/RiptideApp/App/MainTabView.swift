@@ -36,7 +36,10 @@ struct MainTabView: View {
                 .tag(3)
 
             RulesTabView(vm: vm)
-                .tabItem { Label("规则", systemImage: "list.bullet") }
+                .tabItem {
+                    Label("规则", systemImage: "list.bullet")
+                        .accessibilityIdentifier(A11yID.Tab.rules)
+                }
                 .tag(4)
 
             LogTabView(vm: vm)
@@ -47,7 +50,10 @@ struct MainTabView: View {
                 .tag(5)
 
             SettingsTabView(vm: vm, themeManager: themeManager)
-                .tabItem { Label("设置", systemImage: "gearshape") }
+                .tabItem {
+                    Label("设置", systemImage: "gearshape")
+                        .accessibilityIdentifier(A11yID.Tab.settings)
+                }
                 .tag(6)
         }
         .tint(Theme.accent)

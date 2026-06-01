@@ -427,6 +427,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             )
             latestRecoveryError = snapshot
             eventHandler?(.error(snapshot))
+            await UserNotificationManager.shared.notifyMihomoExited()
             return
         }
 

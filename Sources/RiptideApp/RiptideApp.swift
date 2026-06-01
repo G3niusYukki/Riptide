@@ -37,37 +37,62 @@ struct RiptideApp: App {
 
     var body: some SwiftUI.Scene {
         WindowGroup {
-            if shouldShowMainUI {
-                MainTabView(vm: appVM, themeManager: themeManager)
-                    .accessibilityIdentifier(A11yID.App.mainWindow)
-                    .preferredColorScheme(colorScheme)
-                    .frame(minWidth: 800, minHeight: 500)
-                    .onAppear {
-                        guard self.statusBar == nil else { return }
+            Group {
+                if shouldShowMainUI {
+                    MainTabView(vm: appVM, themeManager: themeManager)
+                        .accessibilityIdentifier(A11yID.App.mainWindow)
+                        .preferredColorScheme(colorScheme)
+                        .frame(minWidth: 800, minHeight: 500)
+                } else {
+                    OnboardingView(isPresented: Binding(
+                        get: { !hasCompletedOnboarding },
+                        set: { newValue in hasCompletedOnboarding = !newValue }
+                    ))
+                }
+            }
+            .onOpenURL { url in
+                // LaunchServices delivers `riptide://...` URLs here when
+                // the user runs `open riptide://mode?value=off` and the
+                // .app bundle's Info.plist declares the scheme (see
+                // Scripts/build-release.sh). Wrapping both branches in a
+                // Group ensures the handler fires regardless of whether
+                // onboarding is showing or the main UI is up.
+                Task { @MainActor in
+                    _ = await URLSchemeHandler.route(url, viewModel: appVM)
+                }
+            }
+            .onAppear {
+                guard self.statusBar == nil else { return }
 
-                        // Center window on screen
-                        if let window = NSApp.windows.first,
-                           let screen = NSScreen.main ?? NSScreen.screens.first {
-                            let screenFrame = screen.visibleFrame
-                            let windowSize = window.frame.size
-                            let centerX = screenFrame.origin.x + (screenFrame.width - windowSize.width) / 2
-                            let centerY = screenFrame.origin.y + (screenFrame.height - windowSize.height) / 2
-                            window.setFrameOrigin(NSPoint(x: centerX, y: centerY))
-                            window.setAccessibilityIdentifier(A11yID.App.mainWindow)
-                            AppCoordinator.shared.mainWindow = window
-                            appVM.mainWindow = window
-                        }
+                // Request notification permission on first launch — only prompts
+                // when the user has not yet made a decision in System Settings.
+                let notifManager = UserNotificationManager.shared
+                Task { @MainActor in
+                    await notifManager.requestAuthorizationIfNeeded()
+                }
 
-                        // Create the single status bar item (AppKit)
-                        let bar = StatusBarController()
-                        bar.setup(vm: appVM)
-                        self.statusBar = bar
-                    }
-            } else {
-                OnboardingView(isPresented: Binding(
-                    get: { !hasCompletedOnboarding },
-                    set: { newValue in hasCompletedOnboarding = !newValue }
-                ))
+                // Center window on screen
+                if let window = NSApp.windows.first,
+                   let screen = NSScreen.main ?? NSScreen.screens.first {
+                    let screenFrame = screen.visibleFrame
+                    let windowSize = window.frame.size
+                    let centerX = screenFrame.origin.x + (screenFrame.width - windowSize.width) / 2
+                    let centerY = screenFrame.origin.y + (screenFrame.height - windowSize.height) / 2
+                    window.setFrameOrigin(NSPoint(x: centerX, y: centerY))
+                    window.setAccessibilityIdentifier(A11yID.App.mainWindow)
+                    AppCoordinator.shared.mainWindow = window
+                    appVM.mainWindow = window
+                }
+
+                // Create the single status bar item (AppKit)
+                let bar = StatusBarController()
+                bar.setup(vm: appVM)
+                self.statusBar = bar
+
+                // Install the Touch Bar (only visible on Touch Bar hardware —
+                // 2016-2021 MacBook Pros). No-op elsewhere.
+                TouchBarProvider.shared.appViewModel = appVM
+                AppCoordinator.shared.mainWindow?.touchBar = TouchBarProvider.shared.makeTouchBar()
             }
         }
         .defaultSize(width: 900, height: 600)
