@@ -8,6 +8,13 @@ struct SettingsTabView: View {
     @Bindable var vm: AppViewModel
     @ObservedObject var themeManager: ThemeManager
 
+    @State private var launchAtLogin: Bool = false
+    @State private var launchAgentLoaded: Bool = false
+    @State private var launchAgentError: String?
+    @State private var launchAgentBusy: Bool = false
+
+    private let launchAgent = LaunchAgentManager.shared
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -88,6 +95,33 @@ struct SettingsTabView: View {
                     // MARK: - Updates
                     SettingsSection(title: "软件更新", icon: "arrow.down.circle") {
                         UpdateSettingsView()
+                    }
+
+                    // MARK: - Startup
+                    SettingsSection(title: "启动", icon: "power") {
+                        Toggle(isOn: $launchAtLogin) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("登录时启动 Riptide")
+                                    .font(.callout)
+                                    .foregroundStyle(Theme.text)
+                                Text(launchAtLoginSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.subtext)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .disabled(!launchAgentLoaded || launchAgentBusy)
+                        .accessibilityIdentifier(A11yID.Settings.launchAtLogin)
+                        .padding()
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+
+                        if let error = launchAgentError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(Theme.danger)
+                                .padding(.horizontal)
+                        }
                     }
 
                     // MARK: - Core
@@ -204,6 +238,48 @@ struct SettingsTabView: View {
             .navigationTitle("设置")
             .background(Theme.backgroundGradient.ignoresSafeArea())
         }
+        .task {
+            await loadLaunchAtLoginState()
+        }
+        .onChange(of: launchAtLogin) { _, newValue in
+            guard launchAgentLoaded else { return }
+            Task { await applyLaunchAtLogin(newValue) }
+        }
+    }
+
+    private var launchAtLoginSubtitle: String {
+        if !launchAgentLoaded {
+            return "正在读取登录项状态…"
+        }
+        if launchAgentBusy {
+            return launchAtLogin ? "正在启用登录项…" : "正在禁用登录项…"
+        }
+        return launchAtLogin
+            ? "已添加至 ~/Library/LaunchAgents"
+            : "开启后 Riptide 将在用户登录时自动启动"
+    }
+
+    private func loadLaunchAtLoginState() async {
+        let registered = await launchAgent.isRegistered()
+        launchAtLogin = registered
+        launchAgentLoaded = true
+    }
+
+    private func applyLaunchAtLogin(_ enabled: Bool) async {
+        launchAgentBusy = true
+        launchAgentError = nil
+        do {
+            if enabled {
+                try await launchAgent.register()
+            } else {
+                try await launchAgent.unregister()
+            }
+            launchAgentError = nil
+        } catch {
+            launchAgentError = "无法更新登录项: \(error.localizedDescription)"
+            launchAtLogin = await launchAgent.isRegistered()
+        }
+        launchAgentBusy = false
     }
 
     private var themeModeLabel: String {

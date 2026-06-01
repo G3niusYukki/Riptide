@@ -12,7 +12,9 @@ public enum A11yID {
         public static let config = "tab.config"
         public static let proxy = "tab.proxy"
         public static let traffic = "tab.traffic"
+        public static let rules = "tab.rules"
         public static let logs = "tab.logs"
+        public static let settings = "tab.settings"
     }
 
     public enum Dashboard {
@@ -44,5 +46,9 @@ public enum A11yID {
         public static let levelFilter = "logs.level-filter"
         public static let searchField = "logs.search-field"
         public static let exportButton = "logs.export-button"
+    }
+
+    public enum Settings {
+        public static let launchAtLogin = "settings.launch-at-login"
     }
 }
