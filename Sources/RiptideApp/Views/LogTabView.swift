@@ -39,8 +39,14 @@ struct LogTabView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 300)
+                .accessibilityIdentifier(A11yID.Logs.levelFilter)
 
                 Spacer()
+
+                TextField("搜索日志", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 240)
+                    .accessibilityIdentifier(A11yID.Logs.searchField)
 
                 Button("清空") {
                     vm.clearLogs()
@@ -49,6 +55,7 @@ struct LogTabView: View {
                 Button("导出") {
                     vm.exportLogs()
                 }
+                .accessibilityIdentifier(A11yID.Logs.exportButton)
             }
             .padding()
             .background(Theme.background)
@@ -90,7 +97,6 @@ struct LogTabView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "搜索日志")
         .background(Theme.backgroundGradient.ignoresSafeArea())
     }
 }

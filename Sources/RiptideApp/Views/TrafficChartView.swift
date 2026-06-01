@@ -111,6 +111,7 @@ public struct TrafficChartView: View {
                 }
             }
             .frame(height: 200)
+            .accessibilityIdentifier(A11yID.Traffic.chart)
 
             // Peak Speeds
             HStack {

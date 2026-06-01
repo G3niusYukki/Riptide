@@ -69,6 +69,18 @@ let package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .testTarget(
+            name: "RiptideAppUITests",
+            dependencies: [
+                "Riptide",
+                "RiptideApp"
+            ],
+            path: "Tests/RiptideAppUITests",
+            exclude: ["Fixtures"],
+            resources: [
+                .copy("Fixtures")
+            ]
+        ),
         .target(
             name: "RiptideTunnel",
             dependencies: [

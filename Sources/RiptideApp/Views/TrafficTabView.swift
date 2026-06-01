@@ -1,7 +1,9 @@
 import SwiftUI
+import Riptide
 
 struct TrafficTabView: View {
     @Bindable var vm: AppViewModel
+    @State private var trafficViewModel = TrafficViewModel()
 
     private func formatBytes(_ bytes: Int64) -> String {
         if bytes < 1024 { return "\(bytes) B" }
@@ -67,6 +69,12 @@ struct TrafficTabView: View {
                 .padding()
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+
+                // Live traffic chart (history)
+                TrafficChartView(viewModel: trafficViewModel)
+                    .frame(maxWidth: .infinity)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
 
                 // Active connections — real-time list
                 ConnectionListView(vm: vm)

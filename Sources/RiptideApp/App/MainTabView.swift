@@ -8,19 +8,31 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             DashboardView(vm: vm)
-                .tabItem { Label("概览", systemImage: "square.grid.2x2") }
+                .tabItem {
+                    Label("概览", systemImage: "square.grid.2x2")
+                        .accessibilityIdentifier(A11yID.Tab.dashboard)
+                }
                 .tag(0)
 
             ConfigTabView(vm: vm)
-                .tabItem { Label("配置", systemImage: "doc.text") }
+                .tabItem {
+                    Label("配置", systemImage: "doc.text")
+                        .accessibilityIdentifier(A11yID.Tab.config)
+                }
                 .tag(1)
 
             ProxyTabView(vm: vm)
-                .tabItem { Label("代理", systemImage: "server.rack") }
+                .tabItem {
+                    Label("代理", systemImage: "server.rack")
+                        .accessibilityIdentifier(A11yID.Tab.proxy)
+                }
                 .tag(2)
 
             TrafficTabView(vm: vm)
-                .tabItem { Label("流量", systemImage: "chart.bar") }
+                .tabItem {
+                    Label("流量", systemImage: "chart.bar")
+                        .accessibilityIdentifier(A11yID.Tab.traffic)
+                }
                 .tag(3)
 
             RulesTabView(vm: vm)
@@ -28,7 +40,10 @@ struct MainTabView: View {
                 .tag(4)
 
             LogTabView(vm: vm)
-                .tabItem { Label("日志", systemImage: "terminal") }
+                .tabItem {
+                    Label("日志", systemImage: "terminal")
+                        .accessibilityIdentifier(A11yID.Tab.logs)
+                }
                 .tag(5)
 
             SettingsTabView(vm: vm, themeManager: themeManager)

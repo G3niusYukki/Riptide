@@ -74,6 +74,59 @@ jobs:
       - name: Test Swift Testing suites
         run: bash Scripts/ci-swift-testing-suites.sh
 
+  # NOTE: SwiftUI UI tests live in Tests/RiptideAppUITests as a SwiftPM
+  # .testTarget. The target compiles, but XCUIApplication requires
+  # Xcode's UI test runner (an .xcodeproj UI test target), so
+  # `swift test --filter RiptideAppUITests` will currently crash the
+  # xctest process on macOS runners. We run it anyway with
+  # `continue-on-error: true` to surface the limitation, capture the
+  # failure logs as an artifact, and prove the wiring end-to-end.
+  # Remove `continue-on-error` once Riptide migrates to an
+  # .xcodeproj (or SwiftPM UI test target) that supports XCUIApplication.
+  swift-ui-test:
+    name: SwiftUI UI Tests
+    runs-on: macos-15
+    continue-on-error: true
+    timeout-minutes: 45
+    needs: swift-lint
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache Swift packages
+        uses: actions/cache@v5
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-uitest-${{ hashFiles('Package.resolved') }}
+          restore-keys: ${{ runner.os }}-swift-uitest-
+
+      - name: Download mihomo binary
+        run: ./Scripts/download-mihomo.sh
+
+      - name: Run UI tests (allow retry on flake)
+        run: |
+          set +e
+          swift test --filter "RiptideAppUITests" 2>&1 | tee uitest-output.log
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::UI tests failed, retrying once"
+            sleep 5
+            swift test --filter "RiptideAppUITests" 2>&1 | tee uitest-output.log
+            EXIT_CODE=$?
+          fi
+          exit $EXIT_CODE
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: uitest-results
+          path: uitest-output.log
+
   # ── Windows: Frontend ─────────────────────────────────────────
 
   frontend-check:

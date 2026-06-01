@@ -150,6 +150,7 @@ struct ConnectionListView: View {
                                 }
                             )
                             .contentShape(Rectangle())
+                            .accessibilityIdentifier(A11yID.Traffic.connectionRow + ".\(conn.id)")
                             .onTapGesture {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     if expandedConnectionId == conn.id {
@@ -199,6 +200,7 @@ struct ConnectionRow: View {
                 .font(.caption)
                 .foregroundStyle(Theme.subtext)
                 .frame(width: 10)
+                .accessibilityIdentifier(A11yID.Traffic.connectionDetailToggle)
 
             // Protocol badge
             Text(conn.`protocol`)
