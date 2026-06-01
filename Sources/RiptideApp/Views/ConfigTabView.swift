@@ -36,6 +36,7 @@ struct ConfigTabView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
+                .accessibilityIdentifier(A11yID.Config.importButton)
 
                 // Profiles list (inactive)
                 if !vm.profiles.isEmpty {
@@ -134,6 +135,7 @@ struct ConfigTabView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityIdentifier(A11yID.Config.addSubscription)
             }
 
             if vm.subscriptions.isEmpty {
