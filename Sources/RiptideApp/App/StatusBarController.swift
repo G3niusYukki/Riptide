@@ -14,8 +14,9 @@ public final class StatusBarController: NSObject {
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 360, height: 400)
+        // Placeholder host; replaced as soon as `setup(vm:)` is called.
         popover.contentViewController = NSHostingController(
-            rootView: MenuBarPopoverView()
+            rootView: MenuBarPlaceholderView()
         )
 
         super.init()
@@ -24,6 +25,9 @@ public final class StatusBarController: NSObject {
 
     func setup(vm: AppViewModel) {
         self.vm = vm
+        popover.contentViewController = NSHostingController(
+            rootView: MenuBarPopoverView(viewModel: vm)
+        )
     }
 
     func updateButton(isRunning: Bool) {
@@ -50,5 +54,19 @@ public final class StatusBarController: NSObject {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+}
+
+/// Brief loading placeholder shown until the real view model is wired in.
+private struct MenuBarPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Riptide")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: 360, height: 400)
     }
 }

@@ -51,4 +51,16 @@ public enum A11yID {
     public enum Settings {
         public static let launchAtLogin = "settings.launch-at-login"
     }
+
+    public enum MenuBar {
+        public static let popover = "menubar.popover"
+        public static let modePicker = "menubar.mode-picker"
+        public static let toggleButton = "menubar.toggle-button"
+        public static let groupCard = "menubar.group-card"
+        public static let groupSelector = "menubar.group-selector"
+        public static let speedCard = "menubar.speed-card"
+        public static let shortcutsCard = "menubar.shortcuts-card"
+        public static let openMainWindowButton = "menubar.open-main-window"
+        public static let quitButton = "menubar.quit-button"
+    }
 }
