@@ -102,12 +102,25 @@ let package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .target(
+            name: "RiptideQuickLook",
+            dependencies: [
+                "Riptide",
+                .product(name: "Yams", package: "Yams"),
+            ],
+            path: "Sources/RiptideQuickLook",
+            exclude: ["INSTALLATION.md"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
+            ]
+        ),
         .testTarget(
             name: "RiptideTests",
             dependencies: [
                 "Riptide",
                 "RiptideCLI",
                 "RiptideWidget",
+                "RiptideQuickLook",
             ]
         ),
         .binaryTarget(
