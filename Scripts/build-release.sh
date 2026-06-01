@@ -78,6 +78,17 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
     <string>NSApplication</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.riptide.app.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>riptide</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST
