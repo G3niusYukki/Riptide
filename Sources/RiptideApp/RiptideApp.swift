@@ -32,6 +32,7 @@ struct RiptideApp: App {
         WindowGroup {
             if hasCompletedOnboarding {
                 MainTabView(vm: appVM, themeManager: themeManager)
+                    .accessibilityIdentifier("app.main-window")
                     .preferredColorScheme(colorScheme)
                     .frame(minWidth: 800, minHeight: 500)
                     .onAppear {
