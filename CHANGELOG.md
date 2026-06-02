@@ -1,8 +1,69 @@
 # Changelog
 
+## [2.3.0] — 2026-06-02
+
+> **Status:** Released. 16 commits since v2.2.0. CI green (SwiftLint + Swift
+> Build & Test + SwiftUI UI Tests + Windows Rust + Frontend tsc + Linux cargo).
+> 560 tests / 88 suites passing.
+
+### Added
+
+- **Override (覆写) data model + storage** — new `Sources/Riptide/Override/`
+  package: `Override` value type, `OverrideStore` actor (file-backed
+  JSON sidecar + per-override `<UUID>.yaml`), `OverrideMerger` enum
+  with `meta.replace` / `removed:` semantics, and `OverrideApplyError`.
+  18-test suite in `ProxyURISerializerTests` covers the merge edge cases.
+  Companion to the user-facing Override feature (UI is W3 territory;
+  this commit ships the data layer).
+- **Decision ADRs (SP-1 sub-week decisions)** — three lightweight ADRs
+  in `docs/decisions/` that gate future P0 work:
+  - D1: sing-box integration route (sidecar process)
+  - D2: Override schema (YAML-on-YAML overlay, Stash-style)
+  - D3: Service Mode route (SMAppService.daemon)
+- **Visual rule editor hit preview** — `TargetStrip` (6 TextFields
+  bound to `RuleTarget`) + `PolicyBadge` (resolved policy capsule)
+  added to `RuleEditorView`. The user can type a domain/IP/port/process
+  and see which rule matches + the resolved `RoutingPolicy`. Pure view
+  change, no new tests (UI-only prototype).
+- **Node QR code (W3-1)** — `ProxyURISerializer` (new) generates
+  industry-standard share URIs for **6 protocols** (ss, vmess, vless,
+  trojan, hysteria2, tuic); `ProxyURIParser` (existing) extended to
+  parse the new hysteria2/tuic schemes. `QRCodeGenerator` wraps
+  `CIQRCodeGenerator` to produce `NSImage`. New private `NodeQRSheet`
+  view in `NodeEditorView` with a grid of scannable QRs + "Copy All
+  URIs" + "Save All as PNGs" actions. Entry points: per-row
+  "Share as QR Code" contextMenu + toolbar "Share All".
+
+### Fixed
+
+- **`RuleTarget` properties are now mutable** (`let` → `var`). Required
+  for SwiftUI `Binding` setters in the W2-3 hit-preview helpers. Value
+  type, no consumer-level semantics change.
+- **`parseSS` unpadded-base64 bug** — the parser's
+  `Data(base64Encoded:)` was rejecting URL-safe base64 whose length
+  wasn't a multiple of 4, silently dropping credentials on
+  `ss://...@host:port#name` URIs from share links. Extracted
+  `decodeURLSafeBase64` helper that pads before decoding. Fixed in
+  both `ProxyURIParser.swift` and `SubscriptionManager.swift` (which
+  had a duplicate `parseSS` with the same bug).
+- **`RuleEngine.matchedPolicy` cyclomatic complexity** — 33 in a
+  pre-existing 18-case switch over `ProxyKind`. Disable comment added
+  inline (`// swiftlint:disable:next cyclomatic_complexity`) since
+  the function is irreducible as a single canonical match
+  implementation. Unblocks CI which had been red on master for
+  several weeks.
+
+### Known limitations
+
+- W3-1 (Node QR) is **macOS-only** in this release. Windows has
+  `uri.rs` (parser, 4 schemes) but no serializer or QR generator.
+  Cross-platform parity for share URIs is a future sub-project.
+- `Override` UI (override list view, apply/preview actions) is **not**
+  in this release. Data layer ships; UI work is W3 territory.
+
 ## [3.0.0-dev] — Unreleased
 
-> **Status:** In progress. Plans 06 (UI tests), 07 (macOS native integration), and
+> **Status:** In progress. Plans 06 (UI tests), 07 (macOS native integration),
 > 09 (cleanup & scoping) are merged. Plan 08 (network intelligence) and Plan 10
 > are pending — items from those plans are **not** listed here until they land.
 > This entry will be promoted to a final `3.0.0` GA tag once those plans ship
