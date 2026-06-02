@@ -69,6 +69,7 @@ public struct RuleEngine: Sendable {
         return .reject
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func matchedPolicy(for rule: ProxyRule, target: RuleTarget) -> RoutingPolicy? {
         switch rule {
         case .domain(let domain, let policy):
