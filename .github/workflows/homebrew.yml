@@ -25,29 +25,34 @@ jobs:
           repository: G3niusYukki/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
-      
+          # The homebrew-tap repo's default branch is `main` (modern GitHub
+          # default). The actions/checkout action uses the repo's default
+          # branch when `ref` is omitted, so this is robust to whichever
+          # branch the tap repo uses.
+          fetch-depth: 0
+
       - name: Download release artifacts
         run: |
           VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
           VERSION="${VERSION#v}"
-          
+
           mkdir -p downloads
-          
+
           # Download ARM64 build
           curl -L -o downloads/arm64.zip \
             "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-arm64.zip" \
             || echo "ARM64 build not found"
-          
+
           # Download x86_64 build
           curl -L -o downloads/x86_64.zip \
             "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-x86_64.zip" \
             || echo "x86_64 build not found"
-          
+
           # If universal binary exists, use that instead
           curl -L -o downloads/universal.zip \
             "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-universal.zip" \
             || true
-      
+
       - name: Calculate checksums
         id: checksums
         run: |
@@ -59,68 +64,74 @@ jobs:
             echo "sha256_x86_64=$(sha256sum downloads/x86_64.zip | cut -d' ' -f1)" >> $GITHUB_OUTPUT
             echo "has_universal=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Update formula
         run: |
           VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
           VERSION="${VERSION#v}"
-          
+
           cd tap
-          
+
           if [ "${{ steps.checksums.outputs.has_universal }}" = "true" ]; then
             # Single universal binary
-            cat > Formula/riptide.rb << EOF
-class Riptide < Formula
-  desc "Native macOS proxy client built in Swift"
-  homepage "https://github.com/G3niusYukki/Riptide"
-  version "${VERSION}"
-  license "MIT"
-  
-  url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-universal.zip"
-  sha256 "${{ steps.checksums.outputs.sha256_universal }}"
-  
-  depends_on macos: :sonoma
-  
-  def install
-    bin.install "Riptide"
-  end
-end
-EOF
+            cat > Formula/riptide.rb << 'FORMULA_EOF'
+          class Riptide < Formula
+            desc "Native macOS proxy client built in Swift"
+            homepage "https://github.com/G3niusYukki/Riptide"
+            version "${VERSION}"
+            license "MIT"
+
+            url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-universal.zip"
+            sha256 "${{ steps.checksums.outputs.sha256_universal }}"
+
+            depends_on macos: :sonoma
+
+            def install
+              bin.install "Riptide"
+            end
+          end
+          FORMULA_EOF
           else
             # Separate ARM64 and x86_64 builds
-            cat > Formula/riptide.rb << EOF
-class Riptide < Formula
-  desc "Native macOS proxy client built in Swift"
-  homepage "https://github.com/G3niusYukki/Riptide"
-  version "${VERSION}"
-  license "MIT"
-  
-  if Hardware::CPU.arm?
-    url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-arm64.zip"
-    sha256 "${{ steps.checksums.outputs.sha256_arm64 }}"
-  else
-    url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-x86_64.zip"
-    sha256 "${{ steps.checksums.outputs.sha256_x86_64 }}"
-  end
-  
-  depends_on macos: :sonoma
-  
-  def install
-    bin.install "Riptide"
-  end
-end
-EOF
+            cat > Formula/riptide.rb << 'FORMULA_EOF'
+          class Riptide < Formula
+            desc "Native macOS proxy client built in Swift"
+            homepage "https://github.com/G3niusYukki/Riptide"
+            version "${VERSION}"
+            license "MIT"
+
+            if Hardware::CPU.arm?
+              url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-arm64.zip"
+              sha256 "${{ steps.checksums.outputs.sha256_arm64 }}"
+            else
+              url "https://github.com/G3niusYukki/Riptide/releases/download/v${VERSION}/Riptide-macos-x86_64.zip"
+              sha256 "${{ steps.checksums.outputs.sha256_x86_64 }}"
+            end
+
+            depends_on macos: :sonoma
+
+            def install
+              bin.install "Riptide"
+            end
+          end
+          FORMULA_EOF
           fi
-      
+
       - name: Commit and push
         run: |
           VERSION="${{ github.event.release.tag_name || github.event.inputs.version }}"
           VERSION="${VERSION#v}"
-          
+
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
+          # Determine which branch is the tap repo's default so `git push`
+          # without -u works on first run (when there's no upstream yet).
+          TAP_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
+          echo "Pushing to origin/${TAP_BRANCH}"
+
           git add Formula/riptide.rb
-          git commit -m "riptide: update to ${VERSION}"
-          git push
+          # Allow no-op when the formula content is unchanged (idempotent)
+          git diff --cached --quiet || git commit -m "riptide: update to ${VERSION}"
+          git push origin "${TAP_BRANCH}"

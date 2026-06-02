@@ -37,7 +37,7 @@ This gives you:
 - **Clash-compatible** — drop in your existing `.yaml` configs and subscriptions
 - **Transparent boundaries** — Swift-native code and delegated sidecar/runtime paths are called out explicitly
 
-> **Unsigned builds:** TUN mode is the recommended path — it intercepts all traffic at the packet level via mihomo's gVisor stack and does not require the privileged helper.
+> **Mode recommendation:** TUN mode is the most complete interception path — it captures all traffic at the packet level via mihomo's gVisor stack and works regardless of whether the build is signed. System Proxy mode is lighter-weight (HTTP/HTTPS/SOCKS5 only) and is a good fit for everyday browsing.
 
 ---
 
@@ -167,7 +167,7 @@ Local Proxy / TUN packet
 | Mode | Status | Description |
 |------|--------|-------------|
 | **System Proxy** | Beta | mihomo sidecar + macOS system proxy configuration with auto-guard (guard requires signed helper) |
-| **TUN Mode** | Beta | Full traffic interception via mihomo gVisor TUN + auto-recovery — recommended for unsigned builds. Requires sudo, no Apple Developer account needed |
+| **TUN Mode** | Beta | Full traffic interception via mihomo gVisor TUN + auto-recovery. Requires sudo for first-time helper install; no Network Extension entitlement needed |
 
 ---
 
@@ -176,42 +176,50 @@ Local Proxy / TUN packet
 ### Prerequisites
 
 - macOS 14.0 (Sonoma) or later
-- Swift 6.2+ / Xcode 16+ (building from source)
+- ~15 MB disk for the app, plus ~50 MB for the bundled mihomo core on first launch
+- Swift 6.2+ / Xcode 16+ (only if building from source)
 
-### Install (DMG)
+### Install
 
-1. Download `Riptide-x.x.x-arm64.dmg` from [Releases](https://github.com/G3niusYukki/Riptide/releases)
-2. Open the DMG, drag **RiptideApp** to `/Applications`
-3. If macOS blocks the app (unsigned), run:
-   ```bash
-   xattr -cr /Applications/RiptideApp.app
-   ```
-   Then open normally.
+Riptide v3.0.0 is distributed through three channels, **with no `xattr -cr` workaround required** when the build is signed and notarized (the recommended configuration). Pick whichever fits your setup:
 
-> Riptide is fully open source but not Apple-signed (no $99/year developer certificate). `xattr -cr` simply removes the "downloaded from internet" quarantine flag. After launching, select **TUN mode** during onboarding for full traffic interception without Apple signing.
-
-### Install (Homebrew)
+#### Option 1 — Homebrew (recommended)
 
 ```bash
 brew tap G3niusYukki/riptide
 brew install riptide
 ```
 
-### Build from Source
+Then launch Riptide from Launchpad, Spotlight, or `open -a Riptide`. To update later, `brew update && brew upgrade riptide`.
+
+> **Tap note:** the `G3niusYukki/homebrew-tap` repository is created and published on the first tagged release by `.github/workflows/homebrew.yml`. Until the first tagged release ships, install from the DMG below.
+
+#### Option 2 — Direct download (DMG)
+
+1. Open the [latest release page](https://github.com/G3niusYukki/Riptide/releases/latest)
+2. Download `Riptide-X.Y.Z-universal.dmg`
+3. Double-click to mount, drag **Riptide** into `/Applications`
+4. Launch from Launchpad or `open -a Riptide`
+
+Signed DMGs are verified by Gatekeeper automatically — no Terminal commands, no "unidentified developer" warnings. If you ever do see such a warning, it means the build is **not** signed (e.g. a local dev build) and you should fall back to Option 3.
+
+#### Option 3 — Build from source (developers)
 
 ```bash
 git clone https://github.com/G3niusYukki/Riptide.git
 cd Riptide
-swift build
+./Scripts/download-mihomo.sh   # fetches the mihomo sidecar binary
+swift build                    # build all targets
+swift run RiptideApp           # launch the SwiftUI app
 ```
 
-### Download mihomo Core
+Local dev builds are **unsigned**; macOS will quarantine the binary on first run. For the cleanest experience use a signed release (Options 1 or 2) or sign the build yourself with your own Developer ID — see `docs/signing-setup.md`.
 
-```bash
-./Scripts/download-mihomo.sh
-```
+### Auto-update
 
-This fetches the mihomo binary (universal — Intel + Apple Silicon) needed for the System Proxy runtime.
+Once installed, Riptide checks for new releases in the background via [Sparkle](https://sparkle-project.org/). You'll be notified in the menu bar when an update is available; the update is **edDSA-signed** against the public key bundled in `Riptide.entitlements` so the feed itself cannot be tampered with. You can also trigger a manual check from **Settings → Updates → Check Now**, or via the global hotkey **⌘⇧U**.
+
+For a deeper walkthrough (including uninstall, TUN-mode helper install, and troubleshooting), see **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ---
 
@@ -287,10 +295,27 @@ Tests/RiptideTests/          # 591 tests listed by `swift test list`
 
 ## 🔒 Security
 
-- **TLS verification** enforced by Network.framework — no `skip-cert-verify` by default
-- **Proxy credentials** are never logged
-- **Privileged helper** boundary: launches mihomo only from `/Library/Application Support/Riptide/mihomo/`, validates all config paths, no arbitrary command execution
-- TUN mode uses mihomo's built-in gvisor stack via sudo — no Network Extension or Apple Developer account required
+> Status reflects the v3.0.0 GA configuration. Items marked *(when configured)* activate automatically once the corresponding credentials are provided to the release pipeline — see [`docs/signing-setup.md`](docs/signing-setup.md).
+
+### Distribution integrity
+
+- **Code signed** *(when Developer ID is configured)* — the release build is signed with a `Developer ID Application` certificate by `.github/workflows/release.yml`, applied with the hardened-runtime flag. Unsigned local builds remain supported for development.
+- **Notarized by Apple** *(when notarization credentials are configured)* — signed DMGs are submitted to `notarytool` and stapled, so Gatekeeper verifies them on first launch with no warnings and no `xattr -cr` workaround needed.
+- **Sparkle updates are edDSA-signed** — `Scripts/sign-sparkle-update.sh` signs every released DMG; the public key is bundled in `Riptide.entitlements` as `SUPublicEDKey`, so the appcast feed is authenticated end-to-end and cannot be tampered with in transit.
+
+### Runtime hardening
+
+- **Hardened runtime** is enabled in `Riptide.entitlements` (`com.apple.security.cs.allow-jit`, `allow-unsigned-executable-memory`, `disable-library-validation` for the mihomo sidecar).
+- **TLS verification** is enforced by `Network.framework` — there is no global `skip-cert-verify`; per-node `skip-cert-verify: true` is honoured but disabled by default.
+- **Privileged helper** boundary: the XPC helper launches mihomo **only** from `/Library/Application Support/Riptide/mihomo/`, validates all config paths, and refuses to execute arbitrary commands.
+- **Proxy credentials** are never written to logs.
+- **TUN mode** uses mihomo's gVisor stack via sudo — it does not require a Network Extension entitlement.
+
+### Sandbox status (honest)
+
+- The shipped app is **not** sandboxed. `Riptide.entitlements` sets `com.apple.security.app-sandbox = false`. This is intentional: Riptide is distributed outside the Mac App Store, and the helper tool / mihomo sidecar / system proxy guard require capabilities that the App Sandbox does not grant.
+- For Mac App Store submission the sandbox would need to be re-enabled and the entitlement set trimmed accordingly — see [`docs/MAC-APP-STORE-CHECKLIST.md`](docs/MAC-APP-STORE-CHECKLIST.md). v3.0.0 GA does **not** ship to the App Store.
+- **Reporting vulnerabilities:** please open a GitHub issue or contact the maintainers privately (do not include credentials or node URIs in reports).
 
 ---
 

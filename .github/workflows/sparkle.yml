@@ -1,0 +1,267 @@
+name: Sparkle Update
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 3.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sparkle-update
+  cancel-in-progress: false
+
+jobs:
+  sign-and-deploy:
+    name: Sign DMG and deploy appcast
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="v${{ github.event.inputs.version }}"
+          else
+            echo "::error::No version detected. Run from a release event or supply the workflow_dispatch version input."
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "TAG=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using version: ${VERSION} (tag: ${TAG})"
+
+      - name: Verify Sparkle private key secret
+        env:
+          KEY: ${{ secrets.SPARKLE_PRIVATE_KEY_PEM }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::SPARKLE_PRIVATE_KEY_PEM secret is not configured."
+            echo "::error::Generate a key with 'Scripts/sign-sparkle-update.sh keygen' and add the PEM file contents to repository secrets (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          echo "SPARKLE_PRIVATE_KEY_PEM secret present (${#KEY} chars)"
+
+      - name: Write private key to disk
+        env:
+          KEY: ${{ secrets.SPARKLE_PRIVATE_KEY_PEM }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/sparkle/sparkle-key.pem"
+          chmod 0600 "$RUNNER_TEMP/sparkle/sparkle-key.pem"
+          # Sanity check the PEM
+          head -1 "$RUNNER_TEMP/sparkle/sparkle-key.pem" | grep -q "BEGIN" || {
+            echo "::error::PEM does not look like a valid private key (missing BEGIN marker)."
+            exit 1
+          }
+          echo "Private key written to $RUNNER_TEMP/sparkle/sparkle-key.pem ($(wc -c < "$RUNNER_TEMP/sparkle/sparkle-key.pem") bytes, mode 0600)"
+
+      - name: Download macOS DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.TAG }}"
+          mkdir -p downloads
+          gh release download "${TAG}" \
+            -R "$GITHUB_REPOSITORY" \
+            -p "*.dmg" \
+            -D downloads
+          echo "--- Downloads ---"
+          ls -la downloads/
+
+      - name: Locate DMG artifact
+        id: dmg
+        run: |
+          DMG=$(find downloads -maxdepth 2 -name '*.dmg' -type f | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::No DMG found in release artifacts."
+            ls -laR downloads/
+            exit 1
+          fi
+          DMG_FILE=$(basename "$DMG")
+          DMG_SIZE=$(stat -f %z "$DMG")
+          echo "DMG=${DMG}" >> "$GITHUB_OUTPUT"
+          echo "DMG_FILE=${DMG_FILE}" >> "$GITHUB_OUTPUT"
+          echo "DMG_SIZE=${DMG_SIZE}" >> "$GITHUB_OUTPUT"
+          echo "Found DMG: ${DMG_FILE} (${DMG_SIZE} bytes)"
+
+      - name: Sign DMG with Sparkle
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ runner.temp }}/sparkle/sparkle-key.pem
+        run: |
+          chmod +x Scripts/sign-sparkle-update.sh
+          ./Scripts/sign-sparkle-update.sh sign "${{ steps.dmg.outputs.DMG }}"
+
+      - name: Read signature
+        id: sig
+        run: |
+          DMG="${{ steps.dmg.outputs.DMG }}"
+          SIG_FILE="${DMG}.signature"
+          [ -f "$SIG_FILE" ] || { echo "::error::Signature file not found: $SIG_FILE"; exit 1; }
+          # Read and strip trailing whitespace/newlines so the value is safe in YAML/env
+          SIG=$(tr -d '\n\r ' < "$SIG_FILE")
+          echo "SIG=${SIG}" >> "$GITHUB_OUTPUT"
+          echo "Signature (first 80 chars): ${SIG:0:80}..."
+
+      - name: Build new appcast item
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          DMG_FILE: ${{ steps.dmg.outputs.DMG_FILE }}
+          DMG_SIZE: ${{ steps.dmg.outputs.DMG_SIZE }}
+          SIG: ${{ steps.sig.outputs.SIG }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DMG_FILE="${{ steps.dmg.outputs.DMG_FILE }}"
+          DMG_SIZE="${{ steps.dmg.outputs.DMG_SIZE }}"
+          SIG="${{ steps.sig.outputs.SIG }}"
+          PUB_DATE=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${DMG_FILE}"
+
+          mkdir -p staging
+          cat > staging/new-item.xml << XML_EOF
+              <item>
+                <title>Riptide v${VERSION}</title>
+                <link>${DOWNLOAD_URL}</link>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <pubDate>${PUB_DATE}</pubDate>
+                <description><![CDATA[
+                  <p>See <a href="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}">release notes</a> for full details.</p>
+                ]]></description>
+                <enclosure
+                  url="${DOWNLOAD_URL}"
+                  sparkle:version="${VERSION}"
+                  sparkle:shortVersionString="${VERSION}"
+                  length="${DMG_SIZE}"
+                  type="application/x-apple-diskimage"
+                  sparkle:edSignature="${SIG}" />
+              </item>
+          XML_EOF
+          cat staging/new-item.xml
+
+      - name: Fetch previous appcast.xml from gh-pages
+        id: prevappcast
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          ref: gh-pages
+          path: gh-pages-prev
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble final appcast.xml
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p staging
+
+          python3 - <<'PYEOF'
+          import os
+          import re
+
+          version = os.environ["VERSION"]
+          prev_path = "gh-pages-prev/appcast/appcast.xml"
+          new_item_path = "staging/new-item.xml"
+          out_path = "staging/appcast.xml"
+
+          with open(new_item_path) as f:
+              new_item = f.read().strip()
+
+          if os.path.exists(prev_path):
+              print(f"Merging new item into existing appcast at {prev_path}")
+              with open(prev_path) as f:
+                  prev = f.read()
+              # Drop existing items with the same version (idempotency for re-runs)
+              pattern = re.compile(r'<item>.*?</item>', re.DOTALL)
+              def keep(m):
+                  return '' if f'sparkle:version="{version}"' in m.group(0) else m.group(0)
+              prev = pattern.sub(keep, prev)
+              # Insert new item before </channel>
+              if "</channel>" in prev:
+                  prev = prev.replace("</channel>", f"  {new_item}\n  </channel>")
+              else:
+                  prev = prev.rstrip() + f"\n  {new_item}\n  </channel>\n</rss>\n"
+              with open(out_path, "w") as f:
+                  f.write(prev)
+          else:
+              print("No previous appcast.xml, creating fresh feed")
+              repo = os.environ["GITHUB_REPOSITORY"]
+              header = f'''<?xml version="1.0" encoding="utf-8"?>
+                  <rss version="2.0"
+                       xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+                       xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <channel>
+                      <title>Riptide Updates</title>
+                      <link>https://github.com/{repo}/releases</link>
+                      <description>Most recent Riptide macOS builds with Sparkle update metadata.</description>
+                      <language>en</language>
+                      {new_item}
+                    </channel>
+                  </rss>
+              '''
+              with open(out_path, "w") as f:
+                  f.write(header)
+          PYEOF
+
+          echo ""
+          echo "--- Final appcast.xml ---"
+          cat staging/appcast.xml
+
+      - name: Assemble deploy directory
+        run: |
+          mkdir -p deploy
+          cp "${{ steps.dmg.outputs.DMG }}" deploy/
+          cp "${{ steps.dmg.outputs.DMG }}.signature" deploy/
+          cp staging/appcast.xml deploy/
+          echo "--- Deploy contents ---"
+          ls -la deploy/
+          echo "--- Appcast head ---"
+          head -20 deploy/appcast.xml
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
+          publish_branch: gh-pages
+          destination_dir: appcast
+          keep_files: true
+          commit_message: "sparkle: publish v${{ steps.version.outputs.VERSION }}"
+          enable_jekyll: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+
+      - name: Print deployment URL
+        if: success()
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          REPO="${{ github.event.repository.name }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          echo ""
+          echo "=========================================="
+          echo "  Sparkle deployment complete"
+          echo "=========================================="
+          echo ""
+          echo "Appcast URL:  https://${OWNER_LOWER}.github.io/${REPO}/appcast/appcast.xml"
+          echo "DMG URL:      https://${OWNER_LOWER}.github.io/${REPO}/appcast/${{ steps.dmg.outputs.DMG_FILE }}"
+          echo "Version:      v${VERSION}"
+          echo ""
