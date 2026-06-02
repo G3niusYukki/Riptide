@@ -132,6 +132,12 @@ echo "=========================================="
 echo "macOS signing environment configured successfully!"
 echo "=========================================="
 
+# Note: Sparkle edDSA update signing uses a separate key, managed by
+# Scripts/sign-sparkle-update.sh. For CI release jobs, the private key
+# path is expected in the SPARKLE_PRIVATE_KEY environment variable
+# (a GitHub Secret) and is consumed by sign_update at DMG-signing time.
+# This script intentionally does NOT touch the Sparkle keychain.
+
 # 清理临时文件
 rm -f /tmp/certificate.p12
 

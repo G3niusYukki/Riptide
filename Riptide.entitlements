@@ -29,5 +29,15 @@
     <array>
         <string>packet-tunnel-provider</string>
     </array> -->
+
+    <!-- Sparkle auto-update (read by Sparkle.framework at runtime, Sparkle 2.6+).
+         The public key here MUST match the private key stored in the
+         SPARKLE_PRIVATE_KEY GitHub Secret. Generate the pair with:
+             ./Scripts/sign-sparkle-update.sh keygen
+         See Resources/sparkle-pubkey.pem for the human-readable record. -->
+    <key>SUFeedURL</key>
+    <string>https://riptide.app/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>REPLACE_ME_WITH_GENERATED_BASE64_PUBLIC_KEY</string>
 </dict>
 </plist>
