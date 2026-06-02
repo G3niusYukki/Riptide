@@ -160,6 +160,13 @@ public struct RuleEditorView: View {
 struct RuleEditorRow: View {
     let rule: ProxyRule
     let index: Int
+    let isMatched: Bool
+
+    init(rule: ProxyRule, index: Int, isMatched: Bool = false) {
+        self.rule = rule
+        self.index = index
+        self.isMatched = isMatched
+    }
 
     private var ruleText: String {
         switch rule {
@@ -198,6 +205,12 @@ struct RuleEditorRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 30, alignment: .trailing)
+
+            if isMatched {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.accent)
+                    .font(.callout)
+            }
 
             Text(ruleText)
                 .font(.system(.body, design: .monospaced))
