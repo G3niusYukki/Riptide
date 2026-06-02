@@ -14,7 +14,9 @@ DerivedData/
 /state/
 
 # AI tool configs
+.deepseek/
 .opencode/
+.qwen/
 docs/superpowers/
 docs/stage-plans/
 docs/analysis/

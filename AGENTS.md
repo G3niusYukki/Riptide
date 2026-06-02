@@ -13,6 +13,13 @@ Riptide is a native macOS proxy client built entirely in Swift 6. It has a **lib
 - Package manager: Swift Package Manager
 - Dependencies: `Yams` (YAML parsing), `swift-argument-parser` (CLI)
 
+## Platforms
+
+- **macOS:** Production target, full feature set
+- **iOS:** Out of scope for v3.0.0, archived as `docs/_archive/riptide-ios-stub/`
+- **Windows:** Tauri port in progress at `riptide-windows/`, shipped alongside macOS releases
+- **Linux:** Tauri compilation check in CI, not yet packaged
+
 ## Repo Layout
 
 ### Core Library — `Sources/Riptide/`

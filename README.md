@@ -14,6 +14,8 @@
   Library-first architecture · Clash-compatible · mihomo-powered runtime
 </p>
 
+> **Platform Support:** Riptide v3.0.0 targets **macOS only**. iOS support is not planned for the v3.0.0 release. Archived iOS stubs are available in `docs/_archive/riptide-ios-stub/` for reference.
+
 <p align="center">
   <a href="#-features">Features</a> ·
   <a href="#-architecture">Architecture</a> ·
