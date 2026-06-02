@@ -62,4 +62,59 @@ struct ProxyURISerializerTests {
         #expect(parsed?.port == 443)
         #expect(parsed?.password == "trojan-secret")
     }
+
+    @Test("vmess round-trip")
+    func vmessRoundTrip() {
+        let node = ProxyNode(
+            name: "MyVMess",
+            kind: .vmess,
+            server: "vmess.example.com",
+            port: 443,
+            cipher: "auto",
+            uuid: "11111111-2222-3333-4444-555555555555"
+        )
+        let uri = ProxyURISerializer.makeURI(from: node)
+        #expect(uri != nil)
+        let parsed = ProxyURIParser.parse(uri!)
+        #expect(parsed?.kind == .vmess)
+        #expect(parsed?.server == "vmess.example.com")
+        #expect(parsed?.port == 443)
+    }
+
+    @Test("hysteria2 round-trip")
+    func hysteria2RoundTrip() {
+        let node = ProxyNode(
+            name: "MyHy2",
+            kind: .hysteria2,
+            server: "hy2.example.com",
+            port: 443,
+            password: "hy2-secret",
+            sni: "cdn.example.com"
+        )
+        let uri = ProxyURISerializer.makeURI(from: node)
+        #expect(uri != nil)
+        let parsed = ProxyURIParser.parse(uri!)
+        #expect(parsed?.kind == .hysteria2)
+        #expect(parsed?.server == "hy2.example.com")
+        #expect(parsed?.port == 443)
+        #expect(parsed?.password == "hy2-secret")
+    }
+
+    @Test("tuic round-trip")
+    func tuicRoundTrip() {
+        let node = ProxyNode(
+            name: "MyTUIC",
+            kind: .tuic,
+            server: "tuic.example.com",
+            port: 443,
+            password: "tuic-secret",
+            uuid: "uuid-aaaa-bbbb-cccc"
+        )
+        let uri = ProxyURISerializer.makeURI(from: node)
+        #expect(uri != nil)
+        let parsed = ProxyURIParser.parse(uri!)
+        #expect(parsed?.kind == .tuic)
+        #expect(parsed?.server == "tuic.example.com")
+        #expect(parsed?.port == 443)
+    }
 }

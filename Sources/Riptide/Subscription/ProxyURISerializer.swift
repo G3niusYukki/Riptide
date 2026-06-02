@@ -9,10 +9,16 @@ public enum ProxyURISerializer {
         switch node.kind {
         case .shadowsocks:
             return makeSSURI(node)
+        case .vmess:
+            return makeVMessURI(node)
         case .vless:
             return makeVLESSURI(node)
         case .trojan:
             return makeTrojanURI(node)
+        case .hysteria2:
+            return makeHysteria2URI(node)
+        case .tuic:
+            return makeTUICURI(node)
         default:
             return nil
         }
@@ -86,6 +92,86 @@ public enum ProxyURISerializer {
         let queryString = query.isEmpty ? "" : "?" + query.joined(separator: "&")
         let name = urlFragmentEncode(node.name)
         return "trojan://\(urlUserInfoEncode(password))@\(node.server):\(node.port)\(queryString)#\(name)"
+    }
+
+    // MARK: - VMess
+    // Format: vmess://BASE64(JSON{"v":"2","ps":name,"add":host,"port":port,"id":uuid,...})
+    // VMess uses STANDARD base64 (not URL-safe) and the JSON must contain all
+    // v2 fields clients expect.
+    private static func makeVMessURI(_ node: ProxyNode) -> String? {
+        guard let uuid = node.uuid,
+              node.port > 0,
+              !node.server.isEmpty else { return nil }
+        var json: [String: Any] = [
+            "v": "2",
+            "ps": node.name,
+            "add": node.server,
+            "port": node.port,
+            "id": uuid,
+            "aid": node.alterId ?? 0,
+            "scy": node.cipher ?? "auto",
+            "net": node.network ?? "tcp",
+            "type": "none",
+            "host": node.wsHost ?? "",
+            "path": node.wsPath ?? "",
+        ]
+        if let security = node.security, !security.isEmpty {
+            json["tls"] = security
+        }
+        if let sni = node.sni, !sni.isEmpty {
+            json["sni"] = sni
+        }
+        if let alpn = node.alpn, !alpn.isEmpty {
+            json["alpn"] = alpn.joined(separator: ",")
+        }
+        guard JSONSerialization.isValidJSONObject(json),
+              let data = try? JSONSerialization.data(withJSONObject: json, options: []) else { return nil }
+        let encoded = data.base64EncodedString()
+        return "vmess://\(encoded)"
+    }
+
+    // MARK: - Hysteria2
+    // Format: hysteria2://password@host:port?KEY=VAL#name
+    private static func makeHysteria2URI(_ node: ProxyNode) -> String? {
+        guard let password = node.password,
+              node.port > 0,
+              !node.server.isEmpty else { return nil }
+        var query: [String] = []
+        if let sni = node.sni, !sni.isEmpty {
+            query.append("sni=\(urlQueryValue(sni))")
+        }
+        if let alpn = node.alpn, !alpn.isEmpty {
+            query.append("alpn=\(urlQueryValue(alpn.joined(separator: ",")))")
+        }
+        if node.skipCertVerify == true {
+            query.append("insecure=1")
+        }
+        let queryString = query.isEmpty ? "" : "?" + query.joined(separator: "&")
+        let name = urlFragmentEncode(node.name)
+        return "hysteria2://\(urlUserInfoEncode(password))@\(node.server):\(node.port)\(queryString)#\(name)"
+    }
+
+    // MARK: - TUIC
+    // Format: tuic://UUID:password@host:port?KEY=VAL#name
+    private static func makeTUICURI(_ node: ProxyNode) -> String? {
+        guard let uuid = node.uuid,
+              let password = node.password,
+              node.port > 0,
+              !node.server.isEmpty else { return nil }
+        var query: [String] = []
+        if let sni = node.sni, !sni.isEmpty {
+            query.append("sni=\(urlQueryValue(sni))")
+        }
+        if let alpn = node.alpn, !alpn.isEmpty {
+            query.append("alpn=\(urlQueryValue(alpn.joined(separator: ",")))")
+        }
+        if node.skipCertVerify == true {
+            query.append("allowInsecure=1")
+        }
+        let queryString = query.isEmpty ? "" : "?" + query.joined(separator: "&")
+        let name = urlFragmentEncode(node.name)
+        let userInfo = "\(uuid):\(urlUserInfoEncode(password))"
+        return "tuic://\(userInfo)@\(node.server):\(node.port)\(queryString)#\(name)"
     }
 
     // MARK: - Helpers
