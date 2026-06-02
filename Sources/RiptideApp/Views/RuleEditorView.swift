@@ -8,12 +8,18 @@ public struct RuleEditorView: View {
     @State private var showAddSheet = false
     @State private var editingRule: EditableRule = EditableRule()
     @State private var validationError: String?
+    @State private var target: RuleTarget = RuleTarget()
 
     public init(viewModel: RuleEditorViewModel) {
         self._viewModel = State(initialValue: viewModel)
     }
 
     public var body: some View {
+        let activeTarget = hasAnyTargetField(target) ? target : nil
+        let engine = RuleEngine(rules: viewModel.rules)
+        let resolvedPolicy: RoutingPolicy? = activeTarget != nil ? engine.resolve(target: target) : nil
+        let matchedIndex: Int? = activeTarget != nil ? findFirstMatch(rules: viewModel.rules, target: target) : nil
+
         VStack(spacing: 0) {
             // Header
             HStack {
@@ -32,10 +38,22 @@ public struct RuleEditorView: View {
             }
             .padding()
 
+            // Hit preview strip
+            VStack(spacing: 8) {
+                TargetStrip(target: $target)
+                HStack {
+                    Spacer()
+                    PolicyBadge(policy: resolvedPolicy)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+
             // Rule list with drag-to-reorder
             List {
                 ForEach(Array(viewModel.rules.enumerated()), id: \.offset) { index, rule in
-                    RuleEditorRow(rule: rule, index: index)
+                    RuleEditorRow(rule: rule, index: index, isMatched: index == matchedIndex)
+                        .listRowBackground(index == matchedIndex ? Theme.accent.opacity(0.18) : Color.clear)
                         .contextMenu {
                             Button("删除", role: .destructive) {
                                 Task { try? await viewModel.deleteRule(rule) }
