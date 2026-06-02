@@ -11,6 +11,8 @@ public struct NodeEditorView: View {
     @State private var showDeleteConfirmation = false
     @State private var nodeToDelete: ProxyNode?
     @State private var validationErrors: [String] = []
+    @State private var qrSheetNode: ProxyNode?
+    @State private var showAllQRSheet: Bool = false
 
     public init(viewModel: NodeEditorViewModel) {
         self._viewModel = State(initialValue: viewModel)
@@ -22,9 +24,11 @@ public struct NodeEditorView: View {
             HStack {
                 Text("Proxy Nodes")
                     .font(.headline)
-
                 Spacer()
-
+                Button("Share All") {
+                    showAllQRSheet = true
+                }
+                .disabled(viewModel.nodes.isEmpty)
                 Button("+ Add Node") {
                     showAddNodeSheet()
                 }
@@ -45,7 +49,9 @@ public struct NodeEditorView: View {
                             editableNode = EditableProxyNode(from: node)
                             isEditing = true
                         }
-
+                        Button("Share as QR Code") {
+                            qrSheetNode = node
+                        }
                         Button("Duplicate") {
                             Task {
                                 _ = try? await viewModel.duplicateNode(node)
@@ -69,6 +75,12 @@ public struct NodeEditorView: View {
                 onSave: { saveNode() },
                 onCancel: { isEditing = false }
             )
+        }
+        .sheet(item: $qrSheetNode) { node in
+            NodeQRSheet(nodes: [node])
+        }
+        .sheet(isPresented: $showAllQRSheet) {
+            NodeQRSheet(nodes: viewModel.nodes)
         }
         .alert("Delete Node?", isPresented: $showDeleteConfirmation, presenting: nodeToDelete) { node in
             Button("Cancel", role: .cancel) {}
