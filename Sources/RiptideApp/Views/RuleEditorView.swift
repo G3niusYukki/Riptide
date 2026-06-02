@@ -98,10 +98,10 @@ public struct RuleEditorView: View {
 
     // MARK: - Hit Preview Helpers
 
-    private func hasAnyTargetField(_ t: RuleTarget) -> Bool {
-        t.domain != nil || t.ipAddress != nil || t.sourceIP != nil
-            || t.sourcePort != nil || t.destinationPort != nil
-            || t.processName != nil
+    private func hasAnyTargetField(_ target: RuleTarget) -> Bool {
+        target.domain != nil || target.ipAddress != nil || target.sourceIP != nil
+            || target.sourcePort != nil || target.destinationPort != nil
+            || target.processName != nil
     }
 
     /// Mirrors `RuleEngine.matchedPolicy(for:target:)` (Sources/Riptide/Rules/RuleEngine.swift:72-178)
@@ -109,40 +109,29 @@ public struct RuleEditorView: View {
     /// `RuleEngine.expandedRules` private. If duplication grows, promote to a static
     /// `RuleEngine.matchedIndex(rules:target:)` helper.
     private func findFirstMatch(rules: [ProxyRule], target: RuleTarget) -> Int? {
-        for (i, rule) in rules.enumerated() {
-            if matched(rule, target: target) != nil { return i }
+        for (i, rule) in rules.enumerated() where matched(rule, target: target) != nil {
+            return i
         }
         return nil
     }
 
     /// Returns non-nil if `rule` matches `target`. Mirrors RuleEngine.matchedPolicy(for:target:).
+    /// Split into `matched` (dispatcher) + small per-section helpers to keep cyclomatic
+    /// complexity below the SwiftLint threshold.
     private func matched(_ rule: ProxyRule, target: RuleTarget) -> RoutingPolicy? {
         switch rule {
         case .domain(let domain, let policy):
-            guard let host = normalizedDomain(target.domain),
-                  host == normalizedDomain(domain) else { return nil }
-            return policy
+            return matchDomain(domain, policy, target)
         case .domainSuffix(let suffix, let policy):
-            guard let host = normalizedDomain(target.domain),
-                  let ns = normalizedDomain(suffix),
-                  host == ns || host.hasSuffix(".\(ns)") else { return nil }
-            return policy
+            return matchDomainSuffix(suffix, policy, target)
         case .domainKeyword(let keyword, let policy):
-            guard let host = normalizedDomain(target.domain), !keyword.isEmpty else { return nil }
-            return host.contains(keyword.lowercased()) ? policy : nil
+            return matchDomainKeyword(keyword, policy, target)
         case .ipCIDR(let cidr, let policy):
-            guard let ipAddress = target.ipAddress,
-                  let network = IPv4CIDR(cidr),
-                  let ipValue = IPv4AddressParser.parse(ipAddress) else { return nil }
-            return network.contains(ipValue) ? policy : nil
+            return matchIPv4CIDR(cidr, policy: policy, target: target, field: \.ipAddress)
         case .ipCIDR6(let cidr, let policy):
-            guard let ipAddress = target.ipAddress else { return nil }
-            return IPv6CIDR(cidr)?.contains(ipAddress) == true ? policy : nil
+            return matchIPv6CIDR(cidr, policy: policy, target: target)
         case .srcIPCIDR(let cidr, let policy):
-            guard let sourceIP = target.sourceIP,
-                  let network = IPv4CIDR(cidr),
-                  let ipValue = IPv4AddressParser.parse(sourceIP) else { return nil }
-            return network.contains(ipValue) ? policy : nil
+            return matchIPv4CIDR(cidr, policy: policy, target: target, field: \.sourceIP)
         case .srcPort(let port, let policy):
             return target.sourcePort == port ? policy : nil
         case .dstPort(let port, let policy):
@@ -164,6 +153,40 @@ public struct RuleEditorView: View {
         case .final(let policy):
             return policy
         }
+    }
+
+    private func matchDomain(_ domain: String, _ policy: RoutingPolicy, _ target: RuleTarget) -> RoutingPolicy? {
+        guard let host = normalizedDomain(target.domain),
+              host == normalizedDomain(domain) else { return nil }
+        return policy
+    }
+
+    private func matchDomainSuffix(_ suffix: String, _ policy: RoutingPolicy, _ target: RuleTarget) -> RoutingPolicy? {
+        guard let host = normalizedDomain(target.domain),
+              let ns = normalizedDomain(suffix),
+              host == ns || host.hasSuffix(".\(ns)") else { return nil }
+        return policy
+    }
+
+    private func matchDomainKeyword(_ keyword: String, _ policy: RoutingPolicy, _ target: RuleTarget) -> RoutingPolicy? {
+        guard let host = normalizedDomain(target.domain), !keyword.isEmpty else { return nil }
+        return host.contains(keyword.lowercased()) ? policy : nil
+    }
+
+    private func matchIPv4CIDR(
+        _ cidr: String,
+        policy: RoutingPolicy,
+        target: RuleTarget,
+        field: KeyPath<RuleTarget, String?>
+    ) -> RoutingPolicy? {
+        guard let ipValue = target[keyPath: field].flatMap(IPv4AddressParser.parse),
+              let network = IPv4CIDR(cidr) else { return nil }
+        return network.contains(ipValue) ? policy : nil
+    }
+
+    private func matchIPv6CIDR(_ cidr: String, policy: RoutingPolicy, target: RuleTarget) -> RoutingPolicy? {
+        guard let ipAddress = target.ipAddress else { return nil }
+        return IPv6CIDR(cidr)?.contains(ipAddress) == true ? policy : nil
     }
 
     private func normalizedDomain(_ domain: String?) -> String? {
