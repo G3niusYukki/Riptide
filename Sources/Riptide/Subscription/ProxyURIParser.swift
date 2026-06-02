@@ -27,6 +27,8 @@ public enum ProxyURIParser {
         if rest.hasPrefix("vmess://") { return parseVMess(String(rest.dropFirst(8)), fragment: fragment) }
         if rest.hasPrefix("vless://") { return parseVLESS(String(rest.dropFirst(8)), fragment: fragment) }
         if rest.hasPrefix("trojan://") { return parseTrojan(String(rest.dropFirst(9)), fragment: fragment) }
+        if rest.hasPrefix("hysteria2://") { return parseHysteria2(String(rest.dropFirst(12)), fragment: fragment) }
+        if rest.hasPrefix("tuic://") { return parseTUIC(String(rest.dropFirst(7)), fragment: fragment) }
         return nil
     }
 
@@ -118,5 +120,34 @@ public enum ProxyURIParser {
         let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
 
         return ParsedProxy(name: fragment, kind: .trojan, server: host, port: port, cipher: nil, password: password)
+    }
+
+    private static func parseHysteria2(_ body: String, fragment: String) -> ParsedProxy? {
+        guard let atIdx = body.firstIndex(of: "@") else { return nil }
+        let password = String(body[..<atIdx])
+        let serverAndPort = String(body[body.index(after: atIdx)...])
+
+        guard let colonIdx = serverAndPort.lastIndex(of: ":") else { return nil }
+        let host = String(serverAndPort[..<colonIdx])
+        let portStr = String(serverAndPort[serverAndPort.index(after: colonIdx)...])
+        let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
+
+        return ParsedProxy(name: fragment, kind: .hysteria2, server: host, port: port, cipher: nil, password: password)
+    }
+
+    private static func parseTUIC(_ body: String, fragment: String) -> ParsedProxy? {
+        guard let atIdx = body.firstIndex(of: "@") else { return nil }
+        let userInfo = String(body[..<atIdx])
+        let serverAndPort = String(body[body.index(after: atIdx)...])
+
+        guard let colonIdx = userInfo.firstIndex(of: ":") else { return nil }
+        let uuid = String(userInfo[..<colonIdx])
+
+        guard let portColonIdx = serverAndPort.lastIndex(of: ":") else { return nil }
+        let host = String(serverAndPort[..<portColonIdx])
+        let portStr = String(serverAndPort[serverAndPort.index(after: portColonIdx)...])
+        let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
+
+        return ParsedProxy(name: fragment, kind: .tuic, server: host, port: port, cipher: nil, password: uuid)
     }
 }
