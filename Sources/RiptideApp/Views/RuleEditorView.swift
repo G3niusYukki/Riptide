@@ -135,6 +135,65 @@ struct RuleEditorRow: View {
     }
 }
 
+// MARK: - Target Strip (Hit Preview Input)
+
+/// Horizontal HStack of 6 TextFields bound to a `RuleTarget`.
+/// Empty string ↔ nil translation keeps the model clean.
+struct TargetStrip: View {
+    @Binding var target: RuleTarget
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("测试目标")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                TextField("domain", text: Binding(
+                    get: { target.domain ?? "" },
+                    set: { target.domain = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: .infinity)
+
+                TextField("IP", text: Binding(
+                    get: { target.ipAddress ?? "" },
+                    set: { target.ipAddress = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 140)
+
+                TextField("srcIP", text: Binding(
+                    get: { target.sourceIP ?? "" },
+                    set: { target.sourceIP = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 110)
+
+                TextField("srcPort", value: Binding(
+                    get: { target.sourcePort },
+                    set: { target.sourcePort = $0 }
+                ), format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+
+                TextField("dstPort", value: Binding(
+                    get: { target.destinationPort },
+                    set: { target.destinationPort = $0 }
+                ), format: .number)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+
+                TextField("process", text: Binding(
+                    get: { target.processName ?? "" },
+                    set: { target.processName = $0.isEmpty ? nil : $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 120)
+            }
+        }
+    }
+}
+
 // MARK: - Rule Add Sheet
 
 struct RuleAddSheet: View {
