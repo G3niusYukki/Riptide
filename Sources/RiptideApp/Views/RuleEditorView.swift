@@ -194,6 +194,46 @@ struct TargetStrip: View {
     }
 }
 
+// MARK: - Policy Badge (Hit Preview Result)
+
+/// Capsule that shows the resolved RoutingPolicy for the current target,
+/// or a hint when the target is empty.
+struct PolicyBadge: View {
+    let policy: RoutingPolicy?
+
+    private var displayText: String {
+        guard let policy else { return "（请输入目标）" }
+        switch policy {
+        case .direct: return "→ 直连"
+        case .reject: return "→ 拒绝"
+        case .proxyNode(let name): return "→ \(name)"
+        }
+    }
+
+    private var color: Color {
+        guard let policy else { return .gray }
+        switch policy {
+        case .direct: return Theme.success
+        case .reject: return Theme.danger
+        case .proxyNode: return Theme.accent
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "scope")
+            Text(displayText)
+                .fontWeight(policy == nil ? .regular : .medium)
+                .foregroundStyle(policy == nil ? .secondary : color)
+        }
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.1))
+        .clipShape(Capsule())
+    }
+}
+
 // MARK: - Rule Add Sheet
 
 struct RuleAddSheet: View {
