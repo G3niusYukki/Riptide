@@ -77,6 +77,82 @@ public struct RuleEditorView: View {
             }
         }
     }
+
+    // MARK: - Hit Preview Helpers
+
+    private func hasAnyTargetField(_ t: RuleTarget) -> Bool {
+        t.domain != nil || t.ipAddress != nil || t.sourceIP != nil
+            || t.sourcePort != nil || t.destinationPort != nil
+            || t.processName != nil
+    }
+
+    /// Mirrors `RuleEngine.matchedPolicy(for:target:)` (Sources/Riptide/Rules/RuleEngine.swift:72-178)
+    /// but returns the index of the first matching rule. Mirroring the switch here keeps
+    /// `RuleEngine.expandedRules` private. If duplication grows, promote to a static
+    /// `RuleEngine.matchedIndex(rules:target:)` helper.
+    private func findFirstMatch(rules: [ProxyRule], target: RuleTarget) -> Int? {
+        for (i, rule) in rules.enumerated() {
+            if matched(rule, target: target) != nil { return i }
+        }
+        return nil
+    }
+
+    /// Returns non-nil if `rule` matches `target`. Mirrors RuleEngine.matchedPolicy(for:target:).
+    private func matched(_ rule: ProxyRule, target: RuleTarget) -> RoutingPolicy? {
+        switch rule {
+        case .domain(let domain, let policy):
+            guard let host = normalizedDomain(target.domain),
+                  host == normalizedDomain(domain) else { return nil }
+            return policy
+        case .domainSuffix(let suffix, let policy):
+            guard let host = normalizedDomain(target.domain),
+                  let ns = normalizedDomain(suffix),
+                  host == ns || host.hasSuffix(".\(ns)") else { return nil }
+            return policy
+        case .domainKeyword(let keyword, let policy):
+            guard let host = normalizedDomain(target.domain), !keyword.isEmpty else { return nil }
+            return host.contains(keyword.lowercased()) ? policy : nil
+        case .ipCIDR(let cidr, let policy):
+            guard let ipAddress = target.ipAddress,
+                  let network = IPv4CIDR(cidr),
+                  let ipValue = IPv4AddressParser.parse(ipAddress) else { return nil }
+            return network.contains(ipValue) ? policy : nil
+        case .ipCIDR6(let cidr, let policy):
+            guard let ipAddress = target.ipAddress else { return nil }
+            return IPv6CIDR(cidr)?.contains(ipAddress) == true ? policy : nil
+        case .srcIPCIDR(let cidr, let policy):
+            guard let sourceIP = target.sourceIP,
+                  let network = IPv4CIDR(cidr),
+                  let ipValue = IPv4AddressParser.parse(sourceIP) else { return nil }
+            return network.contains(ipValue) ? policy : nil
+        case .srcPort(let port, let policy):
+            return target.sourcePort == port ? policy : nil
+        case .dstPort(let port, let policy):
+            return target.destinationPort == port ? policy : nil
+        case .processName(let name, let policy):
+            return target.processName == name ? policy : nil
+        case .geoIP, .ipASN, .geoSite, .script, .not:
+            // Resolvers required for a real match; the RuleEngine default-resolves to
+            // .reject for any of these without a configured resolver, so for the
+            // prototype we treat them as "needs a profile environment" and don't
+            // simulate a match here. The badge will still show the RuleEngine's result.
+            return nil
+        case .ruleSet(_, let policy):
+            return policy
+        case .reject:
+            return .reject
+        case .matchAll:
+            return .direct
+        case .final(let policy):
+            return policy
+        }
+    }
+
+    private func normalizedDomain(_ domain: String?) -> String? {
+        guard let domain else { return nil }
+        let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 // MARK: - Rule Editor Row

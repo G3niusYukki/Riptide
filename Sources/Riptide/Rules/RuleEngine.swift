@@ -217,11 +217,11 @@ public struct RuleEngine: Sendable {
     }
 }
 
-struct IPv4CIDR: Sendable {
+public struct IPv4CIDR: Sendable {
     let networkAddress: UInt32
     let mask: UInt32
 
-    init?(_ cidr: String) {
+    public init?(_ cidr: String) {
         let parts = cidr.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 2 else { return nil }
         guard let ipValue = IPv4AddressParser.parse(String(parts[0])) else { return nil }
@@ -239,16 +239,16 @@ struct IPv4CIDR: Sendable {
         self.networkAddress = ipValue & mask
     }
 
-    func contains(_ ip: UInt32) -> Bool {
+    public func contains(_ ip: UInt32) -> Bool {
         (ip & mask) == networkAddress
     }
 }
 
-struct IPv6CIDR: Sendable {
+public struct IPv6CIDR: Sendable {
     let prefix: Int
     let addressData: [UInt8]
 
-    init?(_ cidr: String) {
+    public init?(_ cidr: String) {
         let parts = cidr.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 2 else { return nil }
         guard let prefix = Int(parts[1]), (0...128).contains(prefix) else { return nil }
@@ -263,7 +263,7 @@ struct IPv6CIDR: Sendable {
         self.addressData = withUnsafeBytes(of: &addr) { Array($0) }
     }
 
-    func contains(_ ip: String) -> Bool {
+    public func contains(_ ip: String) -> Bool {
         var addr = in6_addr()
         let result = ip.withCString { ptr in
             inet_pton(AF_INET6, ptr, &addr)
@@ -289,8 +289,8 @@ struct IPv6CIDR: Sendable {
     }
 }
 
-enum IPv4AddressParser {
-    static func parse(_ ip: String) -> UInt32? {
+public enum IPv4AddressParser {
+    public static func parse(_ ip: String) -> UInt32? {
         let parts = ip.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 4 else { return nil }
 
