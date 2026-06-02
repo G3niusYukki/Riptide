@@ -1,12 +1,12 @@
 import Foundation
 
 public struct RuleTarget: Equatable, Sendable {
-    public let domain: String?
-    public let ipAddress: String?
-    public let sourceIP: String?
-    public let sourcePort: Int?
-    public let destinationPort: Int?
-    public let processName: String?
+    public var domain: String?
+    public var ipAddress: String?
+    public var sourceIP: String?
+    public var sourcePort: Int?
+    public var destinationPort: Int?
+    public var processName: String?
 
     public init(domain: String? = nil, ipAddress: String? = nil,
                 sourceIP: String? = nil, sourcePort: Int? = nil,
