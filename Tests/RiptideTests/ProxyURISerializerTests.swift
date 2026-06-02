@@ -117,4 +117,98 @@ struct ProxyURISerializerTests {
         #expect(parsed?.server == "tuic.example.com")
         #expect(parsed?.port == 443)
     }
+
+    @Test("ss name with URL-unsafe chars is percent-encoded and round-trips")
+    func ssNameWithURLUnsafeChars() {
+        let node = ProxyNode(
+            name: "中国节点#1",
+            kind: .shadowsocks,
+            server: "ss.example.com",
+            port: 8388,
+            cipher: "chacha20-ietf-poly1305",
+            password: "p@ss w0rd"
+        )
+        let uri = ProxyURISerializer.makeURI(from: node)
+        #expect(uri != nil)
+        #expect(uri!.contains("#"))  // The trailing fragment
+        let parsed = ProxyURIParser.parse(uri!)
+        #expect(parsed?.kind == .shadowsocks)
+        #expect(parsed?.password == "p@ss w0rd")
+    }
+
+    @Test("vless missing uuid returns nil")
+    func vlessMissingUUIDReturnsNil() {
+        let node = ProxyNode(
+            name: "NoUUID",
+            kind: .vless,
+            server: "vless.example.com",
+            port: 443,
+            uuid: nil
+        )
+        #expect(ProxyURISerializer.makeURI(from: node) == nil)
+    }
+
+    @Test("trojan missing password returns nil")
+    func trojanMissingPasswordReturnsNil() {
+        let node = ProxyNode(
+            name: "NoPassword",
+            kind: .trojan,
+            server: "trojan.example.com",
+            port: 443,
+            password: nil
+        )
+        #expect(ProxyURISerializer.makeURI(from: node) == nil)
+    }
+
+    @Test("hysteria2 empty name generates URI with empty fragment")
+    func hysteria2EmptyName() {
+        let node = ProxyNode(
+            name: "",
+            kind: .hysteria2,
+            server: "hy2.example.com",
+            port: 443,
+            password: "secret"
+        )
+        let uri = ProxyURISerializer.makeURI(from: node)
+        #expect(uri != nil)
+        // The URI ends with `#` (empty fragment)
+        #expect(uri!.hasSuffix("#"))
+    }
+
+    @Test("tuic missing password returns nil")
+    func tuicMissingPasswordReturnsNil() {
+        let node = ProxyNode(
+            name: "NoPassword",
+            kind: .tuic,
+            server: "tuic.example.com",
+            port: 443,
+            password: nil,
+            uuid: "uuid"
+        )
+        #expect(ProxyURISerializer.makeURI(from: node) == nil)
+    }
+
+    @Test("port 0 returns nil")
+    func portZeroReturnsNil() {
+        let node = ProxyNode(
+            name: "BadPort",
+            kind: .shadowsocks,
+            server: "ss.example.com",
+            port: 0,
+            cipher: "aes-256-gcm",
+            password: "secret"
+        )
+        #expect(ProxyURISerializer.makeURI(from: node) == nil)
+    }
+
+    @Test("http kind returns nil (no industry-standard share URI)")
+    func httpKindReturnsNil() {
+        let node = ProxyNode(
+            name: "HTTPNode",
+            kind: .http,
+            server: "proxy.example.com",
+            port: 8080
+        )
+        #expect(ProxyURISerializer.makeURI(from: node) == nil)
+    }
 }
