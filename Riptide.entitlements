@@ -15,20 +15,33 @@
     <!-- Apple Events (AppleScript automation) -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
-
-    <!-- Hardened runtime (required for notarization) -->
+    <!-- Hardened runtime (required for notarization).
+         These three "allow" flags are deliberately opt-in: we only enable what
+         we actively need (JIT for SwiftUI runtime bridging, unsigned memory
+         for Sparkle, library-validation disabled for the Swift Package
+         Manager dynamic loader to load third-party frameworks). The
+         `allow-dyld-environment-variables` flag is explicitly FALSE: loading
+         unsigned code via DYLD_INSERT_LIBRARIES is a common malware
+         technique, so we close that vector. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <false/>
 
-    <!-- Network Extension (预留, 当前不用 NE) -->
+    <!-- Network Extension (预留, 当前不用 NE).
+         Enabling this requires a separate entitlement request from Apple
+         (Network Extension capability) and is needed only if we move from
+         mihomo's userspace TUN to a system Network Extension provider.
+         Currently mihomo handles TUN in userspace. -->
     <!-- <key>com.apple.developer.networking.networkextension</key>
     <array>
         <string>packet-tunnel-provider</string>
-    </array> -->
+    </array>
+    -->
 
     <!-- Sparkle auto-update (read by Sparkle.framework at runtime, Sparkle 2.6+).
          The public key here MUST match the private key stored in the
