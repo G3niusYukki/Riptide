@@ -69,7 +69,16 @@ jobs:
         run: swift build
 
       - name: Test XCTest
-        run: swift test --disable-swift-testing
+        # --filter "^RiptideTests\." runs only tests in the RiptideTests
+        # target. The RiptideAppUITests target contains SwiftUI UI tests
+        # whose setUp() calls XCUIApplication().launch(); loading those
+        # classes crashes the headless xctest process with SIGBUS
+        # (signal 10) on CI runners. They run in the dedicated
+        # `swift-ui-test` job below with continue-on-error: true.
+        # Note: --skip is a post-discovery filter and does NOT prevent
+        # the test target from being loaded, so an anchored --filter is
+        # required to keep RiptideAppUITests out of this job.
+        run: swift test --disable-swift-testing --filter "^RiptideTests\."
 
       - name: Test Swift Testing suites
         run: bash Scripts/ci-swift-testing-suites.sh
@@ -81,6 +90,8 @@ jobs:
   # xctest process on macOS runners. We run it anyway with
   # `continue-on-error: true` to surface the limitation, capture the
   # failure logs as an artifact, and prove the wiring end-to-end.
+  # The `swift-build-test` job above uses `--filter "^RiptideTests\."`
+  # to keep this target out of the main test run.
   # Remove `continue-on-error` once Riptide migrates to an
   # .xcodeproj (or SwiftPM UI test target) that supports XCUIApplication.
   swift-ui-test:
