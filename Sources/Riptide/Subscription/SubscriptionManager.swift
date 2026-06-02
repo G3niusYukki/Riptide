@@ -334,14 +334,14 @@ public actor SubscriptionManager {
         if let atIdx = str.firstIndex(of: "@") {
             let userInfo = String(str[..<atIdx])
             serverAndParams = String(str[str.index(after: atIdx)...])
-            if let base64Data = Data(base64Encoded: userInfo.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")),
+            if let base64Data = decodeURLSafeBase64(userInfo),
                let decoded = String(data: base64Data, encoding: .utf8),
                let colonIdx = decoded.firstIndex(of: ":") {
                 method = String(decoded[..<colonIdx])
                 password = String(decoded[decoded.index(after: colonIdx)...])
             }
         } else {
-            if let base64Data = Data(base64Encoded: str.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")),
+            if let base64Data = decodeURLSafeBase64(str),
                let decoded = String(data: base64Data, encoding: .utf8),
                let atIdx = decoded.firstIndex(of: "@") {
                 let userInfo = String(decoded[..<atIdx])
@@ -437,6 +437,16 @@ public actor SubscriptionManager {
         } catch {
             print("[SubscriptionManager] Failed to save subscriptions: \(error)")
         }
+    }
+
+    /// Decode a URL-safe base64 string (RFC 4648 §5: '-' for '+', '_' for '/',
+    /// optional padding). Adds `=` padding before decoding.
+    private func decodeURLSafeBase64(_ string: String) -> Data? {
+        let standard = string.replacingOccurrences(of: "-", with: "+")
+                             .replacingOccurrences(of: "_", with: "/")
+        let padded = standard.padding(toLength: ((standard.count + 3) / 4) * 4,
+                                      withPad: "=", startingAt: 0)
+        return Data(base64Encoded: padded)
     }
 }
 
