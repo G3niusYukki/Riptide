@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Riptide
 
 // MARK: - Node Editor View
@@ -309,4 +310,127 @@ struct NodeEditSheet: View {
 
 extension ProxyNode: Identifiable {
     public var id: String { name }
+}
+
+// MARK: - Node QR Sheet
+
+/// Sheet that displays scannable QR codes for one or more nodes.
+/// Reused for both per-row "Share as QR Code" (1 node) and toolbar
+/// "Share All" (N nodes). Unsupported kinds are listed in a footer
+/// instead of silently dropped.
+struct NodeQRSheet: View {
+    let nodes: [ProxyNode]
+    @Environment(\.dismiss) var dismiss
+    @State private var uris: [String: String] = [:]
+    @State private var generatedImages: [String: NSImage] = [:]
+    @State private var unsupportedNames: [String] = []
+    @State private var copyConfirmation: String?
+    @State private var saveConfirmation: String?
+
+    private var shareableNodes: [ProxyNode] {
+        nodes.filter { generatedImages[$0.id] != nil }
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Top status / info
+            if unsupportedNames.isEmpty {
+                Text("扫一扫二维码即可在手机上导入节点")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("以下节点不支持分享: \(unsupportedNames.joined(separator: ", "))")
+                    .foregroundStyle(.orange)
+            }
+
+            // Grid of QRs
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
+                    ForEach(shareableNodes) { node in
+                        VStack(spacing: 6) {
+                            if let img = generatedImages[node.id] {
+                                Image(nsImage: img)
+                                    .resizable()
+                                    .interpolation(.none)
+                                    .frame(width: 200, height: 200)
+                            } else {
+                                ProgressView().frame(width: 200, height: 200)
+                            }
+                            Text(node.name)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                .padding()
+            }
+
+            // Bottom action bar
+            HStack {
+                if let copyConfirmation {
+                    Text(copyConfirmation).font(.caption).foregroundStyle(.secondary)
+                }
+                if let saveConfirmation {
+                    Text(saveConfirmation).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Copy All URIs") { copyAllURIs() }
+                    .disabled(uris.isEmpty)
+                Button("Save All as PNGs") { saveAllPNGs() }
+                    .disabled(generatedImages.isEmpty)
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding()
+        }
+        .frame(minWidth: 600, minHeight: 500)
+        .task { generateAll() }
+    }
+
+    private func generateAll() {
+        var uris: [String: String] = [:]
+        var images: [String: NSImage] = [:]
+        var unsupported: [String] = []
+        for node in nodes {
+            guard let uri = ProxyURISerializer.makeURI(from: node) else {
+                unsupported.append(node.name)
+                continue
+            }
+            uris[node.id] = uri
+            if let img = QRCodeGenerator.generate(text: uri, size: 400) {
+                images[node.id] = img
+            }
+        }
+        self.uris = uris
+        self.generatedImages = images
+        self.unsupportedNames = unsupported
+    }
+
+    private func copyAllURIs() {
+        let joined = uris.values.joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(joined, forType: .string)
+        copyConfirmation = "已复制 \(uris.count) 个 URI"
+    }
+
+    private func saveAllPNGs() {
+        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+        guard let desktop else {
+            saveConfirmation = "无法访问 Desktop"
+            return
+        }
+        var saved = 0
+        for (id, image) in generatedImages {
+            guard let node = nodes.first(where: { $0.id == id }),
+                  let tiff = image.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let pngData = rep.representation(using: .png, properties: [:]) else { continue }
+            let name = node.name.isEmpty ? "node-\(id.prefix(8))" : node.name
+            let safeName = name.replacingOccurrences(of: "/", with: "_")
+            let url = desktop.appendingPathComponent("riptide-qr-\(safeName).png")
+            try? pngData.write(to: url)
+            saved += 1
+        }
+        saveConfirmation = "已保存 \(saved) 张到 Desktop"
+    }
 }
