@@ -1,5 +1,38 @@
 # Changelog
 
+## [W3-2a] — 2026-06-03
+
+> **Status:** Unreleased. W3-2a ships the data layer + Diagnostics tab. W3-2b
+> (ClosedConnectionWatcher runtime loop + ConnectionHistorySection data) is a
+> follow-up spec. ~32 new tests; full suite 560 → ~593.
+
+### Added
+
+- **Logbook data layer** — `Sources/Riptide/Logbook/LogbookPaths.swift`,
+  `LogbookEntry.swift`, `LogbookStore.swift`, `LogbookWriter.swift`,
+  `ClosedConnectionWatcher.swift`. JSONL-per-UTC-day format at
+  `~/Library/Application Support/Riptide/logbook/YYYY-MM-DD.jsonl`. Fire-and-forget
+  writes; reads skip malformed lines.
+- **"诊断" (Diagnostics) tab** — 7th tab between 日志 and 设置. Contains
+  "事件" (EventLogSection) and "连接历史" (ConnectionHistorySection, empty state
+  in W3-2a). Filter by level / category / date range; clear + export actions.
+- **LogbookContainer + LogbookViewModel** — `AppViewModel.logbook` holds the
+  trio. Distributed to 5 business modules (ModeCoordinator, SubscriptionManager,
+  HelperToolConnection, MihomoRuntimeManager, OverrideStore) via
+  `logbookWriter: LogbookWriter?` injection with async `setLogbookWriter` setters.
+- **ClosedConnectionWatcher diff algorithm** — actor detects connections that
+  disappeared between two ticks. Runtime loop is W3-2b.
+
+### Known limitations
+
+- W3-2a's connection-history section is empty; the data model + diff algorithm
+  land in W3-2a, but the runtime tick loop that wires into the tunnel runtime is
+  W3-2b.
+- App lifecycle (launch / quit) events are not yet wired to the Logbook
+  (the SwiftUI app has no AppDelegate; lifecycle hooks are deferred).
+- Pre-existing SwiftLint violation in `OverrideStore.swift:45` (`var o` short
+  identifier) is unrelated to this work.
+
 ## [2.3.0] — 2026-06-02
 
 > **Status:** Released. 16 commits since v2.2.0. CI green (SwiftLint + Swift
