@@ -190,12 +190,12 @@ public actor LogbookStore {
         }
         if timestamp < filter.from || timestamp > filter.to { return false }
         if !filter.levels.isEmpty {
-            if let l = level, !filter.levels.contains(l) { return false }
+            if let entryLevel = level, !filter.levels.contains(entryLevel) { return false }
         }
         if !filter.categories.isEmpty {
-            if let c = category, !filter.categories.contains(c) { return false }
+            if let entryCategory = category, !filter.categories.contains(entryCategory) { return false }
         }
-        if let want = filter.hostContains, let h = host, !h.contains(want) {
+        if let want = filter.hostContains, let entryHost = host, !entryHost.contains(want) {
             return false
         }
         return true
