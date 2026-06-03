@@ -262,6 +262,64 @@ struct LogbookStoreTests {
         #expect(remaining.count == 1)
     }
 
+    @Test("concurrent append is safe — no loss, no duplicates")
+    func concurrentAppendSafety() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let count = 1000
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<count {
+                group.addTask {
+                    try? await store.append(makeEvent(message: "msg-\(i)"))
+                }
+            }
+        }
+        try await store.flush()
+        let results = try await store.query(.last24h(limit: count + 100))
+        #expect(results.count == count)
+        let messages = Set(results.compactMap { entry -> String? in
+            if case .event(let e) = entry { return e.message } else { return nil }
+        })
+        #expect(messages.count == count)
+    }
+
+    @Test("query returns entries across multiple consecutive days")
+    func queryAcrossDays() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        var startComps = DateComponents()
+        startComps.year = 2026; startComps.month = 6; startComps.day = 1
+        startComps.hour = 12; startComps.minute = 0; startComps.second = 0
+        let baseDay = utc.date(from: startComps)!
+        var dayDates: [Date] = []
+        for offset in 0..<5 {
+            guard let day = utc.date(byAdding: .day, value: offset, to: baseDay) else {
+                Issue.record("failed to compute day + \(offset)")
+                return
+            }
+            dayDates.append(day)
+            try await store.append(makeEvent(message: "msg-day-\(offset)", at: day))
+        }
+        try await store.flush()
+
+        let from = utc.startOfDay(for: dayDates[0])
+        guard let endDay = utc.date(byAdding: .day, value: 4, to: from) else {
+            Issue.record("failed to compute end day")
+            return
+        }
+        let to = utc.date(
+            bySettingHour: 23, minute: 59, second: 59, of: endDay
+        ) ?? endDay
+        let q = LogbookQuery(
+            from: from, to: to,
+            levels: [], categories: [], limit: 100
+        )
+        let results = try await store.query(q)
+        #expect(results.count == 5)
+    }
+
     @Test("query host filter does not exclude events")
     func queryHostFilterDoesNotExcludeEvents() async throws {
         let (store, dir) = try await makeStore()
