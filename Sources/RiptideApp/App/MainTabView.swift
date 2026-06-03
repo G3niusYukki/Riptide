@@ -49,12 +49,19 @@ struct MainTabView: View {
                 }
                 .tag(5)
 
+            DiagnosticsTabView(vm: vm)
+                .tabItem {
+                    Label("诊断", systemImage: "stethoscope")
+                        .accessibilityIdentifier(A11yID.Tab.diagnostics)
+                }
+                .tag(6)
+
             SettingsTabView(vm: vm, themeManager: themeManager)
                 .tabItem {
                     Label("设置", systemImage: "gearshape")
                         .accessibilityIdentifier(A11yID.Tab.settings)
                 }
-                .tag(6)
+                .tag(7)
         }
         .tint(Theme.accent)
         .background(Theme.backgroundGradient.ignoresSafeArea())

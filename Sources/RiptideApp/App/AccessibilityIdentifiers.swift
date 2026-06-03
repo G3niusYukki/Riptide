@@ -14,6 +14,7 @@ public enum A11yID {
         public static let traffic = "tab.traffic"
         public static let rules = "tab.rules"
         public static let logs = "tab.logs"
+        public static let diagnostics = "tab.diagnostics"
         public static let settings = "tab.settings"
     }
 
@@ -46,6 +47,13 @@ public enum A11yID {
         public static let levelFilter = "logs.level-filter"
         public static let searchField = "logs.search-field"
         public static let exportButton = "logs.export-button"
+    }
+
+    public enum Diagnostics {
+        public static let sectionPicker = "diagnostics.section-picker"
+        public static let eventList = "diagnostics.event-list"
+        public static let clearButton = "diagnostics.clear-button"
+        public static let exportButton = "diagnostics.export-button"
     }
 
     public enum Settings {

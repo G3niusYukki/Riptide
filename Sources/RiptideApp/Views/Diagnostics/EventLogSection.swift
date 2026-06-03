@@ -27,12 +27,12 @@ struct EventLogSection: View {
                 Spacer()
 
                 Button("导出") { exportEntries() }
-                    .accessibilityIdentifier("diagnostics.export-button")
+                    .accessibilityIdentifier(A11yID.Diagnostics.exportButton)
 
                 Button("清空") {
                     Task { await logbookVM.clear() }
                 }
-                .accessibilityIdentifier("diagnostics.clear-button")
+                .accessibilityIdentifier(A11yID.Diagnostics.clearButton)
             }
             .padding(.horizontal)
 
@@ -49,7 +49,7 @@ struct EventLogSection: View {
                     }
                     .padding()
                 }
-                .accessibilityIdentifier("diagnostics.event-list")
+                .accessibilityIdentifier(A11yID.Diagnostics.eventList)
             }
         }
         .onAppear { logbookVM.load() }
