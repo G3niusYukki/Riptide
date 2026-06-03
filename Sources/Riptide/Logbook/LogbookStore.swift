@@ -195,6 +195,7 @@ public actor LogbookStore {
         if !filter.categories.isEmpty {
             if let entryCategory = category, !filter.categories.contains(entryCategory) { return false }
         }
+        // hostContains only applies to .connectionClosed; .event entries pass through (no host to filter).
         if let want = filter.hostContains, let entryHost = host, !entryHost.contains(want) {
             return false
         }

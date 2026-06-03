@@ -206,4 +206,54 @@ struct LogbookStoreTests {
         let results = try await store.query(q)
         #expect(results.count == 1)
     }
+
+    @Test("query host filter does not exclude events")
+    func queryHostFilterDoesNotExcludeEvents() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        // 1 .event entry (no host) — should pass hostContains filter implicitly
+        try await store.append(.event(LogEvent(
+            id: UUID(), timestamp: now, level: .info, category: .appLifecycle,
+            message: "lifecycle-event", context: [:]
+        )))
+        // 1 .connectionClosed entry with host that matches the filter
+        let matchingRecord = ClosedConnectionRecord(
+            id: "1", host: "example.com", proxyName: "p1", protocol: "tcp",
+            rule: nil, sourceIP: "127.0.0.1", sourcePort: 80,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: now, closedAt: now,
+            uploadBytes: 0, downloadBytes: 0, closeReason: .expired
+        )
+        // 1 .connectionClosed entry with host that does not match
+        let excludedRecord = ClosedConnectionRecord(
+            id: "2", host: "other.com", proxyName: "p1", protocol: "tcp",
+            rule: nil, sourceIP: "127.0.0.1", sourcePort: 80,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: now, closedAt: now,
+            uploadBytes: 0, downloadBytes: 0, closeReason: .expired
+        )
+        try await store.append(.connectionClosed(matchingRecord))
+        try await store.append(.connectionClosed(excludedRecord))
+        try await store.flush()
+
+        var q = LogbookQuery.last24h()
+        q.hostContains = "example"
+        let results = try await store.query(q)
+        #expect(results.count == 2)
+
+        // Verify the .event entry is present
+        let events = results.compactMap { entry -> LogEvent? in
+            if case .event(let e) = entry { return e } else { return nil }
+        }
+        #expect(events.count == 1)
+        #expect(events[0].message == "lifecycle-event")
+
+        // Verify the .connectionClosed entry with "other.com" is NOT in results
+        let hosts = results.compactMap { entry -> String? in
+            if case .connectionClosed(let r) = entry { return r.host } else { return nil }
+        }
+        #expect(hosts.contains("example.com"))
+        #expect(!hosts.contains("other.com"))
+    }
 }
