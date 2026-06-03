@@ -21,10 +21,10 @@ struct LogbookPathsTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("logbook-paths-test-\(UUID().uuidString)")
         let paths = LogbookPaths(directory: tmp)
+        defer { try? FileManager.default.removeItem(at: tmp) }
         try paths.createDirectoryIfNeeded()
         try paths.createDirectoryIfNeeded()  // must not throw on second call
         #expect(FileManager.default.fileExists(atPath: tmp.path))
-        try? FileManager.default.removeItem(at: tmp)
     }
 
     @Test("file URL uses UTC date")
