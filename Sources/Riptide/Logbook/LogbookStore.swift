@@ -75,6 +75,42 @@ public actor LogbookStore {
         return results
     }
 
+    /// Delete log files whose UTC day is strictly before `cutoff`'s UTC start-of-day.
+    /// Returns the count of files removed. Only files with a `.jsonl` extension that
+    /// match the `yyyy-MM-dd` filename convention are considered; anything else is
+    /// left untouched so we never accidentally clobber unrelated data.
+    public func prune(olderThan cutoff: Date) throws -> Int {
+        let cutoffDay = Self.utcCalendar.startOfDay(for: cutoff)
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: paths.directory, includingPropertiesForKeys: nil
+        )
+        var removed = 0
+        for url in urls where url.pathExtension == "jsonl" {
+            let name = url.deletingPathExtension().lastPathComponent
+            // Malformed names are left alone — safer than guessing.
+            if let fileDay = Self.dayFormatter.date(from: name), fileDay < cutoffDay {
+                try? FileManager.default.removeItem(at: url)
+                removed += 1
+            }
+        }
+        return removed
+    }
+
+    /// Delete every `.jsonl` file in the directory and reset the actor's current
+    /// handle state. After this call, the next `append` re-opens a fresh daily file.
+    public func purgeAll() throws {
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: paths.directory, includingPropertiesForKeys: nil
+        )
+        for url in urls where url.pathExtension == "jsonl" {
+            try FileManager.default.removeItem(at: url)
+        }
+        try? currentHandle?.synchronize()
+        try? currentHandle?.close()
+        currentHandle = nil
+        currentDateString = ""
+    }
+
     // MARK: - Private
 
     /// Use the shared Task-2 codec so the on-disk date format is identical to

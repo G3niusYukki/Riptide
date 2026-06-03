@@ -207,6 +207,61 @@ struct LogbookStoreTests {
         #expect(results.count == 1)
     }
 
+    @Test("prune removes files older than cutoff")
+    func pruneRemovesOldFiles() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        // Use UTC calendar so the dates straddle UTC midnight regardless of host TZ.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        var c = DateComponents()
+        c.year = 2026; c.month = 6; c.day = 1; c.hour = 12
+        let old = utc.date(from: c)!
+        c.day = 10
+        let recent = utc.date(from: c)!
+        try await store.append(makeEvent(message: "old", at: old))
+        try await store.append(makeEvent(message: "recent", at: recent))
+        try await store.flush()
+        c.day = 5
+        let cutoff = utc.date(from: c)!
+        let removed = try await store.prune(olderThan: cutoff)
+        #expect(removed == 1)
+        let remaining = try FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        )
+        #expect(remaining.count == 1)
+        #expect(remaining[0].lastPathComponent == "2026-06-10.jsonl")
+    }
+
+    @Test("purgeAll removes every file")
+    func purgeAllRemovesEverything() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        for i in 0..<5 {
+            try await store.append(makeEvent(message: "msg-\(i)"))
+        }
+        try await store.flush()
+        try await store.purgeAll()
+        let remaining = try FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        )
+        #expect(remaining.isEmpty)
+    }
+
+    @Test("prune returns 0 when nothing to remove")
+    func pruneNoOp() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        try await store.append(makeEvent(message: "now"))
+        try await store.flush()
+        let removed = try await store.prune(olderThan: Date(timeIntervalSince1970: 0))
+        #expect(removed == 0)
+        let remaining = try FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        )
+        #expect(remaining.count == 1)
+    }
+
     @Test("query host filter does not exclude events")
     func queryHostFilterDoesNotExcludeEvents() async throws {
         let (store, dir) = try await makeStore()
