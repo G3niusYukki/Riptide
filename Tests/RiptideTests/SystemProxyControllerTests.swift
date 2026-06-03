@@ -11,6 +11,10 @@ actor MockMihomoRuntimeManager: MihomoRuntimeManaging {
     var currentMode: RuntimeMode? = nil
     var currentProfile: TunnelProfile? = nil
     var latestRecoveryError: RuntimeErrorSnapshot? = nil
+    var logbookWriter: LogbookWriter? = nil
+    func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
     var eventHandler: (@Sendable (RuntimeEvent) -> Void)? = nil
     func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
         self.eventHandler = handler
