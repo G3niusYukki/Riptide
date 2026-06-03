@@ -7,7 +7,6 @@ import Foundation
 /// invoke `append(_:)` from any context; it is safe to use across tasks.
 public actor LogbookStore {
     private let paths: LogbookPaths
-    private var currentDate: Date?
     private var currentHandle: FileHandle?
     private var currentDateString: String = ""
 
@@ -23,9 +22,8 @@ public actor LogbookStore {
     /// - For `.connectionClosed`, the file is selected by `ClosedConnectionRecord.closedAt`.
     public func append(_ entry: LogbookEntry) throws {
         try ensureHandle(for: dateOf(entry))
-        let data = try Self.encoder.encode(entry)
+        let data = try Self.encoder.encode(entry) + Data([0x0A])
         try currentHandle?.write(contentsOf: data)
-        try currentHandle?.write(contentsOf: Data([0x0A]))  // newline
     }
 
     /// Append a batch. Same semantics as repeated `append` but reuses the
@@ -40,7 +38,6 @@ public actor LogbookStore {
         try? currentHandle?.synchronize()
         try? currentHandle?.close()
         currentHandle = nil
-        currentDate = nil
         currentDateString = ""
     }
 
@@ -99,7 +96,6 @@ public actor LogbookStore {
             handle = try FileHandle(forUpdating: url)
         }
         currentHandle = handle
-        currentDate = date
         currentDateString = dayString
     }
 }
