@@ -82,7 +82,7 @@ public final class LogbookViewModel: ObservableObject {
 
     private func performLoad() async {
         isLoading = true
-        defer { isLoading = false }
+        defer { if !Task.isCancelled { isLoading = false } }
 
         let baseQuery: LogbookQuery
         switch dateRange {
