@@ -20,6 +20,9 @@ DerivedData/
 docs/superpowers/
 docs/stage-plans/
 docs/analysis/
+# Per-developer AI assistant context (not shared project content)
+CLAUDE.md
+QWEN.md
 
 # Internal planning docs (not user-facing)
 docs/mihomo-tun-plan.md
