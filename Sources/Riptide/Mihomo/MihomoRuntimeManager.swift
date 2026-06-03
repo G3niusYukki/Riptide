@@ -33,6 +33,12 @@ public protocol MihomoRuntimeManaging: Actor {
     var helperConnection: HelperToolConnection { get }
     /// The most recent TUN recovery error, if any.
     var latestRecoveryError: RuntimeErrorSnapshot? { get }
+    /// Optional Logbook writer for fire-and-forget diagnostic events.
+    /// Injected by AppViewModel; nil disables logging.
+    var logbookWriter: LogbookWriter? { get set }
+    /// Async setter for `logbookWriter` — required so cross-actor callers
+    /// can inject the writer without awaiting on the synchronous property.
+    func setLogbookWriter(_ writer: LogbookWriter?) async
     /// Sets a closure that receives runtime events from this manager.
     /// Called by ModeCoordinator to wire event forwarding.
     func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async
@@ -143,6 +149,16 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     public private(set) var latestRecoveryError: RuntimeErrorSnapshot?
     /// Closure to emit runtime events (set by ModeCoordinator).
     public var eventHandler: (@Sendable (RuntimeEvent) -> Void)?
+
+    /// Optional Logbook writer. Set via dependency injection from AppViewModel.
+    /// All writes are fire-and-forget; never await on the business path.
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
 
     /// Sets the event handler closure (conforms to MihomoRuntimeManaging protocol).
     public func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
@@ -260,38 +276,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         let configPath = paths.configFileURL.path
 
         // 6. Launch mihomo — XPC helper or sudo fallback
-        if helperInstalled {
-            // --- XPC Helper path ---
-            let modeString = mode == .systemProxy ? "systemProxy" : "tun"
-            let launchError = await helperConnection.launchMihomo(
-                configPath: configPath,
-                mode: modeString
-            )
-            if let error = launchError {
-                throw RuntimeError.launchFailed(error.localizedDescription)
-            }
-            launchedViaSudo = false
-        } else {
-            // --- Sudo fallback path ---
-            // Try system-wide binary first, then user-space
-            let systemBinary = "/Library/Application Support/Riptide/mihomo"
-            let userBinary = paths.executable
-            let binaryPath: String
-            if FileManager.default.isExecutableFile(atPath: systemBinary) {
-                binaryPath = systemBinary
-            } else if FileManager.default.isExecutableFile(atPath: userBinary) {
-                binaryPath = userBinary
-            } else {
-                throw RuntimeError.launchFailed("mihomo binary not found at \(systemBinary) or \(userBinary)")
-            }
-
-            do {
-                try await sudoLauncher.launch(binaryPath: binaryPath, configPath: configPath)
-            } catch {
-                throw RuntimeError.launchFailed("sudo launch failed: \(error.localizedDescription)")
-            }
-            launchedViaSudo = true
-        }
+        try await launchMihomoBinary(configPath: configPath, mode: mode, helperInstalled: helperInstalled)
 
         // 7. Initialize API client
         let apiURL = URL(string: "http://127.0.0.1:\(defaultAPIPort)")!
@@ -331,6 +316,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             } else {
                 try? await sudoLauncher.terminate()
             }
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "mihomo API not ready after 10s — aborting start",
+                    category: .mihomoCore
+                )
+            }
             throw RuntimeError.apiNotAvailable
         }
 
@@ -341,6 +332,13 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         isRunning = true
         currentMode = mode
         currentProfile = profile
+        let launcherKind = helperInstalled ? "xpc" : "sudo"
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo(
+                "mihomo started: mode=\(mode) launcher=\(launcherKind)",
+                category: .mihomoCore
+            )
+        }
         if mode == .tun {
             tunRecoveryFailures = 0
             latestRecoveryError = nil
@@ -433,6 +431,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         let backoffSeconds: UInt64 = UInt64(min(pow(2.0, Double(tunRecoveryFailures)), 8.0))
         print("[MihomoRuntimeManager] TUN recovery attempt \(tunRecoveryFailures)/\(maxTUNRecoveryAttempts) with \(backoffSeconds)s backoff")
+        Task { [weak writer = logbookWriter] in
+            await writer?.logWarning(
+                "TUN recovery attempt \(self.tunRecoveryFailures)/\(self.maxTUNRecoveryAttempts) with \(backoffSeconds)s backoff",
+                category: .mihomoCore
+            )
+        }
 
         try? await stop()
         try? await Task.sleep(nanoseconds: backoffSeconds * 1_000_000_000)
@@ -441,8 +445,20 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             try await start(mode: .tun, profile: profile)
             tunRecoveryFailures = 0
             print("[MihomoRuntimeManager] TUN recovery succeeded")
+            Task { [weak writer = logbookWriter] in
+                await writer?.logInfo(
+                    "TUN recovery succeeded",
+                    category: .mihomoCore
+                )
+            }
         } catch {
             print("[MihomoRuntimeManager] TUN recovery attempt \(tunRecoveryFailures) failed: \(error)")
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "TUN recovery attempt \(self.tunRecoveryFailures) failed: \(error)",
+                    category: .mihomoCore
+                )
+            }
         }
     }
     /// Stops the mihomo runtime.
@@ -743,6 +759,40 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         // Write new config
         try yaml.write(toFile: configPath, atomically: true, encoding: .utf8)
+    }
+
+    /// Launches mihomo via XPC helper or sudo fallback. Updates `launchedViaSudo`
+    /// to reflect which path was taken.
+    /// - Throws: RuntimeError.launchFailed on either path's failure mode.
+    private func launchMihomoBinary(configPath: String, mode: RuntimeMode, helperInstalled: Bool) async throws {
+        if helperInstalled {
+            let modeString = mode == .systemProxy ? "systemProxy" : "tun"
+            if let error = await helperConnection.launchMihomo(
+                configPath: configPath,
+                mode: modeString
+            ) {
+                throw RuntimeError.launchFailed(error.localizedDescription)
+            }
+            launchedViaSudo = false
+            return
+        }
+        // Sudo fallback — try system-wide binary first, then user-space
+        let systemBinary = "/Library/Application Support/Riptide/mihomo"
+        let userBinary = paths.executable
+        let binaryPath: String
+        if FileManager.default.isExecutableFile(atPath: systemBinary) {
+            binaryPath = systemBinary
+        } else if FileManager.default.isExecutableFile(atPath: userBinary) {
+            binaryPath = userBinary
+        } else {
+            throw RuntimeError.launchFailed("mihomo binary not found at \(systemBinary) or \(userBinary)")
+        }
+        do {
+            try await sudoLauncher.launch(binaryPath: binaryPath, configPath: configPath)
+        } catch {
+            throw RuntimeError.launchFailed("sudo launch failed: \(error.localizedDescription)")
+        }
+        launchedViaSudo = true
     }
 
     /// Waits for the mihomo process to terminate.

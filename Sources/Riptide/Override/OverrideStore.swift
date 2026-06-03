@@ -10,6 +10,16 @@ public actor OverrideStore {
     private let directoryURL: URL
     private let sidecarURL: URL
 
+    /// Optional Logbook writer. Set via dependency injection from AppViewModel.
+    /// All writes are fire-and-forget; never await on the business path.
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
+
     public init(
         directoryName: String = "overrides",
         fileName: String = "overrides.json"
@@ -47,6 +57,12 @@ public actor OverrideStore {
         overrides[ovr.id] = ovr
         try writeYAMLFile(for: ovr)
         try saveSidecar()
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo(
+                "override created: \(ovr.name) (\(ovr.id.uuidString))",
+                category: .override
+            )
+        }
         return ovr
     }
 
@@ -60,6 +76,12 @@ public actor OverrideStore {
         existing.updatedAt = Date()
         overrides[id] = existing
         try saveSidecar()
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo(
+                "override updated: \(existing.name) (\(existing.id.uuidString))",
+                category: .override
+            )
+        }
         return existing
     }
 
@@ -69,6 +91,12 @@ public actor OverrideStore {
         try? FileManager.default.removeItem(at: yamlFile)
         overrides.removeValue(forKey: id)
         try saveSidecar()
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo(
+                "override deleted: \(existing.name) (\(existing.id.uuidString))",
+                category: .override
+            )
+        }
     }
 
     // MARK: - Persistence

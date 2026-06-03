@@ -8,7 +8,15 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     public private(set) var currentMode: RuntimeMode?
     public private(set) var currentProfile: TunnelProfile?
     public private(set) var latestRecoveryError: RuntimeErrorSnapshot?
-    
+
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
+
     private var eventHandler: (@Sendable (RuntimeEvent) -> Void)?
     
     public init(helperConnection: HelperToolConnection = HelperToolConnection()) {
@@ -56,6 +64,9 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
 
         self.eventHandler?(.stateChanged(.running))
         self.eventHandler?(.modeChanged(mode))
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo("mihomo started: mode=\(mode)", category: .mihomoCore)
+        }
     }
 
     public func stop() async throws {
@@ -64,6 +75,9 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
         self.currentMode = nil
         self.currentProfile = nil
         self.eventHandler?(.stateChanged(.stopped))
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo("mihomo stopped", category: .mihomoCore)
+        }
     }
     
     public func switchProxy(to proxyName: String) async throws {

@@ -20,6 +20,16 @@ public actor ModeCoordinator {
     private var pathMonitorQueue: DispatchQueue?
     private let environmentManager = NetworkEnvironmentManager()
 
+    /// Optional Logbook writer. Set via dependency injection from AppViewModel.
+    /// All writes are fire-and-forget; never await on the business path.
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
+
     private let maxEvents = 100
 
     public static let defaultHTTPPort: Int = 6152
@@ -49,6 +59,9 @@ public actor ModeCoordinator {
             activeMode = mode
             emit(.modeChanged(mode))
             emit(.stateChanged(.running))
+            Task { [weak writer = logbookWriter] in
+                await writer?.logInfo("mode started: \(mode)", category: .modeChange)
+            }
 
             // Start system proxy guard if in system proxy mode
             if mode == .systemProxy {
@@ -102,6 +115,9 @@ public actor ModeCoordinator {
         do {
             try await mihomoManager.stop()
             emit(.stateChanged(.stopped))
+            Task { [weak writer = logbookWriter] in
+                await writer?.logInfo("mode stopped", category: .modeChange)
+            }
         } catch {
             emit(.error(RuntimeErrorSnapshot(
                 code: "E_STOP_FAILED",
@@ -500,6 +516,9 @@ public actor ModeCoordinator {
                 try await mihomoManager.start(mode: targetMode, profile: currentProfile)
                 activeMode = targetMode
                 emit(.modeChanged(targetMode))
+                Task { [weak writer = logbookWriter] in
+                    await writer?.logInfo("env switch: \(activeMode) → \(targetMode)", category: .modeChange)
+                }
             } catch {
                 emit(.degraded(activeMode, "env_switch_failed: \(error.localizedDescription)"))
                 return

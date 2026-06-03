@@ -99,6 +99,16 @@ public actor SubscriptionManager {
     private var subscriptions: [UUID: Subscription] = [:]
     private let storage: SubscriptionStorage
 
+    /// Optional Logbook writer. Set via dependency injection from AppViewModel.
+    /// All writes are fire-and-forget; never await on the business path.
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
+
     public init(storage: SubscriptionStorage = UserDefaultsSubscriptionStorage()) {
         self.storage = storage
         // Load saved subscriptions
@@ -256,14 +266,32 @@ public actor SubscriptionManager {
         do {
             let update = try await fetchSubscription(url: url)
             await recordUpdateSuccess(id: id, userinfo: update.userinfo)
+            Task { [weak writer = logbookWriter] in
+                await writer?.logInfo(
+                    "subscription fetched: \(subscription.name) (\(update.nodes.count) nodes)",
+                    category: .subscription
+                )
+            }
             return .success(proxies: update.nodes)
         } catch let error as SubscriptionError {
             let errorMessage = String(describing: error)
             await recordUpdateFailure(id: id, error: errorMessage)
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "subscription fetch failed: \(subscription.name) — \(errorMessage)",
+                    category: .subscription
+                )
+            }
             return .failure(error: errorMessage)
         } catch {
             let errorMessage = String(describing: error)
             await recordUpdateFailure(id: id, error: errorMessage)
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "subscription fetch failed: \(subscription.name) — \(errorMessage)",
+                    category: .subscription
+                )
+            }
             return .failure(error: errorMessage)
         }
     }

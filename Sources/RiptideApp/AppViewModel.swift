@@ -272,6 +272,7 @@ public final class AppViewModel: @unchecked Sendable {
     private let importService: ConfigImportService
     private let subscriptionManager: SubscriptionManager
     private let profileStore: ProfileStore
+    private let overrideStore: OverrideStore
     private var statsTask: Task<Void, Never>?
     private let smManager: SMJobBlessManager
     private var subscriptionScheduler: SubscriptionUpdateScheduler?
@@ -290,12 +291,21 @@ public final class AppViewModel: @unchecked Sendable {
         self.subscriptionManager = SubscriptionManager()
         do {
             self.profileStore = try ProfileStore()
+            self.overrideStore = try OverrideStore()
         } catch {
             fatalError("Failed to initialize ProfileStore: \(error)")
         }
         self.smManager = SMJobBlessManager()
+        // Inject the Logbook writer into each business module so its
+        // fire-and-forget logInfo/logError calls reach the persistent store.
         checkHelperInstallation()
+        let writer = self.logbook.writer
         Task {
+            await self.modeCoordinator.setLogbookWriter(writer)
+            await self.mihomoManager.setLogbookWriter(writer)
+            await self.subscriptionManager.setLogbookWriter(writer)
+            await self.overrideStore.setLogbookWriter(writer)
+            await self.mihomoManager.helperConnection.setLogbookWriter(writer)
             await loadProfilesFromStore()
 
             await loadSubscriptionsFromBackend()

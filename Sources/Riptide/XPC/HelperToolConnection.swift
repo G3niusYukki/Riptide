@@ -77,6 +77,16 @@ public actor HelperToolConnection {
     /// The helper tool's reported version (nil until first successful connection).
     public private(set) var helperVersion: String?
 
+    /// Optional Logbook writer. Set via dependency injection from AppViewModel.
+    /// All writes are fire-and-forget; never await on the business path.
+    public var logbookWriter: LogbookWriter?
+
+    /// Async setter so callers from a different actor can write the property
+    /// without crossing the actor boundary synchronously.
+    public func setLogbookWriter(_ writer: LogbookWriter?) async {
+        self.logbookWriter = writer
+    }
+
     // MARK: - Initialization
 
     /// Creates a new HelperToolConnection.
@@ -200,14 +210,30 @@ public actor HelperToolConnection {
         await ensureConnection()
 
         guard let wrapper = proxyWrapper else {
-            return ConnectionError.notInstalled
+            let err = ConnectionError.notInstalled
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "helper install failed: not installed",
+                    category: .helperInstall
+                )
+            }
+            return err
         }
 
-        return await withCheckedContinuation { continuation in
+        let result: Error? = await withCheckedContinuation { continuation in
             wrapper.proxy.installMihomo(binaryPath: binaryPath) { error in
                 continuation.resume(returning: error)
             }
         }
+        if let result {
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "helper install failed: \(result.localizedDescription)",
+                    category: .helperInstall
+                )
+            }
+        }
+        return result
     }
 
     // MARK: - System Proxy Control
@@ -337,7 +363,14 @@ public actor HelperToolConnection {
             newConnection.invalidate()
             connectionWrapper.connection.invalidate()
             self.connectionWrapper = nil
-            throw ConnectionError.connectionFailed("Failed to create remote object proxy")
+            let err = ConnectionError.connectionFailed("Failed to create remote object proxy")
+            Task { [weak writer = logbookWriter] in
+                await writer?.logError(
+                    "helper connection failed: \(err.localizedDescription)",
+                    category: .helperInstall
+                )
+            }
+            throw err
         }
 
         // Verify connection works with a status check
