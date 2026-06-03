@@ -259,6 +259,12 @@ public final class AppViewModel: @unchecked Sendable {
     // MARK: - Window Reference
     public weak var mainWindow: NSWindow?
 
+    // MARK: - Logbook
+
+    /// Persistent diagnostic Logbook (store + writer + view model trio).
+    /// Wired here so business modules can later receive the writer via DI.
+    public let logbook: LogbookContainer
+
     // MARK: - Private
 
     private let mihomoManager: any MihomoRuntimeManaging
@@ -273,6 +279,10 @@ public final class AppViewModel: @unchecked Sendable {
     // MARK: - Init
 
     public init() {
+        // Wire the Logbook trio first so subsequent constructors can pick up
+        // `logbook.writer` via DI in Task 12.
+        self.logbook = LogbookContainer(paths: .default)
+
         let manager = GoCoreTunnelRuntime()
         self.mihomoManager = manager
         self.modeCoordinator = ModeCoordinator(mihomoManager: manager)
