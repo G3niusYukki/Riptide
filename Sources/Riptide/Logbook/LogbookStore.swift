@@ -52,12 +52,47 @@ public actor LogbookStore {
         }
     }
 
+    /// Query entries matching the filter across a date range (inclusive).
+    ///
+    /// Reads every `.jsonl` file whose UTC day falls within `filter.from..filter.to`,
+    /// parses each line as a `LogbookEntry` (silently skipping malformed lines), and
+    /// returns up to `filter.limit` entries that pass `matches(_:filter:)`.
+    ///
+    /// Uses the shared Task-2 `JSONDecoder.iso8601` so timestamps written by `append`
+    /// round-trip even with fractional seconds.
+    public func query(_ filter: LogbookQuery) throws -> [LogbookEntry] {
+        // Ensure the current file's latest bytes are visible to a fresh `Data(contentsOf:)`.
+        try? currentHandle?.synchronize()
+        let urls = try enumerateDateURLs(from: filter.from, to: filter.to)
+        var results: [LogbookEntry] = []
+        for url in urls {
+            let entries = try readEntries(from: url)
+            for entry in entries where matches(entry, filter: filter) {
+                results.append(entry)
+                if results.count >= filter.limit { return results }
+            }
+        }
+        return results
+    }
+
     // MARK: - Private
 
     /// Use the shared Task-2 codec so the on-disk date format is identical to
     /// what other components (and tests) read back. The custom strategy preserves
     /// fractional seconds, which the default `.iso8601` strategy does not.
     private static let encoder: JSONEncoder = JSONEncoder.iso8601
+
+    /// Read-side decoder. Public from Task 2; shared so writes and reads always
+    /// agree on timestamp format (with a fallback chain for non-fractional input).
+    private static let decoder: JSONDecoder = JSONDecoder.iso8601
+
+    /// UTC calendar reused for date-range enumeration. Local-time `Calendar` would
+    /// put each day's "start of day" in the wrong zone and double-skip some files.
+    private static let utcCalendar: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }()
 
     private static let dayFormatter: DateFormatter = {
         let fmt = DateFormatter()
@@ -97,5 +132,72 @@ public actor LogbookStore {
         }
         currentHandle = handle
         currentDateString = dayString
+    }
+
+    /// Enumerate every daily file URL whose UTC day lies in `[from..to]` (inclusive
+    /// of both endpoints), in chronological order. Missing days are simply skipped.
+    private func enumerateDateURLs(from: Date, to: Date) throws -> [URL] {
+        var urls: [URL] = []
+        var current = Self.utcCalendar.startOfDay(for: from)
+        let end = Self.utcCalendar.startOfDay(for: to)
+        while current <= end {
+            let url = paths.fileURL(for: current)
+            if FileManager.default.fileExists(atPath: url.path) {
+                urls.append(url)
+            }
+            guard let next = Self.utcCalendar.date(byAdding: .day, value: 1, to: current) else {
+                break
+            }
+            current = next
+        }
+        return urls
+    }
+
+    /// Read every line of a JSONL file and parse each as `LogbookEntry`.
+    /// Malformed lines are silently dropped (the read path is lenient by design).
+    private func readEntries(from url: URL) throws -> [LogbookEntry] {
+        let data = try Data(contentsOf: url)
+        guard let text = String(data: data, encoding: .utf8) else { return [] }
+        var entries: [LogbookEntry] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard let lineData = String(line).data(using: .utf8) else { continue }
+            if let entry = try? Self.decoder.decode(LogbookEntry.self, from: lineData) {
+                entries.append(entry)
+            }
+        }
+        return entries
+    }
+
+    /// Apply the user-supplied filter to a parsed entry. Tuple destructuring keeps
+    /// the optional `LogLevel?` / `LogbookCategory?` / `host?` shape uniform across
+    /// `.event` and `.connectionClosed` variants.
+    private func matches(_ entry: LogbookEntry, filter: LogbookQuery) -> Bool {
+        let timestamp: Date
+        let level: LogLevel?
+        let category: LogbookCategory?
+        let host: String?
+        switch entry {
+        case .event(let event):
+            timestamp = event.timestamp
+            level = event.level
+            category = event.category
+            host = nil
+        case .connectionClosed(let record):
+            timestamp = record.closedAt
+            level = nil
+            category = nil
+            host = record.host
+        }
+        if timestamp < filter.from || timestamp > filter.to { return false }
+        if !filter.levels.isEmpty {
+            if let l = level, !filter.levels.contains(l) { return false }
+        }
+        if !filter.categories.isEmpty {
+            if let c = category, !filter.categories.contains(c) { return false }
+        }
+        if let want = filter.hostContains, let h = host, !h.contains(want) {
+            return false
+        }
+        return true
     }
 }

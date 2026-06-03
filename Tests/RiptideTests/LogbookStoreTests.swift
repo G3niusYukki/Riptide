@@ -101,4 +101,109 @@ struct LogbookStoreTests {
         let size = await store.totalSize()
         #expect(size > 200)
     }
+
+    // MARK: - query(_:)
+
+    @Test("query returns appended entries within range")
+    func queryReturnsAppended() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        try await store.append(makeEvent(message: "a", at: now.addingTimeInterval(-3600)))
+        try await store.append(makeEvent(message: "b", at: now))
+        try await store.flush()
+        let results = try await store.query(.last24h())
+        #expect(results.count == 2)
+    }
+
+    @Test("query filters by level")
+    func queryFiltersByLevel() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        try await store.append(.event(LogEvent(
+            id: UUID(), timestamp: now, level: .info, category: .appLifecycle,
+            message: "info", context: [:]
+        )))
+        try await store.append(.event(LogEvent(
+            id: UUID(), timestamp: now, level: .error, category: .appLifecycle,
+            message: "error", context: [:]
+        )))
+        try await store.flush()
+        var q = LogbookQuery.last24h()
+        q.levels = [.error]
+        let results = try await store.query(q)
+        #expect(results.count == 1)
+        if case .event(let e) = results[0] { #expect(e.level == .error) }
+        else { Issue.record("expected event") }
+    }
+
+    @Test("query filters by category")
+    func queryFiltersByCategory() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        try await store.append(.event(LogEvent(
+            id: UUID(), timestamp: now, level: .info, category: .mihomoCore,
+            message: "m", context: [:]
+        )))
+        try await store.append(.event(LogEvent(
+            id: UUID(), timestamp: now, level: .info, category: .appLifecycle,
+            message: "a", context: [:]
+        )))
+        try await store.flush()
+        var q = LogbookQuery.last24h()
+        q.categories = [.mihomoCore]
+        let results = try await store.query(q)
+        #expect(results.count == 1)
+    }
+
+    @Test("query skips malformed lines")
+    func querySkipsMalformed() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        try await store.append(makeEvent(message: "ok-1"))
+        try await store.append(makeEvent(message: "ok-2"))
+        try await store.flush()
+        let files = try FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        )
+        let today = files[0]
+        let handle = try FileHandle(forWritingTo: today)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data("\nnot-json\n".utf8))
+        try handle.close()
+        try await store.append(makeEvent(message: "ok-3"))
+        try await store.flush()
+        let results = try await store.query(.last24h())
+        #expect(results.count == 3)
+    }
+
+    @Test("query filters connectionClosed by host")
+    func queryFiltersByHost() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        let rec1 = ClosedConnectionRecord(
+            id: "1", host: "example.com", proxyName: "p1", protocol: "tcp",
+            rule: nil, sourceIP: "127.0.0.1", sourcePort: 80,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: now, closedAt: now,
+            uploadBytes: 0, downloadBytes: 0, closeReason: .expired
+        )
+        let rec2 = ClosedConnectionRecord(
+            id: "2", host: "other.com", proxyName: "p1", protocol: "tcp",
+            rule: nil, sourceIP: "127.0.0.1", sourcePort: 80,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: now, closedAt: now,
+            uploadBytes: 0, downloadBytes: 0, closeReason: .expired
+        )
+        try await store.append(.connectionClosed(rec1))
+        try await store.append(.connectionClosed(rec2))
+        try await store.flush()
+        var q = LogbookQuery.last24h()
+        q.hostContains = "example"
+        let results = try await store.query(q)
+        #expect(results.count == 1)
+    }
 }
