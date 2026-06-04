@@ -11,6 +11,12 @@ public enum MihomoConfigGenerator {
         /// the previous silent fallback emitted an empty `type:` line that
         /// mihomo would refuse to load.
         case unsupportedProxyKind(ProxyKind)
+        /// FIX-18: two `ProxyNode`s share the same `name`, or two
+        /// `ProxyGroup`s share the same `id`. mihomo refuses to load a
+        /// config with duplicate names; surfacing the conflict here turns
+        /// a generic sidecar "config invalid" error into an actionable
+        /// `GenerationError`.
+        case duplicateProxyName(String)
     }
 
     /// Escapes a string for safe inclusion in YAML output.
@@ -75,6 +81,13 @@ public enum MihomoConfigGenerator {
     /// - Throws: `GenerationError.unsupportedProxyKind` when the config
     ///   contains a `ProxyNode` whose `kind` is not yet supported.
     public static func generate(config: RiptideConfig, options: GenerationOptions) throws -> String {
+        // FIX-18: reject duplicate names before any YAML is emitted. mihomo
+        // refuses to load a config with duplicate `name:` keys, so catching
+        // it here turns a generic sidecar "config invalid" error into an
+        // actionable `GenerationError.duplicateProxyName`.
+        try Self.assertUnique(config.proxies.map(\.name), context: "proxies")
+        try Self.assertUnique(config.proxyGroups.map(\.id), context: "proxy groups")
+
         var lines: [String] = []
 
         // Port settings
@@ -408,6 +421,15 @@ public enum MihomoConfigGenerator {
             return "REJECT"
         case .proxyNode(let name):
             return yamlEscape(name)
+        }
+    }
+
+    /// FIX-18: throw `duplicateProxyName` for the first repeated name.
+    /// `context` is included in the error description for diagnostics.
+    private static func assertUnique(_ names: [String], context: String) throws {
+        var seen: Set<String> = []
+        for name in names where !seen.insert(name).inserted {
+            throw GenerationError.duplicateProxyName("\(context): \(name)")
         }
     }
 }

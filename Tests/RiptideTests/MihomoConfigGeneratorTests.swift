@@ -994,4 +994,51 @@ struct MihomoConfigGeneratorTests {
             _ = try MihomoConfigGenerator.generate(config: config, options: options)
         }
     }
+
+    // FIX-18: duplicate proxy / group names must throw loudly — mihomo
+    // refuses to load a config with duplicate `name:` keys and would
+    // surface as a generic "config invalid" error from the sidecar.
+    @Test("rejects duplicate proxy names")
+    func testRejectsDuplicateProxyNames() throws {
+        let node1 = ProxyNode(
+            name: "dup", kind: .shadowsocks,
+            server: "1.1.1.1", port: 443,
+            cipher: "aes-256-gcm", password: "x"
+        )
+        let node2 = ProxyNode(
+            name: "dup", kind: .shadowsocks,
+            server: "2.2.2.2", port: 443,
+            cipher: "aes-256-gcm", password: "y"
+        )
+        let config = RiptideConfig(
+            mode: .rule, proxies: [node1, node2],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+
+        #expect(throws: MihomoConfigGenerator.GenerationError.self) {
+            _ = try MihomoConfigGenerator.generate(config: config, options: options)
+        }
+    }
+
+    @Test("rejects duplicate proxy group names")
+    func testRejectsDuplicateGroupNames() throws {
+        let node = ProxyNode(
+            name: "p1", kind: .shadowsocks,
+            server: "1.1.1.1", port: 443,
+            cipher: "aes-256-gcm", password: "x"
+        )
+        let group = ProxyGroup(
+            id: "G", kind: .select, proxies: ["p1"]
+        )
+        let config = RiptideConfig(
+            mode: .rule, proxies: [node], rules: [.final(policy: .direct)],
+            proxyGroups: [group, group]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+
+        #expect(throws: MihomoConfigGenerator.GenerationError.self) {
+            _ = try MihomoConfigGenerator.generate(config: config, options: options)
+        }
+    }
 }
