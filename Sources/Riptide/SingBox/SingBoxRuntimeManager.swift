@@ -8,7 +8,7 @@ public actor SingBoxRuntimeManager {
         case failed(reason: String)
     }
 
-    private(set) public var state: State = .stopped
+    public private(set) var state: State = .stopped
     private let paths: SingBoxPaths
     private let api: SingBoxAPIClient
 
@@ -21,7 +21,7 @@ public actor SingBoxRuntimeManager {
         } else if let resolved = try? SingBoxPaths() {
             self.paths = resolved
         } else {
-            // FIXME: Phase 2 should make this init throwing and remove the
+            // NOTE: Phase 2 should make this init throwing and remove the
             // synthetic-fallback branch. Silent fallbacks mask real
             // `applicationSupportDirectoryNotFound` errors from CI/dev.
             // Last-resort synthetic path so the manager is still constructable

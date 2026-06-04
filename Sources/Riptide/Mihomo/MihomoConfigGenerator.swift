@@ -173,7 +173,7 @@ public enum MihomoConfigGenerator {
         case .wireguard:
             return "wireguard"
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): emit mihomo config for these kinds once data fields land.
+            // NOTE(Task 16/17): emit mihomo config for these kinds once data fields land.
             return ""
         }
     }
@@ -215,7 +215,7 @@ public enum MihomoConfigGenerator {
             }
             appendPassword(proxy: proxy, to: &lines)
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): emit mihomo config for these kinds once data fields land.
+            // NOTE(Task 16/17): emit mihomo config for these kinds once data fields land.
             break
         }
     }

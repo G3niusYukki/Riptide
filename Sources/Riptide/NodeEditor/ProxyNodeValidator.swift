@@ -70,48 +70,47 @@ public actor ProxyNodeValidator {
         }
 
         // Validate kind-specific fields
+        let kindErrors = await validateKindSpecificFields(for: node)
+        errors.append(contentsOf: kindErrors)
+
+        return NodeValidationDetails(isValid: errors.isEmpty, errors: errors)
+    }
+
+    /// Validates fields specific to the node's `ProxyKind` and returns the list
+    /// of human-readable error messages. Returned in the same order as the
+    /// original in-switch checks; the outer function preserves the contract.
+    private func validateKindSpecificFields(for node: ProxyNode) async -> [String] {
+        var errors: [String] = []
         switch node.kind {
         case .shadowsocks:
-            if node.cipher == nil || node.cipher?.isEmpty == true {
-                errors.append("Shadowsocks requires a cipher")
-            }
-            if node.password == nil || node.password?.isEmpty == true {
-                errors.append("Shadowsocks requires a password")
-            }
+            errors.append(contentsOf: requireNonEmpty(
+                node.cipher, message: "Shadowsocks requires a cipher"))
+            errors.append(contentsOf: requireNonEmpty(
+                node.password, message: "Shadowsocks requires a password"))
 
         case .vmess:
-            if node.uuid == nil || node.uuid?.isEmpty == true {
-                errors.append("VMess requires a UUID")
-            } else if let uuid = node.uuid, !(await validate(uuid: uuid).isValid) {
-                errors.append("VMess requires a valid UUID")
-            }
+            errors.append(contentsOf: await requireValidUUID(
+                node.uuid, kindLabel: "VMess"))
 
         case .vless:
-            if node.uuid == nil || node.uuid?.isEmpty == true {
-                errors.append("VLESS requires a UUID")
-            } else if let uuid = node.uuid, !(await validate(uuid: uuid).isValid) {
-                errors.append("VLESS requires a valid UUID")
-            }
+            errors.append(contentsOf: await requireValidUUID(
+                node.uuid, kindLabel: "VLESS"))
 
         case .trojan:
-            if node.password == nil || node.password?.isEmpty == true {
-                errors.append("Trojan requires a password")
-            }
+            errors.append(contentsOf: requireNonEmpty(
+                node.password, message: "Trojan requires a password"))
 
         case .hysteria2:
-            if node.password == nil || node.password?.isEmpty == true {
-                errors.append("Hysteria2 requires a password")
-            }
+            errors.append(contentsOf: requireNonEmpty(
+                node.password, message: "Hysteria2 requires a password"))
 
         case .snell:
-            if node.password == nil || node.password?.isEmpty == true {
-                errors.append("Snell requires a password")
-            }
+            errors.append(contentsOf: requireNonEmpty(
+                node.password, message: "Snell requires a password"))
 
         case .tuic:
-            if node.password == nil || node.password?.isEmpty == true {
-                errors.append("TUIC requires a password")
-            }
+            errors.append(contentsOf: requireNonEmpty(
+                node.password, message: "TUIC requires a password"))
 
         case .wireguard:
             // WireGuard validation is handled separately (private key, public key, etc.)
@@ -122,11 +121,31 @@ public actor ProxyNodeValidator {
             break
 
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): add field validation for these kinds once data fields land.
+            // NOTE(Task 16/17): add field validation for these kinds once data fields land.
             break
         }
+        return errors
+    }
 
-        return NodeValidationDetails(isValid: errors.isEmpty, errors: errors)
+    /// Returns `[message]` if the value is nil or empty, `[]` otherwise.
+    private func requireNonEmpty(_ value: String?, message: String) -> [String] {
+        guard let value, !value.isEmpty else { return [message] }
+        return []
+    }
+
+    /// Validates a UUID field, returning the appropriate "missing" or
+    /// "invalid" message. Mirrors the original `if/else if` chain behavior
+    /// exactly: the "missing" check wins over the "invalid" check.
+    private func requireValidUUID(
+        _ uuid: String?, kindLabel: String
+    ) async -> [String] {
+        if uuid == nil || uuid?.isEmpty == true {
+            return ["\(kindLabel) requires a UUID"]
+        }
+        if let uuid, !(await validate(uuid: uuid).isValid) {
+            return ["\(kindLabel) requires a valid UUID"]
+        }
+        return []
     }
 
     /// Validates a proxy node name
@@ -204,7 +223,19 @@ public actor ProxyNodeValidator {
 
         // IPv6 validation using a comprehensive regex
         // Supports full form, compressed form (::), and IPv4-mapped
-        let ipv6Pattern = "^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|:(?::[0-9a-fA-F]{1,4}){1,7}|::1|::)$"
+        let ipv6Pattern =
+            "^(?:" +
+            "(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,7}:|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|" +
+            "(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|" +
+            "[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|" +
+            ":(?::[0-9a-fA-F]{1,4}){1,7}|" +
+            "::1|::" +
+            ")$"
 
         let ipv6Regex = try? NSRegularExpression(pattern: ipv6Pattern, options: [])
         let ipv6Range = NSRange(location: 0, length: address.utf16.count)

@@ -174,7 +174,7 @@ struct NodeRow: View {
         case .tuic: return "lock.shield"
         case .wireguard: return "antenna.radiowaves.left.and.right"
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): dedicated SF Symbol once data fields land.
+            // NOTE(Task 16/17): dedicated SF Symbol once data fields land.
             return "questionmark.circle"
         }
     }

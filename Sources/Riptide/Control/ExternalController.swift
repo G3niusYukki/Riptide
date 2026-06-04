@@ -136,14 +136,23 @@ public actor ExternalController {
                     }
 
                     let response = await routeRequest(method: method, path: path, body: body)
-                    let httpResponse = "HTTP/1.1 \(response.statusCode) OK\r\nContent-Type: application/json\r\nContent-Length: \(response.body.count)\r\n\r\n"
+                    let httpResponse = """
+                        HTTP/1.1 \(response.statusCode) OK\r
+                        Content-Type: application/json\r
+                        Content-Length: \(response.body.count)\r
+                        \r
+
+                        """
                     var responseData = Data(httpResponse.utf8)
                     responseData.append(response.body)
 
                     try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
                         connection.send(content: responseData, completion: .contentProcessed { error in
-                            if let error { cont.resume(throwing: error) }
-                            else { cont.resume() }
+                            if let error {
+                                cont.resume(throwing: error)
+                            } else {
+                                cont.resume()
+                            }
                         })
                     }
                 }
@@ -292,19 +301,19 @@ public actor ExternalController {
 
     private func rulePayload(_ rule: ProxyRule) -> String {
         switch rule {
-        case .domain(let d, _): return d
-        case .domainSuffix(let s, _): return s
-        case .domainKeyword(let k, _): return k
-        case .ipCIDR(let c, _): return c
-        case .ipCIDR6(let c, _): return c
-        case .srcIPCIDR(let c, _): return c
-        case .srcPort(let p, _): return "\(p)"
-        case .dstPort(let p, _): return "\(p)"
-        case .processName(let n, _): return n
-        case .geoIP(let c, _): return c
-        case .ipASN(let a, _): return "\(a)"
-        case .geoSite(let c, let cat, _): return "\(c),\(cat)"
-        case .ruleSet(let n, _): return n
+        case .domain(let domain, _): return domain
+        case .domainSuffix(let suffix, _): return suffix
+        case .domainKeyword(let keyword, _): return keyword
+        case .ipCIDR(let cidr, _): return cidr
+        case .ipCIDR6(let cidr6, _): return cidr6
+        case .srcIPCIDR(let srcCIDR, _): return srcCIDR
+        case .srcPort(let port, _): return "\(port)"
+        case .dstPort(let port, _): return "\(port)"
+        case .processName(let name, _): return name
+        case .geoIP(let code, _): return code
+        case .ipASN(let asn, _): return "\(asn)"
+        case .geoSite(let country, let cat, _): return "\(country),\(cat)"
+        case .ruleSet(let name, _): return name
         case .script(let code, _): return code.prefix(50) + "..."
         case .not(let ruleType, let value, _): return "\(ruleType),\(value)"
         case .reject: return "*"

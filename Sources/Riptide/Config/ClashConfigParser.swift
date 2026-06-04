@@ -151,7 +151,7 @@ public enum ClashConfigParser {
             return try wireGuardProxyNode(proxy, port: port, index: index)
 
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): parse these kinds once data fields land.
+            // NOTE(Task 16/17): parse these kinds once data fields land.
             throw ClashConfigError.invalidProxy(index: index, reason: "proxy kind \(kind) is not yet supported")
         }
     }
@@ -575,131 +575,17 @@ public enum ClashConfigParser {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
     private static func parseDNSPolicy(_ raw: ClashRawDNS?) -> DNSPolicy {
         guard let raw else {
             return .default
         }
 
-        let primary: [DNSResolverEndpoint]
-        if let nameservers = raw.nameserver, !nameservers.isEmpty {
-            primary = nameservers.map { addr in
-                let normalized = addr.lowercased()
-                if normalized.hasPrefix("https://") {
-                    return .doh(url: addr)
-                } else if normalized.hasPrefix("tls://") {
-                    let stripped = String(addr.dropFirst(6))
-                    if stripped.contains(":") {
-                        return DNSResolverEndpoint(kind: .dot, address: stripped)
-                    } else {
-                        return .dot(host: stripped)
-                    }
-                } else if normalized.hasPrefix("quic://") {
-                    let stripped = String(addr.dropFirst(7))
-                    if stripped.contains(":") {
-                        return DNSResolverEndpoint(kind: .doq, address: stripped)
-                    } else {
-                        return .doq(host: stripped)
-                    }
-                } else if addr.contains(":") {
-                    return DNSResolverEndpoint(kind: .udp, address: addr)
-                } else {
-                    return .udp(host: addr)
-                }
-            }
-        } else {
-            primary = []
-        }
-
-        let fallbackResolvers: [DNSResolverEndpoint]
-        if let fallback = raw.fallback, !fallback.isEmpty {
-            fallbackResolvers = fallback.map { addr in
-                if addr.contains(":") {
-                    return DNSResolverEndpoint(kind: .udp, address: addr)
-                } else {
-                    return .udp(host: addr)
-                }
-            }
-        } else {
-            fallbackResolvers = []
-        }
-
-        // Parse tls-nameserver (DoT entries) — add to primary resolvers.
-        // Entries may be in "tls://host:port" format.
-        var dotResolvers: [DNSResolverEndpoint] = []
-        if let tlsNS = raw.tlsNameserver, !tlsNS.isEmpty {
-            for addr in tlsNS {
-                let normalized = addr.lowercased()
-                if normalized.hasPrefix("https://") {
-                    // Some configs may put DoH URLs in tls-nameserver
-                    dotResolvers.append(.doh(url: addr))
-                } else {
-                    // Strip "tls://" prefix if present, then treat as DoT
-                    let stripped = normalized.hasPrefix("tls://") ? String(addr.dropFirst(6)) : addr
-                    if stripped.contains(":") {
-                        dotResolvers.append(DNSResolverEndpoint(kind: .dot, address: stripped))
-                    } else {
-                        dotResolvers.append(.dot(host: stripped))
-                    }
-                }
-            }
-        }
-
-        let allPrimary = primary + dotResolvers
-
-        // Parse quic-nameserver (DoQ entries).
-        var doqResolvers: [DNSResolverEndpoint] = []
-        if let quicNS = raw.quicNameserver, !quicNS.isEmpty {
-            for addr in quicNS {
-                let normalized = addr.lowercased()
-                if normalized.hasPrefix("quic://") {
-                    let stripped = String(addr.dropFirst(7))  // drop "quic://"
-                    if stripped.contains(":") {
-                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: stripped))
-                    } else {
-                        doqResolvers.append(.doq(host: stripped))
-                    }
-                } else if normalized.hasPrefix("https://") {
-                    doqResolvers.append(.doh(url: addr))
-                } else {
-                    // Bare address — treat as DoQ on default port 853
-                    if addr.contains(":") {
-                        doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: addr))
-                    } else {
-                        doqResolvers.append(.doq(host: addr))
-                    }
-                }
-            }
-        }
-
-        let finalPrimary = allPrimary + doqResolvers
-
-        // Parse nameserver-policy (domain pattern → resolvers)
-        var nameserverPolicies: [NameserverPolicyEntry] = []
-        if let rawPolicies = raw.nameserverPolicy {
-            for (pattern, addrs) in rawPolicies {
-                let resolvers = addrs.map { addr -> DNSResolverEndpoint in
-                    let normalized = addr.lowercased()
-                    if normalized.hasPrefix("https://") {
-                        return .doh(url: addr)
-                    } else if normalized.hasPrefix("tls://") {
-                        let stripped = String(addr.dropFirst(6))
-                        return DNSResolverEndpoint(kind: .dot, address: stripped)
-                    } else if normalized.hasPrefix("quic://") {
-                        let stripped = String(addr.dropFirst(7))
-                        return DNSResolverEndpoint(kind: .doq, address: stripped)
-                    } else if addr.contains(":") {
-                        return DNSResolverEndpoint(kind: .udp, address: addr)
-                    } else {
-                        return .udp(host: addr)
-                    }
-                }
-                nameserverPolicies.append(NameserverPolicyEntry(
-                    domainPattern: pattern,
-                    resolvers: resolvers
-                ))
-            }
-        }
+        let primary = parsePrimaryResolvers(raw.nameserver)
+        let fallbackResolvers = parseFallbackResolvers(raw.fallback)
+        let dotResolvers = parseTLSResolvers(raw.tlsNameserver)
+        let doqResolvers = parseQUICResolvers(raw.quicNameserver)
+        let finalPrimary = primary + dotResolvers + doqResolvers
+        let nameserverPolicies = parseNameserverPolicies(raw.nameserverPolicy)
 
         return DNSPolicy(
             primaryResolvers: finalPrimary,
@@ -711,6 +597,109 @@ public enum ClashConfigParser {
             fakeIPCIDR: raw.fakeIPRange ?? "198.18.0.0/16",
             hosts: raw.hosts ?? [:]
         )
+    }
+
+    /// Map a single resolver address to a `DNSResolverEndpoint`, recognizing
+    /// the `https://` (DoH), `tls://` (DoT), and `quic://` (DoQ) URL schemes
+    /// and falling back to plain UDP for bare host:port or host values.
+    private static func resolverEndpoint(for address: String) -> DNSResolverEndpoint {
+        let normalized = address.lowercased()
+        if normalized.hasPrefix("https://") {
+            return .doh(url: address)
+        } else if normalized.hasPrefix("tls://") {
+            let stripped = String(address.dropFirst(6))
+            if stripped.contains(":") {
+                return DNSResolverEndpoint(kind: .dot, address: stripped)
+            } else {
+                return .dot(host: stripped)
+            }
+        } else if normalized.hasPrefix("quic://") {
+            let stripped = String(address.dropFirst(7))
+            if stripped.contains(":") {
+                return DNSResolverEndpoint(kind: .doq, address: stripped)
+            } else {
+                return .doq(host: stripped)
+            }
+        } else if address.contains(":") {
+            return DNSResolverEndpoint(kind: .udp, address: address)
+        } else {
+            return .udp(host: address)
+        }
+    }
+
+    private static func parsePrimaryResolvers(_ nameservers: [String]?) -> [DNSResolverEndpoint] {
+        guard let nameservers, !nameservers.isEmpty else { return [] }
+        return nameservers.map { resolverEndpoint(for: $0) }
+    }
+
+    private static func parseFallbackResolvers(_ fallback: [String]?) -> [DNSResolverEndpoint] {
+        guard let fallback, !fallback.isEmpty else { return [] }
+        return fallback.map { addr in
+            if addr.contains(":") {
+                return DNSResolverEndpoint(kind: .udp, address: addr)
+            } else {
+                return .udp(host: addr)
+            }
+        }
+    }
+
+    private static func parseTLSResolvers(_ tlsNameserver: [String]?) -> [DNSResolverEndpoint] {
+        guard let tlsNameserver, !tlsNameserver.isEmpty else { return [] }
+        var dotResolvers: [DNSResolverEndpoint] = []
+        for addr in tlsNameserver {
+            let normalized = addr.lowercased()
+            if normalized.hasPrefix("https://") {
+                // Some configs may put DoH URLs in tls-nameserver
+                dotResolvers.append(.doh(url: addr))
+            } else {
+                // Strip "tls://" prefix if present, then treat as DoT
+                let stripped = normalized.hasPrefix("tls://") ? String(addr.dropFirst(6)) : addr
+                if stripped.contains(":") {
+                    dotResolvers.append(DNSResolverEndpoint(kind: .dot, address: stripped))
+                } else {
+                    dotResolvers.append(.dot(host: stripped))
+                }
+            }
+        }
+        return dotResolvers
+    }
+
+    private static func parseQUICResolvers(_ quicNameserver: [String]?) -> [DNSResolverEndpoint] {
+        guard let quicNameserver, !quicNameserver.isEmpty else { return [] }
+        var doqResolvers: [DNSResolverEndpoint] = []
+        for addr in quicNameserver {
+            let normalized = addr.lowercased()
+            if normalized.hasPrefix("quic://") {
+                let stripped = String(addr.dropFirst(7))  // drop "quic://"
+                if stripped.contains(":") {
+                    doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: stripped))
+                } else {
+                    doqResolvers.append(.doq(host: stripped))
+                }
+            } else if normalized.hasPrefix("https://") {
+                doqResolvers.append(.doh(url: addr))
+            } else {
+                // Bare address — treat as DoQ on default port 853
+                if addr.contains(":") {
+                    doqResolvers.append(DNSResolverEndpoint(kind: .doq, address: addr))
+                } else {
+                    doqResolvers.append(.doq(host: addr))
+                }
+            }
+        }
+        return doqResolvers
+    }
+
+    private static func parseNameserverPolicies(
+        _ rawPolicies: [String: [String]]?
+    ) -> [NameserverPolicyEntry] {
+        guard let rawPolicies else { return [] }
+        return rawPolicies.map { pattern, addrs in
+            NameserverPolicyEntry(
+                domainPattern: pattern,
+                resolvers: addrs.map { resolverEndpoint(for: $0) }
+            )
+        }
     }
     private static func parseRuleProviders(
         _ raw: [String: Any]?

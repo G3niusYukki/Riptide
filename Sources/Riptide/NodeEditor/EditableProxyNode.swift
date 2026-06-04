@@ -147,7 +147,7 @@ public struct EditableProxyNode: Equatable, Sendable {
         case .wireguard:
             node.port = 51820
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): sensible defaults once data fields land.
+            // NOTE(Task 16/17): sensible defaults once data fields land.
             node.port = 443
         }
 
@@ -259,7 +259,7 @@ public struct ProxyFieldRequirements {
             )
 
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): declare field requirements once data fields land.
+            // NOTE(Task 16/17): declare field requirements once data fields land.
             return ProxyFieldRequirements(
                 requiresCipher: false,
                 requiresPassword: false,

@@ -293,7 +293,7 @@ extension ProxyKind {
         case .tuic: return "tuic"
         case .wireguard: return "wireguard"
         case .reality, .anytls, .ssh:
-            // TODO(Task 16/17): map to mihomo type string once data fields land.
+            // NOTE(Task 16/17): map to mihomo type string once data fields land.
             return ""
         }
     }
