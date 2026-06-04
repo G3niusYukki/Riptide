@@ -307,7 +307,11 @@ public actor ModeCoordinator {
         guard let scheduler = providerScheduler else { return }
 
         for (name, config) in profile.config.proxyProviders {
-            let id = UUID(uuidString: name.hashValue.description) ?? UUID()
+            // FIX-3: use a process-independent hash so the same provider
+            // name yields the same UUID across app launches. The previous
+            // `name.hashValue` is randomized per process, which made the
+            // update scheduler silently no-op on cold start.
+            let id = StableHash.uuid(from: name)
             registeredProviders[id] = config
 
             // Schedule updates if interval is specified
