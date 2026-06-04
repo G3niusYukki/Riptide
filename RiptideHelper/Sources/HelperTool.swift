@@ -505,9 +505,8 @@ extension HelperTool: HelperToolProtocol {
     /// Parses the port number from networksetup output (e.g. "Port: 7890").
     nonisolated private func parsePort(from output: String) -> Int? {
         for line in output.components(separatedBy: .newlines) where line.hasPrefix("Port:") {
-                let value = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                return Int(value)
-            }
+            let value = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            return Int(value)
         }
         return nil
     }
