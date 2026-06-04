@@ -1,0 +1,25 @@
+name: Engine Benchmark
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'  # 1st of each month, 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.2'
+      - name: Build CLI
+        run: swift build --product riptide
+      - name: Run bench
+        run: swift test --filter EngineBenchmarkTests
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench-results.json
