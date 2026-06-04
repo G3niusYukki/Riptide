@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  audit-policy.plist — caller allowlist for RiptideHelper XPC endpoint.
+
+  Read by Sources/Riptide/XPC/HelperCallerValidator.swift on the helper
+  side to decide whether to accept a new XPC connection.
+
+  Fields:
+    allowedTeamID     — Apple Developer Team ID of the calling app.
+                        Placeholder "YOUR_TEAM_ID" until Apple Developer
+                        enrollment is complete. The validator still runs
+                        software-side checks; the TeamID is the only piece
+                        that requires Apple infrastructure.
+    allowedBundleID   — Bundle identifier of the calling app.
+                        Must be "com.riptide.client" in production.
+
+  To roll out: ship the binary with this file; the validator in
+  HelperCallerValidator.swift loads it on helper startup. A signed helper
+  will reject unsigned / foreign callers regardless of TeamID value.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>allowedTeamID</key>
+    <string>YOUR_TEAM_ID</string>
+    <key>allowedBundleID</key>
+    <string>com.riptide.client</string>
+</dict>
+</plist>
