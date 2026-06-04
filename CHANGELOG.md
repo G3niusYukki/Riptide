@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.4.1] — 2026-06-04
+
+> **Status:** Unreleased. Phase 1 closeout — closes a helper-LPE-class
+> issue pattern, ships the EngineBenchmark harness + the Swift-vs-mihomo
+> perf doc, and lands the sing-box skeleton (not enabled by default).
+> Test suite: 590 → 593.
+
+### Security (P0)
+
+- **Helper caller validation** — `RiptideHelper` XPC listener now
+  validates the caller audit token and code-signing identifier before
+  accepting connections. Closes a helper-LPE-class issue pattern
+  (CVE-style disclosure forthcoming — see ADR-0004 and
+  `docs/security/2026-06-04-helper-cve.md`). Helper rejects
+  unsigned / foreign callers; the client side declares its
+  code-signing requirement via `setCodeSigningRequirement`.
+- **`audit-policy.plist`** — new `RiptideHelper/Resources/audit-policy.plist`
+  declares the caller allowlist and the `SMAuthorizedClients`
+  placeholder (awaits a real Apple Developer Team ID).
+
+### Performance
+
+- **EngineBenchmark harness** — `Sources/Riptide/Performance/EngineBenchmark.swift`
+  compares the pure-Swift engine against the mihomo sidecar across 5
+  dimensions: HTTP CONNECT p50/p99, throughput, idle memory, CPU,
+  startup. First CI run lives at `.github/workflows/bench.yml`.
+- **mihomo sidecar version pin policy** — `Scripts/download-mihomo.sh`
+  now pins `MIHOMO_VERSION="v1.18.5"` and the policy is documented
+  in ADR-0006. (Pin was already in place on master; the ADR is new.)
+
+### Foundation (no user-visible default change)
+
+- **Sing-box skeleton** — added `SingBoxRuntimeManager` and
+  `SingBoxDownloader` in `Sources/Riptide/SingBox/`. (`SingBoxPaths`,
+  `SingBoxConfigGenerator`, and `SingBoxAPIClient` already existed on
+  master since 5/27.) Sing-box is **not** enabled by default; the
+  skeleton exists to support new protocols (Reality, AnyTLS) in
+  v2.5.0.
+- **`ProxyEngine` protocol + `EngineRouter`** — new
+  `Sources/Riptide/Engines/ProxyEngine.swift` and `EngineRouter.swift`
+  with default-mihomo policy. Visible in 设置 → 内核管理 as a
+  read-only status panel (status-only in Phase 1).
+- **`download-singbox.sh`** — `Scripts/download-singbox.sh` (already
+  on master, 5/27) pins `v1.13.0`; the `SingBoxDownloader` skeleton
+  hard-codes the same version so the two stay in sync.
+- **Tests:** 4 new test suites / 3 new tests (EngineRouter suite).
+  590 → 593.
+
 ## [W3-2a] — 2026-06-03
 
 > **Status:** Unreleased. W3-2a ships the data layer + Diagnostics tab. W3-2b
