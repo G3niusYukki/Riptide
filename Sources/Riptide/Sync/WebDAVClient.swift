@@ -25,18 +25,9 @@ public actor WebDAVClient {
 
     /// Build a URL by normalizing the path and resolving it against the server URL.
     private func resolvedURL(for path: String) -> URL? {
-        let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-        if normalizedPath.isEmpty {
-            return serverURL
-        }
-
-        var baseURL = serverURL
-        if !baseURL.absoluteString.hasSuffix("/") {
-            baseURL = baseURL.appendingPathComponent("")
-        }
-
-        return URL(string: normalizedPath, relativeTo: baseURL)?.absoluteURL
+        // FIX-5: route through the shared helper so this stays in lockstep
+        // with `ConfigSyncWebDAVClient.resolvedURL(for:)`.
+        return WebDAVShared.resolveURL(baseURL: serverURL, for: path)
     }
 
     // MARK: - WebDAV Operations

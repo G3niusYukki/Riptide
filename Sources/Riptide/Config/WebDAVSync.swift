@@ -161,18 +161,9 @@ public actor ConfigSyncWebDAVClient {
     // MARK: - Private Methods
     
     private func resolvedURL(for path: String) -> URL? {
-        let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        
-        if normalizedPath.isEmpty {
-            return baseURL
-        }
-        
-        var base = baseURL
-        if !base.absoluteString.hasSuffix("/") {
-            base = base.appendingPathComponent("")
-        }
-        
-        return URL(string: normalizedPath, relativeTo: base)?.absoluteURL
+        // FIX-5: route through the shared helper so this stays in lockstep
+        // with `WebDAVClient.resolvedURL(for:)`.
+        return WebDAVShared.resolveURL(baseURL: baseURL, for: path)
     }
     
     private func parseWebDAVResponse(_ data: Data) throws -> [ConfigSyncWebDAVFile] {
