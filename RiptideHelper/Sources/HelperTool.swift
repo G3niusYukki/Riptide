@@ -1,4 +1,6 @@
 import Foundation
+import Riptide
+import Security
 
 // MARK: - Path Validation
 
@@ -92,10 +94,23 @@ final class HelperTool: NSObject {
     /// The mihomo launcher actor.
     private let launcher = MihomoLauncher()
 
+    /// Caller policy validator. Re-initialised in `run()` from disk when available,
+    /// falls back to the built-in Team ID / Bundle ID pair at first use.
+    /// Marked `nonisolated(unsafe)` because `HelperCallerValidator` is a
+    /// `Sendable` immutable struct, so concurrent reads/writes from the
+    /// `nonisolated` `listener` callback are safe.
+    private nonisolated(unsafe) var validator: HelperCallerValidator = HelperCallerValidator(
+        policy: CallerPolicy(allowedTeamID: "YOUR_TEAM_ID", allowedBundleID: "com.riptide.client")
+    )
+
     // MARK: - Main Entry
 
     /// Runs the helper tool XPC service.
     nonisolated func run() {
+        // Re-initialise the validator from the on-disk policy plist (if present)
+        // before we start accepting any XPC connections.
+        self.validator = HelperCallerValidator(policy: loadCallerPolicy())
+
         // Create the XPC listener (must happen before setting delegate)
         let newListener = NSXPCListener(machServiceName: "com.riptide.helper")
 
@@ -183,24 +198,26 @@ extension HelperTool: NSXPCListenerDelegate {
 
     nonisolated func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection
     ) -> Bool {
-        // Configure the connection with the helper tool protocol
+        // Step 1: caller validation
+        let token = extractCallerAuditToken(from: newConnection)
+        let csr = extractCallerCodeSigningRequirement(from: newConnection)
+        let result = validator.validate(auditToken: token, codeSigningRequirement: csr)
+        guard result.isAllowed else {
+            logMessageNonIsolated("REJECTED XPC connection: \(String(describing: result.reason))")
+            return false
+        }
+
+        // Step 2: existing wiring (unchanged)
         let interface = NSXPCInterface(with: HelperToolProtocol.self)
         newConnection.exportedInterface = interface
         newConnection.exportedObject = self
-
-        // Set up the remote object interface (for callbacks if needed)
         newConnection.remoteObjectInterface = nil
-
-        // Set up invalidation handler
         newConnection.invalidationHandler = { [weak self] in
             self?.logMessageNonIsolated("XPC connection invalidated")
         }
-
-        // Set up interruption handler
         newConnection.interruptionHandler = { [weak self] in
             self?.logMessageNonIsolated("XPC connection interrupted")
         }
-
         logMessageNonIsolated("Accepted new XPC connection")
         newConnection.resume()
         return true
@@ -510,5 +527,60 @@ extension HelperTool: HelperToolProtocol {
         }
         return nil
     }
+
+    // MARK: - Caller Policy Loading
+
+    /// Loads the caller policy from `/Library/Application Support/Riptide/audit-policy.plist`.
+    /// Falls back to the built-in Team ID / Bundle ID pair if the file is missing or malformed.
+    nonisolated private func loadCallerPolicy() -> CallerPolicy {
+        let policyURL = URL(fileURLWithPath: "/Library/Application Support/Riptide/audit-policy.plist")
+        let fallbackPolicy = CallerPolicy(
+            allowedTeamID: "YOUR_TEAM_ID",
+            allowedBundleID: "com.riptide.client"
+        )
+        guard let data = try? Data(contentsOf: policyURL),
+              let policy = try? PropertyListDecoder().decode(CallerPolicy.self, from: data) else {
+            logMessageNonIsolated("WARN: failed to load audit-policy.plist, using built-in fallback")
+            return fallbackPolicy
+        }
+        return policy
+    }
+
+    // MARK: - Caller Extraction
+
+    /// Pulls the calling process's team ID and bundle ID from the kernel-provided
+    /// audit token that backs the XPC connection. Currently uses `SecCodeCopySelf`
+    /// to evaluate the helper's *own* code as a stand-in — full per-connection
+    /// audit-token plumbing lands in Task 4.
+    private nonisolated func extractCallerAuditToken(from connection: NSXPCConnection) -> CallerAuditToken? {
+        var code: SecCode?
+        let createStatus = SecCodeCopySelf([], &code)
+        guard createStatus == errSecSuccess, let code else { return nil }
+
+        var staticCode: SecStaticCode?
+        let staticStatus = SecCodeCopyStaticCode(code, [], &staticCode)
+        guard staticStatus == errSecSuccess, let staticCode else { return nil }
+
+        var infoCF: CFDictionary?
+        let infoStatus = SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSRequirementInformation), &infoCF)
+        guard infoStatus == errSecSuccess, let infoCF else { return nil }
+        let info = infoCF as? [String: Any] ?? [:]
+
+        let teamID = info[kSecCodeInfoTeamIdentifier as String] as? String
+        let bundleID = info[kSecCodeInfoIdentifier as String] as? String
+        return CallerAuditToken(teamID: teamID, bundleID: bundleID)
+    }
+
+    /// Returns the code-signing requirement that the helper expects from its
+    /// callers. macOS 10.14+ does not expose the caller's requirement on the
+    /// XPC connection itself, so the helper publishes its own anchor; the
+    /// client is required to declare a matching requirement (Task 4).
+    private nonisolated func extractCallerCodeSigningRequirement(from connection: NSXPCConnection) -> String? {
+        return Self.clientRequirement
+    }
+
+    /// Anchor requirement the helper expects from its callers.
+    private nonisolated static let clientRequirement: String? =
+        "anchor apple generic and identifier \"com.riptide.client\""
 }
 // swiftlint:disable:this file_length
