@@ -126,6 +126,17 @@ struct SettingsTabView: View {
 
                     // MARK: - Core
                     SettingsSection(title: "内核管理", icon: "cpu") {
+                        NavigationLink {
+                            KernelSwitcherView()
+                        } label: {
+                            SettingsRow(
+                                icon: "cpu",
+                                title: "内核切换",
+                                subtitle: "查看已安装的代理内核及状态",
+                                accent: Theme.accent
+                            )
+                        }
+
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("mihomo 版本")
