@@ -327,6 +327,13 @@ public actor HelperToolConnection {
     private func establishConnection() async throws {
         // Create new connection wrapped in Sendable container
         let newConnection = NSXPCConnection(machServiceName: machServiceName)
+        // NEW: require the helper to be signed by Apple and identify as
+        // com.riptide.helper. Mirrors the helper-side policy in
+        // audit-policy.plist. Without this, a same-named unsigned binary
+        // running on the same machine could impersonate the helper.
+        newConnection.setCodeSigningRequirement(
+            "anchor apple generic and identifier \"com.riptide.helper\""
+        )
         let connectionWrapper = SendableXPCConnection(newConnection)
         self.connectionWrapper = connectionWrapper
 
