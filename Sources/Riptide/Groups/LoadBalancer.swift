@@ -57,14 +57,13 @@ public actor LoadBalancer {
     /// Uses FNV-1a hash for deterministic mapping.
     private func selectConsistentHash(host: String?) -> String? {
         guard !proxies.isEmpty else { return nil }
-        let key: String
-        if let host = host, !host.isEmpty {
-            key = host
-        } else {
-            // Fallback to time-based for unknown hosts
-            key = "\(Date().timeIntervalSince1970)"
+        // FIX-1: when host is nil/empty, route deterministically to the
+        // first proxy. The old code used `Date().timeIntervalSince1970`
+        // as the fallback key, which violated the consistent-hash contract.
+        if host == nil || host?.isEmpty == true {
+            return proxies[0]
         }
-        let hash = fnv1a(key)
+        let hash = fnv1a(host!)
         let index = Int(hash % UInt64(proxies.count))
         return proxies[index]
     }
