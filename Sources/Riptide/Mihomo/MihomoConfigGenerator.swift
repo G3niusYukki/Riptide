@@ -3,6 +3,16 @@ import Foundation
 /// Generates mihomo-compatible YAML configuration from Riptide internal models.
 public enum MihomoConfigGenerator {
 
+    /// Errors raised by `MihomoConfigGenerator.generate` and its helpers.
+    public enum GenerationError: Error, Equatable, Sendable {
+        /// The supplied `RiptideConfig` includes a `ProxyNode` whose `kind` is
+        /// not yet supported by the mihomo YAML emitter. This is the
+        /// intended, loud failure for `.reality`, `.anytls`, and `.ssh` —
+        /// the previous silent fallback emitted an empty `type:` line that
+        /// mihomo would refuse to load.
+        case unsupportedProxyKind(ProxyKind)
+    }
+
     /// Escapes a string for safe inclusion in YAML output.
     /// - Wraps strings in double quotes if they contain special characters
     /// - Escapes backslashes and double quotes inside the string
@@ -62,7 +72,9 @@ public enum MihomoConfigGenerator {
     ///   - config: The Riptide configuration to convert.
     ///   - options: Generation options controlling output format.
     /// - Returns: A YAML string suitable for mihomo core.
-    public static func generate(config: RiptideConfig, options: GenerationOptions) -> String {
+    /// - Throws: `GenerationError.unsupportedProxyKind` when the config
+    ///   contains a `ProxyNode` whose `kind` is not yet supported.
+    public static func generate(config: RiptideConfig, options: GenerationOptions) throws -> String {
         var lines: [String] = []
 
         // Port settings
@@ -102,12 +114,12 @@ public enum MihomoConfigGenerator {
         lines.append("proxies:")
         for proxy in config.proxies {
             lines.append("  - name: \(yamlEscape(proxy.name))")
-            lines.append("    type: \(mihomoProxyType(for: proxy.kind))")
+            lines.append("    type: \(try mihomoProxyType(for: proxy.kind))")
             lines.append("    server: \(yamlEscape(proxy.server))")
             lines.append("    port: \(proxy.port)")
 
             // Add proxy-specific fields
-            appendProxyFields(proxy: proxy, to: &lines)
+            try appendProxyFields(proxy: proxy, to: &lines)
         }
         lines.append("")
 
@@ -148,7 +160,11 @@ public enum MihomoConfigGenerator {
     }
 
     /// Maps Riptide ProxyKind to mihomo type string.
-    private static func mihomoProxyType(for kind: ProxyKind) -> String {
+    /// - Throws: `GenerationError.unsupportedProxyKind` for kinds whose
+    ///   mihomo YAML emission is not yet implemented (e.g. `.reality`,
+    ///   `.anytls`, `.ssh`). This is a loud failure by design: emitting an
+    ///   empty `type:` would cause mihomo to silently refuse to load.
+    private static func mihomoProxyType(for kind: ProxyKind) throws -> String {
         switch kind {
         case .shadowsocks:
             return "ss"
@@ -173,13 +189,12 @@ public enum MihomoConfigGenerator {
         case .wireguard:
             return "wireguard"
         case .reality, .anytls, .ssh:
-            // NOTE(Task 16/17): emit mihomo config for these kinds once data fields land.
-            return ""
+            throw GenerationError.unsupportedProxyKind(kind)
         }
     }
 
     /// Appends proxy-specific fields based on the proxy type.
-    private static func appendProxyFields(proxy: ProxyNode, to lines: inout [String]) {
+    private static func appendProxyFields(proxy: ProxyNode, to lines: inout [String]) throws {
         switch proxy.kind {
         case .shadowsocks:
             appendCipherAndPassword(proxy: proxy, to: &lines)
@@ -215,8 +230,11 @@ public enum MihomoConfigGenerator {
             }
             appendPassword(proxy: proxy, to: &lines)
         case .reality, .anytls, .ssh:
-            // NOTE(Task 16/17): emit mihomo config for these kinds once data fields land.
-            break
+            // Mirrors the throw in `mihomoProxyType(for:)` — these kinds
+            // are not yet wired into the mihomo YAML emitter. Surfacing the
+            // error here too guarantees the same loud failure regardless
+            // of which call site reaches an unsupported kind first.
+            throw GenerationError.unsupportedProxyKind(proxy.kind)
         }
     }
 

@@ -261,7 +261,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             tunDeviceName: tunDeviceName
         )
 
-        let configYAML = MihomoConfigGenerator.generate(
+        let configYAML = try MihomoConfigGenerator.generate(
             config: profile.config,
             options: generationOptions
         )

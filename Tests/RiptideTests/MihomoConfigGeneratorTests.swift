@@ -25,7 +25,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-ss"))
         #expect(yaml.contains("type: ss"))
@@ -57,7 +57,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-vless"))
         #expect(yaml.contains("type: vless"))
@@ -97,7 +97,7 @@ struct MihomoConfigGeneratorTests {
             apiPort: 9090
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // Port settings
         #expect(yaml.contains("mixed-port: 6152"))
@@ -144,7 +144,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // TUN should be enabled with all required fields
         #expect(yaml.contains("tun:"))
@@ -170,7 +170,7 @@ struct MihomoConfigGeneratorTests {
             tunDeviceName: "utun200"
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("device: utun200"))
         #expect(yaml.contains("enable: true"))
@@ -187,7 +187,7 @@ struct MihomoConfigGeneratorTests {
             mode: .systemProxy
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("enable: false"))
         #expect(!yaml.contains("device:"))
@@ -229,7 +229,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("proxy-groups:"))
         #expect(yaml.contains("name: AutoSelect"))
@@ -270,7 +270,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("DOMAIN,example.com,DIRECT"))
         #expect(yaml.contains("DOMAIN-SUFFIX,google.com,my-proxy"))
@@ -306,7 +306,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-vmess"))
         #expect(yaml.contains("type: vmess"))
@@ -337,7 +337,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-trojan"))
         #expect(yaml.contains("type: trojan"))
@@ -365,7 +365,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-hy2"))
         #expect(yaml.contains("type: hysteria2"))
@@ -393,7 +393,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-http"))
         #expect(yaml.contains("type: http"))
@@ -421,7 +421,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: test-socks"))
         #expect(yaml.contains("type: socks5"))
@@ -457,7 +457,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: LoadBalance"))
         #expect(yaml.contains("type: load-balance"))
@@ -492,7 +492,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: Fallback"))
         #expect(yaml.contains("type: fallback"))
@@ -525,7 +525,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("name: ManualSelect"))
         #expect(yaml.contains("type: select"))
@@ -555,7 +555,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // Name with quotes should be escaped and wrapped in quotes
         #expect(yaml.contains("name: \"test: \\\"proxy\\\"\""))
@@ -581,7 +581,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // Password with quotes and backslashes should be escaped
         #expect(yaml.contains("password: \"pass\\\\\\\"word\\\\\\\\test\""))
@@ -607,7 +607,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // IPv6 address with colons - colons don't require quoting in value position
         #expect(yaml.contains("server: 2001:db8::1"))
@@ -623,7 +623,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152,
             allowLAN: true
         )
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("allow-lan: true"))
     }
 
@@ -635,7 +635,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152,
             logLevel: "debug"
         )
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("log-level: debug"))
     }
 
@@ -647,7 +647,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152,
             ipv6: false
         )
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("ipv6: false"))
     }
 
@@ -659,7 +659,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152,
             apiPort: 9091
         )
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("external-controller: 127.0.0.1:9091"))
     }
 
@@ -682,7 +682,7 @@ struct MihomoConfigGeneratorTests {
             rules: [.final(policy: .direct)]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("name: test-tuic"))
         #expect(yaml.contains("type: tuic"))
         #expect(yaml.contains("password: tuicpassword"))
@@ -706,7 +706,7 @@ struct MihomoConfigGeneratorTests {
             rules: [.final(policy: .direct)]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("name: test-snell"))
         #expect(yaml.contains("type: snell"))
         #expect(yaml.contains("password: snellpassword"))
@@ -726,7 +726,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("SRC-IP-CIDR,192.168.0.0/16,DIRECT"))
     }
 
@@ -741,7 +741,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("SRC-PORT,12345,REJECT"))
     }
 
@@ -756,7 +756,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("DST-PORT,443,DIRECT"))
     }
 
@@ -771,7 +771,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("PROCESS-NAME,Safari,REJECT"))
     }
 
@@ -786,7 +786,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("GEOSITE,google,DIRECT"))
     }
 
@@ -801,7 +801,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("RULE-SET,my-rule-set,REJECT"))
     }
 
@@ -813,7 +813,7 @@ struct MihomoConfigGeneratorTests {
             rules: [.matchAll]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("MATCH,DIRECT"))
     }
 
@@ -828,7 +828,7 @@ struct MihomoConfigGeneratorTests {
             ]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("NOT,DOMAIN,example.com,REJECT"))
     }
 
@@ -838,7 +838,7 @@ struct MihomoConfigGeneratorTests {
     func testEmptyConfig() throws {
         let config = RiptideConfig(mode: .rule, proxies: [], rules: [.final(policy: .direct)])
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("proxies:"))
         #expect(yaml.contains("rules:"))
         #expect(yaml.contains("MATCH,DIRECT"))
@@ -854,7 +854,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 7890,
             apiPort: 9091
         )
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
         #expect(yaml.contains("mixed-port: 7890"))
         #expect(yaml.contains("external-controller: 127.0.0.1:9091"))
         #expect(yaml.contains("enable: true"))
@@ -890,7 +890,7 @@ struct MihomoConfigGeneratorTests {
             mixedPort: 6152
         )
 
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         // Colon does not require quoting in this context
         // Verify both the proxy definition and group reference use consistent escaping
@@ -908,7 +908,7 @@ struct MihomoConfigGeneratorTests {
             rules: [.final(policy: .direct)]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .tun)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(yaml.contains("route-address-exclude:"))
         #expect(yaml.contains("192.168.0.0/16"))
@@ -928,8 +928,70 @@ struct MihomoConfigGeneratorTests {
             rules: [.final(policy: .direct)]
         )
         let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
-        let yaml = MihomoConfigGenerator.generate(config: config, options: options)
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
 
         #expect(!yaml.contains("route-address-exclude:"))
+    }
+
+    // MARK: - FIX-2: throws on unsupported ProxyKind (.reality/.anytls/.ssh)
+
+    @Test("generate throws on .reality")
+    func testGenerateThrowsOnReality() {
+        let node = ProxyNode(
+            name: "test-reality",
+            kind: .reality,
+            server: "1.2.3.4",
+            port: 443
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+
+        #expect(throws: MihomoConfigGenerator.GenerationError.self) {
+            _ = try MihomoConfigGenerator.generate(config: config, options: options)
+        }
+    }
+
+    @Test("generate throws on .anytls")
+    func testGenerateThrowsOnAnyTLS() {
+        let node = ProxyNode(
+            name: "test-anytls",
+            kind: .anytls,
+            server: "1.2.3.4",
+            port: 443
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+
+        #expect(throws: MihomoConfigGenerator.GenerationError.self) {
+            _ = try MihomoConfigGenerator.generate(config: config, options: options)
+        }
+    }
+
+    @Test("generate throws on .ssh")
+    func testGenerateThrowsOnSSH() {
+        let node = ProxyNode(
+            name: "test-ssh",
+            kind: .ssh,
+            server: "1.2.3.4",
+            port: 22
+        )
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [node],
+            rules: [.final(policy: .direct)]
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(mode: .systemProxy)
+
+        #expect(throws: MihomoConfigGenerator.GenerationError.self) {
+            _ = try MihomoConfigGenerator.generate(config: config, options: options)
+        }
     }
 }
