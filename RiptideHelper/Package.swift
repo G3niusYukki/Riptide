@@ -12,9 +12,15 @@ let package = Package(
             targets: ["RiptideHelper"]
         )
     ],
+    dependencies: [
+        .package(path: "../")
+    ],
     targets: [
         .executableTarget(
             name: "RiptideHelper",
+            dependencies: [
+                .product(name: "Riptide", package: "Riptide")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
