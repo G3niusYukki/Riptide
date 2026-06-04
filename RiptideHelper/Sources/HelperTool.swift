@@ -99,7 +99,7 @@ final class HelperTool: NSObject {
     /// Marked `nonisolated(unsafe)` because `HelperCallerValidator` is a
     /// `Sendable` immutable struct, so concurrent reads/writes from the
     /// `nonisolated` `listener` callback are safe.
-    private nonisolated(unsafe) var validator: HelperCallerValidator = HelperCallerValidator(
+    nonisolated(unsafe) private var validator: HelperCallerValidator = HelperCallerValidator(
         policy: CallerPolicy(allowedTeamID: "YOUR_TEAM_ID", allowedBundleID: "com.riptide.client")
     )
 
@@ -228,7 +228,6 @@ extension HelperTool: NSXPCListenerDelegate {
 
 extension HelperTool: HelperToolProtocol {
 
-    // swiftlint:disable:next function_body_length
     nonisolated func launchMihomo(configPath: String, mode: String, reply: @escaping @Sendable (Error?) -> Void) {
         logMessageNonIsolated("Received launchMihomo request - config: \(configPath), mode: \(mode)")
 
@@ -552,7 +551,7 @@ extension HelperTool: HelperToolProtocol {
     /// audit token that backs the XPC connection. Currently uses `SecCodeCopySelf`
     /// to evaluate the helper's *own* code as a stand-in — full per-connection
     /// audit-token plumbing lands in Task 4.
-    private nonisolated func extractCallerAuditToken(from connection: NSXPCConnection) -> CallerAuditToken? {
+    nonisolated private func extractCallerAuditToken(from connection: NSXPCConnection) -> CallerAuditToken? {
         var code: SecCode?
         let createStatus = SecCodeCopySelf([], &code)
         guard createStatus == errSecSuccess, let code else { return nil }
@@ -575,12 +574,11 @@ extension HelperTool: HelperToolProtocol {
     /// callers. macOS 10.14+ does not expose the caller's requirement on the
     /// XPC connection itself, so the helper publishes its own anchor; the
     /// client is required to declare a matching requirement (Task 4).
-    private nonisolated func extractCallerCodeSigningRequirement(from connection: NSXPCConnection) -> String? {
+    nonisolated private func extractCallerCodeSigningRequirement(from connection: NSXPCConnection) -> String? {
         return Self.clientRequirement
     }
 
     /// Anchor requirement the helper expects from its callers.
-    private nonisolated static let clientRequirement: String? =
+    nonisolated static let clientRequirement: String? =
         "anchor apple generic and identifier \"com.riptide.client\""
 }
-// swiftlint:disable:this file_length
