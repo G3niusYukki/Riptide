@@ -542,4 +542,35 @@ struct MihomoDownloaderFileOperationsTests {
         // Cleanup
         try? FileManager.default.removeItem(at: testFile)
     }
+
+    // FIX-17: listLocalVersions must skip symlinks so install scripts and
+    // user-created links don't surface as launchable binaries.
+    @Test("listLocalVersions skips symlinks")
+    func listLocalVersionsSkipsSymlinks() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("riptide-fix17-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: tempDir, withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Real binary directory with valid name
+        let realDir = tempDir.appendingPathComponent("mihomo-v1", isDirectory: true)
+        try FileManager.default.createDirectory(at: realDir, withIntermediateDirectories: true)
+        let realBinary = realDir.appendingPathComponent("mihomo")
+        FileManager.default.createFile(atPath: realBinary.path, contents: Data([0x00]))
+
+        // A second version that is a symlink to the first
+        let linkedDir = tempDir.appendingPathComponent("mihomo-v9", isDirectory: true)
+        try FileManager.default.createSymbolicLink(
+            at: linkedDir, withDestinationURL: realDir
+        )
+
+        let downloader = await MihomoDownloader(downloadDir: tempDir)
+        let versions = await downloader.listLocalVersions()
+
+        // Real entry surfaces as "v1"; the symlink must NOT surface as "v9".
+        #expect(versions.contains("v1"))
+        #expect(!versions.contains("v9"))
+    }
 }

@@ -232,14 +232,26 @@ extension MihomoDownloader {
 
     /// Lists all locally downloaded versions.
     /// - Returns: Array of version strings (e.g., ["v1.18.0", "v1.17.0"]).
+    /// FIX-17: Symlinks are skipped. A user-created or install-script-created
+    /// symlink in the sidecar directory would otherwise surface as a
+    /// "launchable" version and `MihomoRuntimeManager.start(...)` would
+    /// fail when it tried to exec through the link.
     nonisolated public func listLocalVersions() -> [String] {
         let fileManager = FileManager.default
-        guard let contents = try? fileManager.contentsOfDirectory(at: downloadDir, includingPropertiesForKeys: nil) else {
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: downloadDir,
+            includingPropertiesForKeys: [.isSymbolicLinkKey]
+        ) else {
             return []
         }
 
         return contents
-            .filter { $0.hasDirectoryPath || !$0.pathExtension.isEmpty }
+            .filter { url in
+                if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+                    return false
+                }
+                return url.hasDirectoryPath || !url.pathExtension.isEmpty
+            }
             .compactMap { url -> String? in
                 let name = url.deletingPathExtension().lastPathComponent
                 // Extract version from "mihomo-v1.18.0" or similar
