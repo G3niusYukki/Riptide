@@ -46,6 +46,38 @@ final class HelperCallerValidatorTests: XCTestCase {
         XCTAssertTrue(result.isAllowed)
         XCTAssertNil(result.reason)
     }
+
+    func test_validator_rejects_caller_when_code_signing_requirement_missing() {
+        // Arrange
+        let policy = CallerPolicy(allowedTeamID: "ABCDE12345", allowedBundleID: "com.riptide.client")
+        let validator = HelperCallerValidator(policy: policy)
+
+        // Act — token present, but no requirement
+        let result = validator.validate(
+            auditToken: AuditTokenFixture.privileged(teamID: "ABCDE12345"),
+            codeSigningRequirement: nil
+        )
+
+        // Assert
+        XCTAssertFalse(result.isAllowed)
+        XCTAssertEqual(result.reason, .missingCodeSigningRequirement)
+    }
+
+    func test_validator_rejects_caller_when_team_id_mismatches() {
+        // Arrange
+        let policy = CallerPolicy(allowedTeamID: "ABCDE12345", allowedBundleID: "com.riptide.client")
+        let validator = HelperCallerValidator(policy: policy)
+
+        // Act — token has wrong team, correct bundle
+        let result = validator.validate(
+            auditToken: CallerAuditToken(teamID: "EVIL99999", bundleID: "com.riptide.client"),
+            codeSigningRequirement: "identifier \"com.riptide.client\""
+        )
+
+        // Assert
+        XCTAssertFalse(result.isAllowed)
+        XCTAssertEqual(result.reason, .teamIDMismatch)
+    }
 }
 
 // MARK: - Fixtures

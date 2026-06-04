@@ -1,9 +1,13 @@
 import Foundation
 
-/// A thin abstraction over an audit token so validator logic is testable
-/// without a live XPC connection. In production, `auditToken` is filled
-/// from `SecCodeCopySelf()` on the helper side; `codeSigningRequirement`
-/// comes from `SecCodeCopySigningInformation`.
+/// A thin abstraction over a caller audit token so validator logic is
+/// testable without a live XPC connection. In production, the host
+/// populates this from `SecCodeCopyGuestWithAttributes(... kSecGuestAttributeAudit ...)`
+/// using the `audit_token_t` that XPC passes to the listener; the
+/// resulting `SecCode` is then queried with `SecCodeCopySigningInformation`
+/// to obtain the teamID and bundleID. The `codeSigningRequirement`
+/// parameter to `validate(...)` is a separately-evaluated requirement
+/// string for `SecCodeCheckValidity`.
 public struct CallerAuditToken: Equatable, Sendable {
     public let teamID: String?
     public let bundleID: String?
