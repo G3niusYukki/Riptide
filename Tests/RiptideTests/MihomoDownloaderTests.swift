@@ -208,6 +208,77 @@ struct MihomoDownloaderTests {
         #expect(DownloadError.fetchFailed != DownloadError.assetNotFound)
     }
 
+    // MARK: - SHA-256 Integrity Verification Tests (FIX-A: CWE-494)
+
+    @Test("SHA256Verifier throws checksumMismatch on mismatch")
+    func sha256VerifierThrowsOnMismatch() throws {
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sha256-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let file = temp.appendingPathComponent("payload.bin")
+        try Data("hello world".utf8).write(to: file)
+
+        // Pre-computed SHA-256 of "hello world" is correct; supply a wrong one.
+        let wrongDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        #expect(throws: DownloadError.self) {
+            try SHA256Verifier.verify(fileAt: file, againstDigest: wrongDigest)
+        }
+    }
+
+    @Test("SHA256Verifier accepts matching digest")
+    func sha256VerifierAcceptsMatchingDigest() throws {
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sha256-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let file = temp.appendingPathComponent("payload.bin")
+        try Data("hello world".utf8).write(to: file)
+
+        // SHA-256("hello world") = b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+        let goodDigest = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        try SHA256Verifier.verify(fileAt: file, againstDigest: goodDigest)
+    }
+
+    @Test("SHA256Verifier skips when digest lacks sha256 prefix")
+    func sha256VerifierSkipsNonSha256Digest() throws {
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sha256-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let file = temp.appendingPathComponent("payload.bin")
+        try Data("anything".utf8).write(to: file)
+
+        // Unknown algorithm: must NOT throw — the caller decides to skip verification
+        // and GitHub currently only ships sha256 digests.
+        try SHA256Verifier.verify(fileAt: file, againstDigest: "sha512:abc")
+    }
+
+    @Test("GitHubAsset decodes digest field when present")
+    func gitHubAssetDecodesDigest() throws {
+        let json = #"""
+        {
+            "name": "mihomo-darwin-arm64-v1.18.0.gz",
+            "browser_download_url": "https://example.com/mihomo.gz",
+            "digest": "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        }
+        """#
+        let asset = try JSONDecoder().decode(GitHubAsset.self, from: Data(json.utf8))
+        #expect(asset.digest == "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
+    }
+
+    @Test("GitHubAsset tolerates missing digest field")
+    func gitHubAssetToleratesMissingDigest() throws {
+        let json = #"""
+        {
+            "name": "mihomo-darwin-arm64-v1.18.0.gz",
+            "browser_download_url": "https://example.com/mihomo.gz"
+        }
+        """#
+        let asset = try JSONDecoder().decode(GitHubAsset.self, from: Data(json.utf8))
+        #expect(asset.digest == nil)
+    }
+
     // MARK: - GitHubRelease Parsing Tests
 
     @Test("GitHubRelease parsing")

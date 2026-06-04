@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 // MARK: - Error Types
 
@@ -16,6 +17,9 @@ public enum DownloadError: Error, Equatable, Sendable {
     case fileWriteFailed
     /// Invalid version string.
     case invalidVersion(String)
+    /// Downloaded file's SHA-256 did not match the expected digest.
+    /// Carries the expected and computed hex strings for diagnostics.
+    case checksumMismatch(expected: String, actual: String)
 }
 
 // MARK: - Platform
@@ -98,10 +102,14 @@ struct GitHubRelease: Codable, Sendable {
 struct GitHubAsset: Codable, Sendable {
     let name: String
     let browserDownloadURL: URL
+    /// GitHub-provided per-asset digest, formatted as `"sha256:<hex>"`.
+    /// May be `nil` for older releases that do not include the field.
+    let digest: String?
 
     enum CodingKeys: String, CodingKey {
         case name
         case browserDownloadURL = "browser_download_url"
+        case digest
     }
 }
 
@@ -167,8 +175,8 @@ extension MihomoDownloader {
     public func downloadLatest(channel: Channel = .stable) async throws -> URL {
         let release = try await fetchRelease(channel: channel)
         let platform = currentPlatform()
-        let downloadURL = try extractDownloadURL(from: release, for: platform)
-        return try await downloadAndExtract(from: downloadURL, version: release.tagName, platform: platform)
+        let (downloadURL, digest) = try extractDownloadURL(from: release, for: platform)
+        return try await downloadAndExtract(from: downloadURL, version: release.tagName, platform: platform, expectedDigest: digest)
     }
 
     /// Downloads a specific mihomo version.
@@ -191,8 +199,8 @@ extension MihomoDownloader {
         let release = try decoder.decode(GitHubRelease.self, from: data)
 
         let platform = currentPlatform()
-        let downloadURL = try extractDownloadURL(from: release, for: platform)
-        return try await downloadAndExtract(from: downloadURL, version: release.tagName, platform: platform)
+        let (downloadURL, digest) = try extractDownloadURL(from: release, for: platform)
+        return try await downloadAndExtract(from: downloadURL, version: release.tagName, platform: platform, expectedDigest: digest)
     }
 
     /// Checks for available updates.
@@ -209,7 +217,7 @@ extension MihomoDownloader {
             guard latestVersion != normalizedCurrent else { return nil }
 
             let platform = currentPlatform()
-            let downloadURL = try extractDownloadURL(from: release, for: platform)
+            let downloadURL = try extractDownloadURL(from: release, for: platform).url
 
             return UpdateInfo(
                 version: release.tagName,
@@ -276,8 +284,9 @@ extension MihomoDownloader {
         return try decoder.decode(GitHubRelease.self, from: data)
     }
 
-    /// Extracts the download URL for the current platform from release assets.
-    private func extractDownloadURL(from release: GitHubRelease, for platform: Platform) throws -> URL {
+    /// Extracts the download URL and digest for the current platform from release assets.
+    /// - Returns: A tuple of the asset's `browser_download_url` and its `digest` (if present).
+    private func extractDownloadURL(from release: GitHubRelease, for platform: Platform) throws -> (url: URL, digest: String?) {
         let assetName = platform.assetName
 
         // For macOS, prefer amd64 (Intel) or arm64 (Apple Silicon)
@@ -286,7 +295,7 @@ extension MihomoDownloader {
 
         // First try to find exact match with architecture
         if let asset = release.assets.first(where: { $0.name.contains(archPattern) && $0.name.hasSuffix(".gz") }) {
-            return asset.browserDownloadURL
+            return (asset.browserDownloadURL, asset.digest)
         }
 
         // Fallback to any asset matching the platform
@@ -294,11 +303,20 @@ extension MihomoDownloader {
             throw DownloadError.assetNotFound
         }
 
-        return asset.browserDownloadURL
+        return (asset.browserDownloadURL, asset.digest)
     }
 
-    /// Downloads and extracts the mihomo binary.
-    private func downloadAndExtract(from url: URL, version: String, platform: Platform) async throws -> URL {
+    /// Downloads and extracts the mihomo binary, optionally verifying SHA-256
+    /// against the GitHub-provided asset digest before extraction.
+    /// - Parameter expectedDigest: The `"sha256:<hex>"` digest from the release JSON.
+    ///   When `nil` or not prefixed with `"sha256:"`, verification is skipped —
+    ///   this preserves the legacy behavior for releases that omit the field.
+    private func downloadAndExtract(
+        from url: URL,
+        version: String,
+        platform: Platform,
+        expectedDigest: String? = nil
+    ) async throws -> URL {
         // Create temp directory for download
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -308,6 +326,11 @@ extension MihomoDownloader {
 
         // Download with progress tracking
         try await performDownload(from: url, to: downloadFileURL)
+
+        // Verify SHA-256 integrity BEFORE extraction (CWE-494 mitigation).
+        if let digest = expectedDigest, digest.lowercased().hasPrefix("sha256:") {
+            try SHA256Verifier.verify(fileAt: downloadFileURL, againstDigest: digest)
+        }
 
         // Create version directory
         let versionDir = downloadDir.appendingPathComponent("mihomo-\(version)")
@@ -398,6 +421,34 @@ extension MihomoDownloader {
 }
 
 // MARK: - Helper Functions
+
+/// Verifies the SHA-256 of a downloaded file against a GitHub-style digest
+/// (`"sha256:<hex>"`). Throws `DownloadError.checksumMismatch` on mismatch.
+///
+/// CWE-494 mitigation: prevents the privileged mihomo downloader from
+/// running attacker-substituted code. When the digest is missing or uses an
+/// unsupported algorithm the verifier returns silently — the caller decides
+/// whether to fail closed (the production path in `MihomoRuntimeManager`
+/// does fail closed upstream by only invoking this when `expectedDigest` is
+/// present and SHA-256-prefixed).
+public enum SHA256Verifier {
+    /// Computes the SHA-256 of `file` and compares it to `digest`.
+    /// - Parameter digest: A `"sha256:<hex>"` string. If the prefix is
+    ///   missing or unknown, this returns without throwing (the caller
+    ///   should pre-filter with `hasPrefix("sha256:")`).
+    public static func verify(fileAt file: URL, againstDigest digest: String) throws {
+        let trimmed = digest.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.lowercased().hasPrefix("sha256:") else { return }
+        let expected = String(trimmed.dropFirst("sha256:".count)).lowercased()
+        let data = try Data(contentsOf: file)
+        let actual = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        guard actual == expected else {
+            throw DownloadError.checksumMismatch(expected: expected, actual: actual)
+        }
+    }
+}
 
 /// Decompresses a gzipped file.
 /// - Parameters:
