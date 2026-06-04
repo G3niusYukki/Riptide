@@ -64,6 +64,9 @@ public struct ProxyConnector: Sendable {
                 // profile is available to resolve the chain. A relay node should never
                 // reach ProxyConnector.connect() directly; it is always unwrapped there.
                 throw ProtocolError.malformedResponse("unexpected relay node in ProxyConnector")
+            case .reality, .anytls, .ssh:
+                // TODO(Task 16/17): wire up connectors for these kinds once data fields land.
+                throw ProtocolError.malformedResponse("unsupported proxy kind: \(node.kind)")
             }
             return ConnectedProxyContext(node: node, connection: connection)
         } catch {

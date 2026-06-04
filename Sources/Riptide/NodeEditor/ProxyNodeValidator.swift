@@ -120,6 +120,10 @@ public actor ProxyNodeValidator {
         case .http, .socks5, .relay:
             // No additional required fields
             break
+
+        case .reality, .anytls, .ssh:
+            // TODO(Task 16/17): add field validation for these kinds once data fields land.
+            break
         }
 
         return NodeValidationDetails(isValid: errors.isEmpty, errors: errors)

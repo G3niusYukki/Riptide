@@ -149,6 +149,10 @@ public enum ClashConfigParser {
 
         case .wireguard:
             return try wireGuardProxyNode(proxy, port: port, index: index)
+
+        case .reality, .anytls, .ssh:
+            // TODO(Task 16/17): parse these kinds once data fields land.
+            throw ClashConfigError.invalidProxy(index: index, reason: "proxy kind \(kind) is not yet supported")
         }
     }
 

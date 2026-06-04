@@ -356,6 +356,9 @@ public actor WebSocketExternalController {
         case .relay: return "Relay"
         case .tuic: return "Tuic"
         case .wireguard: return "WireGuard"
+        case .reality: return "Reality"
+        case .anytls: return "AnyTls"
+        case .ssh: return "Ssh"
         }
     }
 

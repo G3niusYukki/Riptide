@@ -273,6 +273,9 @@ extension ProxyKind {
         case .relay: return "Relay"
         case .tuic: return "TUIC"
         case .wireguard: return "WireGuard"
+        case .reality: return "Reality"
+        case .anytls: return "AnyTLS"
+        case .ssh: return "SSH"
         }
     }
 
@@ -289,6 +292,9 @@ extension ProxyKind {
         case .relay: return "relay"
         case .tuic: return "tuic"
         case .wireguard: return "wireguard"
+        case .reality, .anytls, .ssh:
+            // TODO(Task 16/17): map to mihomo type string once data fields land.
+            return ""
         }
     }
 }

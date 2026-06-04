@@ -261,6 +261,9 @@ public actor ExternalController {
         case .relay: return "Relay"
         case .tuic: return "TUIC"
         case .wireguard: return "WireGuard"
+        case .reality: return "Reality"
+        case .anytls: return "AnyTLS"
+        case .ssh: return "SSH"
         }
     }
 

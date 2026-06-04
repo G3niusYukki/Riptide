@@ -6,7 +6,7 @@ public enum ProxyMode: String, Equatable, Sendable, Codable {
     case direct
 }
 
-public enum ProxyKind: Equatable, Sendable {
+public enum ProxyKind: Equatable, Sendable, Hashable {
     case http
     case socks5
     case shadowsocks
@@ -18,6 +18,9 @@ public enum ProxyKind: Equatable, Sendable {
     case snell
     case tuic
     case wireguard
+    case reality         // Phase 2 routing; data structure lands in Task 16 (now)
+    case anytls          // Phase 2 routing; data structure lands in Task 17 (now)
+    case ssh             // Placeholder for fallback test (Task 15)
 }
 
 public struct ProxyNode: Equatable, Sendable {

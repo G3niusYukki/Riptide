@@ -134,7 +134,8 @@ public enum SingBoxConfigGenerator {
             return httpOutbound(for: proxy)
         case .trojan:
             return try trojanOutbound(for: proxy)
-        case .vmess, .vless, .hysteria2, .relay, .snell, .tuic:
+        case .vmess, .vless, .hysteria2, .relay, .snell, .tuic,
+             .reality, .anytls, .ssh:
             throw SingBoxConfigGeneratorError.unsupportedProxyKind(proxyName: proxy.name, kind: proxy.kind)
         }
     }
