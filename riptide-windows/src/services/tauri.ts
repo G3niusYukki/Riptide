@@ -17,43 +17,34 @@ export const startProxy = () => invoke<void>('start_proxy');
 export const stopProxy = () => invoke<void>('stop_proxy');
 export const restartProxy = () => invoke<void>('restart_proxy');
 export const getProxyStatus = () => invoke<boolean>('get_proxy_status');
-export const testProxyDelay = (name: string, url?: string) => 
+export const testProxyDelay = (name: string, url?: string) =>
   invoke<number>('test_proxy_delay', { name, url });
-export const getProxyGroups = () => 
-  invoke<ProxyGroupDetail[]>('get_proxy_groups');
-export const getAllProxies = () => 
-  invoke<ProxyInfo[]>('get_all_proxies');
-export const switchProxy = (group: string, proxyName: string) => 
+export const getProxyGroups = () => invoke<ProxyGroupDetail[]>('get_proxy_groups');
+export const getAllProxies = () => invoke<ProxyInfo[]>('get_all_proxies');
+export const switchProxy = (group: string, proxyName: string) =>
   invoke<void>('switch_proxy', { group, proxyName });
-export const testGroupDelay = (group: string) => 
+export const testGroupDelay = (group: string) =>
   invoke<Record<string, number>>('test_group_delay', { group });
 
 // Connection commands
-export const getConnections = () =>
-  invoke<ConnectionInfo[]>('get_connections');
-export const closeConnection = (id: string) =>
-  invoke<void>('close_connection', { id });
-export const closeAllConnections = () =>
-  invoke<void>('close_all_connections');
-export const getTraffic = () =>
-  invoke<TrafficData>('get_traffic');
-export const getRules = () =>
-  invoke<RuleInfo[]>('get_rules');
+export const getConnections = () => invoke<ConnectionInfo[]>('get_connections');
+export const closeConnection = (id: string) => invoke<void>('close_connection', { id });
+export const closeAllConnections = () => invoke<void>('close_all_connections');
+export const getTraffic = () => invoke<TrafficData>('get_traffic');
+export const getRules = () => invoke<RuleInfo[]>('get_rules');
 
 // Config commands (disk-backed)
 export const getProfiles = () => invoke<Profile[]>('list_profiles');
 export const addProfile = (name: string, content: string) =>
   invoke<Profile>('create_profile', { name, content });
-export const removeProfile = (id: string) =>
-  invoke<void>('delete_profile', { id });
+export const removeProfile = (id: string) => invoke<void>('delete_profile', { id });
 export const updateProfile = (id: string, content: string) =>
   invoke<void>('update_profile', { id, content });
 export const importProfileFromUrl = (url: string, name?: string) =>
   invoke<Profile>('import_profile_from_url', { url, name });
 export const importProfileFromFile = (path: string) =>
   invoke<Profile>('import_profile_from_file', { path });
-export const importShareUri = (uri: string) =>
-  invoke<Profile>('import_share_uri', { uri });
+export const importShareUri = (uri: string) => invoke<Profile>('import_share_uri', { uri });
 export const exportProfile = (id: string, path: string) =>
   invoke<void>('export_profile', { id, path });
 export const validateConfig = (content: string) =>
@@ -62,10 +53,8 @@ export const validateConfig = (content: string) =>
     { content },
   );
 export const getActiveProfile = () => invoke<string | null>('get_active_profile');
-export const setActiveProfile = (id: string) =>
-  invoke<void>('set_active_profile', { id });
-export const refreshProfile = (id: string) =>
-  invoke<Profile>('refresh_profile', { id });
+export const setActiveProfile = (id: string) => invoke<void>('set_active_profile', { id });
+export const refreshProfile = (id: string) => invoke<Profile>('refresh_profile', { id });
 export const setProfileSubscription = (
   id: string,
   url: string | null,
@@ -163,11 +152,8 @@ export const listProfileProxies = (profileId: string) =>
   invoke<ClashProxy[]>('list_profile_proxies', { profileId });
 export const addProfileProxy = (profileId: string, proxy: ClashProxy) =>
   invoke<void>('add_profile_proxy', { profileId, proxy });
-export const updateProfileProxy = (
-  profileId: string,
-  originalName: string,
-  proxy: ClashProxy,
-) => invoke<void>('update_profile_proxy', { profileId, originalName, proxy });
+export const updateProfileProxy = (profileId: string, originalName: string, proxy: ClashProxy) =>
+  invoke<void>('update_profile_proxy', { profileId, originalName, proxy });
 export const deleteProfileProxy = (profileId: string, name: string) =>
   invoke<void>('delete_profile_proxy', { profileId, name });
 
@@ -207,16 +193,16 @@ export interface TunOptions {
 }
 export const startTunMode = () => invoke<void>('start_tun_mode');
 export const stopTunMode = () => invoke<void>('stop_tun_mode');
-export const getTunStatus = () => invoke<{
-  status: string;
-  running: boolean;
-  adapter_name?: string;
-  interface_ip?: string;
-  gateway?: string;
-}>('get_tun_status');
+export const getTunStatus = () =>
+  invoke<{
+    status: string;
+    running: boolean;
+    adapter_name?: string;
+    interface_ip?: string;
+    gateway?: string;
+  }>('get_tun_status');
 export const getTunOptions = () => invoke<TunOptions>('get_tun_options');
-export const setTunOptions = (options: TunOptions) =>
-  invoke<void>('set_tun_options', { options });
+export const setTunOptions = (options: TunOptions) => invoke<void>('set_tun_options', { options });
 
 // mihomo binary lifecycle
 export const downloadMihomo = () => invoke<string>('download_mihomo');
@@ -258,17 +244,14 @@ export interface DnsPolicy {
   respect_rules?: boolean;
 }
 export const getDnsPolicy = () => invoke<DnsPolicy>('get_dns_policy');
-export const setDnsPolicy = (policy: DnsPolicy) =>
-  invoke<void>('set_dns_policy', { policy });
+export const setDnsPolicy = (policy: DnsPolicy) => invoke<void>('set_dns_policy', { policy });
 
 // Rewrite rules
 export const getRewriteRules = () => invoke<RewriteRule[]>('get_rewrite_rules');
 export const setRewriteRules = (rules: RewriteRule[]) =>
   invoke<void>('set_rewrite_rules', { rules });
-export const addRewriteRule = (rule: RewriteRule) =>
-  invoke<void>('add_rewrite_rule', { rule });
-export const deleteRewriteRule = (id: string) =>
-  invoke<void>('delete_rewrite_rule', { id });
+export const addRewriteRule = (rule: RewriteRule) => invoke<void>('add_rewrite_rule', { rule });
+export const deleteRewriteRule = (id: string) => invoke<void>('delete_rewrite_rule', { id });
 export const toggleRewriteRule = (id: string, enabled: boolean) =>
   invoke<void>('toggle_rewrite_rule', { id, enabled });
 
@@ -282,8 +265,7 @@ export interface GatewayDevice {
   mac: string;
   interface: string;
 }
-export const getGatewayDevices = () =>
-  invoke<GatewayDevice[]>('get_gateway_devices');
+export const getGatewayDevices = () => invoke<GatewayDevice[]>('get_gateway_devices');
 
 // WebDAV sync
 export interface WebDAVConfigDto {
@@ -341,8 +323,7 @@ export interface DiagnosticReport {
   geo_assets: { name: string; installed: boolean; size_bytes?: number }[];
   log_tail: string;
 }
-export const collectDiagnosticReport = () =>
-  invoke<DiagnosticReport>('collect_diagnostic_report');
+export const collectDiagnosticReport = () => invoke<DiagnosticReport>('collect_diagnostic_report');
 
 // Hotkey commands
 export const getHotkeys = () => invoke<string[]>('get_hotkeys');
@@ -359,3 +340,74 @@ export const checkUpdate = () => invoke<UpdateInfo>('check_update');
 // Log commands
 export const getLogs = (level?: string, lines?: number) =>
   invoke<string>('get_logs', { level, lines });
+
+// Logbook — persistent diagnostic event store (Phase B B3).
+// Backend layout: JSONL per UTC day under `%APPDATA%\Riptide\logbook\YYYY-MM-DD.jsonl`.
+// Each entry's `fields` object is preserved verbatim by the Rust side as a
+// `serde_json::Value`, so the TS side just threads it through as `unknown`
+// and the consuming component decides how to render it.
+
+/** Severity levels written by the Rust LogbookWriter. */
+export type LogLevel = 'debug' | 'info' | 'warning' | 'error';
+
+/** Known logbook categories. Free-form strings are also accepted; this union
+ *  is just for autocomplete in the components and to avoid typos in the
+ *  5 injection points enumerated by the catchup plan (mode_coordinator,
+ *  subscription_scheduler, service, sysproxy, recovery_watchdog). */
+export type LogCategory =
+  | 'mode'
+  | 'subscription'
+  | 'service'
+  | 'sysproxy'
+  | 'recovery'
+  | (string & {});
+
+/** Structured context attached to every entry. The Rust side models this as
+ *  `HashMap<String, serde_json::Value>`; we keep it loosely typed on the
+ *  TS side so callers can attach numbers / nested objects / arrays without
+ *  fighting the type system. */
+export type LogFields = Record<string, unknown>;
+
+/** A single logbook entry — wire format from the Rust backend. */
+export interface LogEntry {
+  /** ISO 8601 timestamp with millis, e.g. "2026-06-05T22:00:00.123Z". */
+  ts: string;
+  level: LogLevel;
+  category: LogCategory;
+  message: string;
+  fields: LogFields;
+}
+
+/** Optional filters for `logbook_query`. All fields are optional; the Rust
+ *  side treats `None` as "no constraint". `from` / `to` are ISO 8601 strings
+ *  to match the timestamp encoding on the entry itself. */
+export interface LogbookQuery {
+  limit?: number | null;
+  level?: LogLevel | null;
+  category?: LogCategory | null;
+  /** ISO 8601 timestamp (inclusive). */
+  from?: string | null;
+  /** ISO 8601 timestamp (inclusive). */
+  to?: string | null;
+}
+
+/** Query the persistent logbook. Returns entries newest-first. */
+export const logbookQuery = (filters: LogbookQuery = {}) =>
+  invoke<LogEntry[]>('logbook_query', { filters });
+
+/** Clear entries from the logbook. `category` and `beforeDate` (YYYY-MM-DD)
+ *  narrow the deletion scope; both `null` deletes everything. Returns the
+ *  number of entries removed. */
+export const logbookClear = (category?: string | null, beforeDate?: string | null) =>
+  invoke<number>('logbook_clear', { category, beforeDate });
+
+/** Export entries to a JSONL file at `destPath`. Returns the number of
+ *  entries written. The UI is expected to source `destPath` from a
+ *  platform save dialog (Tauri dialog plugin) — the hook layer in
+ *  `hooks/useLogbook.ts` exposes a mutation that takes the path from the
+ *  caller. */
+export const logbookExport = (
+  from: string | null | undefined,
+  to: string | null | undefined,
+  destPath: string,
+) => invoke<number>('logbook_export', { from, to, destPath });
