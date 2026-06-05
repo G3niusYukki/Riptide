@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
+import type { ViewUpdate } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { yaml } from '@codemirror/lang-yaml';
 import { linter, type Diagnostic } from '@codemirror/lint';
@@ -18,7 +19,7 @@ type YamlParseError = Error & {
 };
 
 // YAML linter that checks for syntax errors
-const yamlLinter = linter((view) => {
+const yamlLinter = linter((view: EditorView): readonly Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
   const doc = view.state.doc.toString();
 
@@ -148,7 +149,7 @@ export function YamlEditor({
 
     if (!readOnly) {
       extensions.push(
-        EditorView.updateListener.of((update) => {
+        EditorView.updateListener.of((update: ViewUpdate) => {
           if (update.docChanged) {
             onChange(update.state.doc.toString());
           }
