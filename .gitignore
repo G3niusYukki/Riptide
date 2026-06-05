@@ -47,3 +47,9 @@ node_modules/
 
 # Reasonix artifacts
 .reasonix/
+
+# Bump-version script backups (transient, regenerated on each run)
+.bump-backup/
+
+# Mavis plan / decision scratch files (transient, regenerated on each run)
+.mavis/
