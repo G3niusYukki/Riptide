@@ -6,7 +6,7 @@
 //! `last_updated_at + interval < now`. Failures are logged and don't stall
 //! the loop — a next-tick retry costs nothing.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
 
 use chrono::Utc;
@@ -15,9 +15,33 @@ use tauri::{AppHandle, Emitter, Manager};
 #[cfg(target_os = "windows")]
 use crate::cmds::config::refresh_profile_impl;
 use crate::cmds::config::AppState;
+use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookWriter};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Module-level writer slot — the scheduler task is spawned once at
+/// startup and holds no struct state we can attach a writer to.
+static SUB_LOGBOOK: OnceLock<StdMutex<Option<Arc<LogbookWriter>>>> = OnceLock::new();
+
+fn sub_cell() -> &'static StdMutex<Option<Arc<LogbookWriter>>> {
+    SUB_LOGBOOK.get_or_init(|| StdMutex::new(None))
+}
+
+/// Install the diagnostic Logbook writer for the subscription scheduler.
+pub fn set_logbook_writer(writer: Option<Arc<LogbookWriter>>) {
+    if let Ok(mut g) = sub_cell().lock() {
+        *g = writer;
+    }
+}
+
+#[allow(dead_code)]
+fn log_event(level: LogLevel, message: impl Into<String>) {
+    let Some(writer) = sub_cell().lock().ok().and_then(|g| g.clone()) else {
+        return;
+    };
+    writer.send(LogEntry::new(level, LogCategory::Subscription, message));
+}
 
 #[derive(Clone, serde::Serialize)]
 struct RefreshedEvent {

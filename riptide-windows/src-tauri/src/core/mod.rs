@@ -5,6 +5,7 @@ pub mod diagnostics;
 pub mod gateway;
 pub mod geo_assets;
 pub mod kill_switch;
+pub mod logbook;
 pub mod mihomo;
 pub mod mihomo_api;
 pub mod mihomo_bootstrap;

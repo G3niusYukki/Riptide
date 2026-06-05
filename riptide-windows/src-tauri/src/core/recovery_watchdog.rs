@@ -15,13 +15,14 @@
 //! tail of issues where mihomo's gVisor TUN stack gets confused after the
 //! interface list shifts under it.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 
+use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookWriter};
 use crate::core::mihomo::MihomoManager;
 use crate::core::mihomo_api::MihomoApiClient;
 
@@ -40,6 +41,30 @@ pub fn spawn(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         run(app_handle).await;
     });
+}
+
+/// Module-level writer slot — the watchdog task is spawned once at
+/// startup and holds no struct state we can attach a writer to.
+static RECOVERY_LOGBOOK: OnceLock<StdMutex<Option<Arc<LogbookWriter>>>> = OnceLock::new();
+
+fn cell() -> &'static StdMutex<Option<Arc<LogbookWriter>>> {
+    RECOVERY_LOGBOOK.get_or_init(|| StdMutex::new(None))
+}
+
+/// Install the diagnostic Logbook writer for the recovery watchdog.
+/// Called once at app startup, right after `AppState::install_logbook_writer`.
+pub fn set_logbook_writer(writer: Option<Arc<LogbookWriter>>) {
+    if let Ok(mut g) = cell().lock() {
+        *g = writer;
+    }
+}
+
+#[allow(dead_code)]
+fn log_event(level: LogLevel, message: &str) {
+    let Some(writer) = cell().lock().ok().and_then(|g| g.clone()) else {
+        return;
+    };
+    writer.send(LogEntry::new(level, LogCategory::Recovery, message));
 }
 
 async fn run(app_handle: AppHandle) {

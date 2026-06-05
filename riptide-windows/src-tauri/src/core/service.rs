@@ -13,6 +13,9 @@
 use serde::Serialize;
 use std::ffi::OsStr;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+
+use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookWriter};
 use windows_service::{
     service::{
         ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceState,
@@ -25,6 +28,33 @@ const SERVICE_NAME: &str = "RiptideTUN";
 const SERVICE_DISPLAY_NAME: &str = "Riptide TUN Service";
 const SERVICE_DESCRIPTION: &str =
     "Runs the mihomo proxy core for Riptide's TUN mode with SYSTEM privileges.";
+
+/// Module-level writer slot — the service module is a bag of free
+/// functions called from commands; the writer is keyed off a `OnceLock`
+/// in module scope so the call sites can `log_event` without holding
+/// state on a struct.
+static SERVICE_LOGBOOK: OnceLock<StdMutex<Option<Arc<LogbookWriter>>>> = OnceLock::new();
+
+fn service_cell() -> &'static StdMutex<Option<Arc<LogbookWriter>>> {
+    SERVICE_LOGBOOK.get_or_init(|| StdMutex::new(None))
+}
+
+/// Install the diagnostic Logbook writer for the TUN service control
+/// module. Called once at app startup, right after
+/// `AppState::install_logbook_writer`.
+pub fn set_logbook_writer(writer: Option<Arc<LogbookWriter>>) {
+    if let Ok(mut g) = service_cell().lock() {
+        *g = writer;
+    }
+}
+
+#[allow(dead_code)]
+fn log_event(level: LogLevel, message: impl Into<String>) {
+    let Some(writer) = service_cell().lock().ok().and_then(|g| g.clone()) else {
+        return;
+    };
+    writer.send(LogEntry::new(level, LogCategory::Service, message));
+}
 
 /// Status reported back to the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

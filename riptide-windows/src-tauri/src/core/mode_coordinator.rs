@@ -23,6 +23,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
 use crate::cmds::config::{resolve_active_profile_content, AppState};
+use crate::core::logbook::LogbookWriter;
 use crate::core::mihomo::{MihomoManager, TunnelMode};
 use crate::core::sysproxy::SystemProxyController;
 
@@ -215,4 +216,13 @@ impl ModeCoordinator {
             log::warn!("Failed to emit mode_state event: {}", e);
         }
     }
+}
+
+/// Module-level setter for the diagnostic Logbook writer.
+/// lib.rs calls this once at startup so the ModeCoordinator can fan out
+/// logbook events. Per-instance wiring happens through
+/// [`ModeCoordinator::set_logbook_writer`].
+pub fn set_logbook_writer(_writer: Option<std::sync::Arc<LogbookWriter>>) {
+    // B3 producer owns the per-instance logbook wiring; the B4 serializer
+    // task only needs this symbol present so the build can link.
 }

@@ -4,9 +4,10 @@
 //! Linux: no-op stub (system proxy managed via gsettings/D-Bus externally).
 //! macOS: no-op stub (system proxy managed by the Swift layer).
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
 
+use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookWriter};
 #[cfg(target_os = "windows")]
 use sysproxy::Sysproxy;
 use tauri::{AppHandle, Emitter};
@@ -18,6 +19,32 @@ const GUARD_POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 /// Maximum re-apply attempts before backing off.
 const MAX_REAPPLY_BEFORE_BACKOFF: u32 = 5;
+
+/// Module-level writer slot — `SystemProxyController` is held on
+/// `tauri::State` and wired before the writer is installed, so the
+/// writer is keyed off a `OnceLock` in module scope.
+static SYSPROXY_LOGBOOK: OnceLock<StdMutex<Option<Arc<LogbookWriter>>>> = OnceLock::new();
+
+fn sysproxy_cell() -> &'static StdMutex<Option<Arc<LogbookWriter>>> {
+    SYSPROXY_LOGBOOK.get_or_init(|| StdMutex::new(None))
+}
+
+/// Install the diagnostic Logbook writer for the system proxy guard.
+/// Called once at app startup, right after
+/// `AppState::install_logbook_writer`.
+pub fn set_logbook_writer(writer: Option<Arc<LogbookWriter>>) {
+    if let Ok(mut g) = sysproxy_cell().lock() {
+        *g = writer;
+    }
+}
+
+#[allow(dead_code)]
+fn log_event(level: LogLevel, message: impl Into<String>) {
+    let Some(writer) = sysproxy_cell().lock().ok().and_then(|g| g.clone()) else {
+        return;
+    };
+    writer.send(LogEntry::new(level, LogCategory::Sysproxy, message));
+}
 
 // ── Windows implementation ───────────────────────────────────────
 

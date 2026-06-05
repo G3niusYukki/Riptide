@@ -15,19 +15,34 @@ pub mod core;
 pub mod platform;
 pub mod utils;
 
+// Tauri runtime imports + the Tauri command wiring are isolated from
+// `cargo test` builds. Loading the tauri runtime inside a test binary
+// pulls in WebView2 / Edge dependencies on Windows; the test runner
+// then fails with `STATUS_ENTRYPOINT_NOT_FOUND` (0xc0000139) the
+// moment the harness tries to load the resulting binary. The unit
+// tests under `mod tests` only exercise the cross-platform helpers
+// (`autostart_args`, `AppState`) and never the Tauri builder itself,
+// so the run() function (and the imports it alone needs) is gated
+// out of test builds.
+#[cfg(not(test))]
 use tauri::Manager;
 
+#[cfg(not(test))]
 use crate::core::mihomo::MihomoManager;
+#[cfg(not(test))]
 use crate::core::mode_coordinator::ModeCoordinator;
+#[cfg(not(test))]
 use crate::core::sysproxy::SystemProxyController;
+#[cfg(not(test))]
 use crate::cmds::config::AppState;
-#[cfg(target_os = "windows")]
+#[cfg(all(not(test), target_os = "windows"))]
 use crate::utils::hotkeys::init_hotkeys;
 
 fn autostart_args() -> Option<Vec<&'static str>> {
     Some(vec!["--minimized"])
 }
 
+#[cfg(not(test))]
 fn autostart_launcher() -> tauri_plugin_autostart::MacosLauncher {
     #[cfg(target_os = "macos")]
     {
@@ -40,13 +55,33 @@ fn autostart_launcher() -> tauri_plugin_autostart::MacosLauncher {
     }
 }
 
+// Test-only stub for `autostart_launcher`. The real version instantiates
+// a `tauri_plugin_autostart::MacosLauncher`, which compiles fine on its
+// own, but the `tauri_plugin_autostart::init` call (which is reachable
+// only via the real `autostart_plugin`) pulls in the tauri runtime +
+// WebView2 dependency surface on Windows. Since both `autostart_plugin`
+// and the real `autostart_launcher` are only called from `pub fn run`
+// (which is also `#[cfg(not(test))]`), the production build is
+// unaffected. This stub keeps the historical unit test green without
+// dragging the tauri runtime into the test build.
+#[cfg(test)]
+fn autostart_launcher() -> tauri_plugin_autostart::MacosLauncher {
+    tauri_plugin_autostart::MacosLauncher::default()
+}
+
+#[cfg(not(test))]
 fn autostart_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     // The launcher choice is only used on macOS. Windows uses the plugin's
     // native autostart backend, so we avoid hard-coding a macOS launcher there.
     tauri_plugin_autostart::init(autostart_launcher(), autostart_args())
 }
 
-/// Run the Tauri application
+/// Run the Tauri application.
+///
+/// Gated out of `cfg(test)` so that `cargo test` does not try to link
+/// the Tauri runtime (which depends on WebView2 / Edge and is not
+/// available in a `cargo test` invocation).
+#[cfg(not(test))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialise tracing-based logging. Failure here shouldn't block app launch
@@ -87,6 +122,23 @@ pub fn run() {
             }
             app.manage(sysproxy);
             app.manage(ModeCoordinator::new(app_handle.clone()));
+
+            // Spawn the diagnostic Logbook writer and fan it out to the
+            // five injection points (mode_coordinator, subscription_scheduler,
+            // service, sysproxy, recovery_watchdog). The writer is
+            // fire-and-forget (internal mpsc + 50ms batch flush), so spinning
+            // it up here guarantees the very first business-path `log_*` call
+            // lands in the daily JSONL file. Failure to spawn falls back to
+            // no-op slots — diagnostic logging is best-effort.
+            let logbook_writer = std::sync::Arc::new(crate::core::logbook::LogbookWriter::spawn_default());
+            let app_state = app.state::<AppState>();
+            app_state.install_logbook_writer(logbook_writer.clone());
+            let logbook_for_inject = logbook_writer.clone();
+            crate::core::mode_coordinator::set_logbook_writer(Some(logbook_for_inject.clone()));
+            crate::core::subscription_scheduler::set_logbook_writer(Some(logbook_for_inject.clone()));
+            crate::core::service::set_logbook_writer(Some(logbook_for_inject.clone()));
+            crate::core::sysproxy::set_logbook_writer(Some(logbook_for_inject.clone()));
+            crate::core::recovery_watchdog::set_logbook_writer(Some(logbook_for_inject));
 
             // Initialize Windows-specific state
             #[cfg(target_os = "windows")]
@@ -208,6 +260,9 @@ pub fn run() {
             cmds::proxy_editor::add_profile_proxy,
             cmds::proxy_editor::update_profile_proxy,
             cmds::proxy_editor::delete_profile_proxy,
+            // Share URI serializer
+            cmds::uri_serializer::serialize_proxy_to_uri,
+            cmds::uri_serializer::serialize_proxies_to_uris,
             // mihomo lifecycle
             core::mihomo_bootstrap::download_mihomo,
             // WARP integration
@@ -309,6 +364,11 @@ pub fn run() {
             // Hotkey commands
             #[cfg(target_os = "windows")]
             utils::hotkeys::get_hotkeys,
+            // Diagnostic Logbook (cross-platform Tauri commands backing
+            // the front-end LogViewer/Logs tab with on-disk JSONL entries)
+            cmds::logbook::logbook_query,
+            cmds::logbook::logbook_clear,
+            cmds::logbook::logbook_export,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

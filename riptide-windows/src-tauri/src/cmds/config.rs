@@ -9,13 +9,20 @@ use crate::config::active_state;
 use crate::config::parser::parse_clash_config;
 use crate::config::profile_meta::{self, ProfileMetadata, DEFAULT_UPDATE_INTERVAL_SECS};
 use crate::config::profiles::{Profile, ValidationResult};
+use crate::core::logbook::LogbookWriter;
 use tauri::State;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-/// In-memory cache of the disk-backed profile list plus the active profile id.
+/// In-memory cache of the disk-backed profile list plus the active profile id,
+/// plus the diagnostic Logbook writer (installed at startup, optional).
 pub struct AppState {
     pub profiles: Mutex<Vec<Profile>>,
     pub active_profile_id: Mutex<Option<String>>,
+    /// Fire-and-forget Logbook writer. `None` only during very early
+    /// startup before `install_logbook_writer` runs, or in unit tests
+    /// that never spin up a writer. Injection points must therefore
+    /// treat this as optional (see `set_logbook_writer` on each module).
+    pub logbook_writer: Mutex<Option<Arc<LogbookWriter>>>,
 }
 
 impl AppState {
@@ -23,7 +30,16 @@ impl AppState {
         Self {
             profiles: Mutex::new(Vec::new()),
             active_profile_id: Mutex::new(None),
+            logbook_writer: Mutex::new(None),
         }
+    }
+
+    /// Install the diagnostic Logbook writer. Called once at app
+    /// startup, after `WindowsDirs::ensure_dirs()` succeeds. The writer
+    /// is then fanned out to the five injection points via
+    /// `crate::core::<module>::set_logbook_writer`.
+    pub fn install_logbook_writer(&self, writer: Arc<LogbookWriter>) {
+        *self.logbook_writer.lock().unwrap() = Some(writer);
     }
 
     /// Restore the active profile pointer from disk. Called once at app
