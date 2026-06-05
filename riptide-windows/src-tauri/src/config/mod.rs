@@ -8,3 +8,4 @@ pub mod profiles;
 pub mod rewrite;
 pub mod rules;
 pub mod uri;
+pub mod uri_serializer;

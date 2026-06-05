@@ -226,3 +226,52 @@ pub fn set_logbook_writer(_writer: Option<std::sync::Arc<LogbookWriter>>) {
     // B3 producer owns the per-instance logbook wiring; the B4 serializer
     // task only needs this symbol present so the build can link.
 }
+
+#[cfg(test)]
+mod tests {
+    //! Pure-logic tests for the `AppMode` state machine. The full
+    //! transition path (`switch_to_system_proxy` / `switch_to_tun` /
+    //! `switch_off`) requires a live `AppHandle` + `MihomoManager`
+    //! + `SystemProxyController`, so it's covered by the B1+ integration
+    //! harness; the tests here lock down the bits the integration
+    //! tests implicitly rely on: the enum shape, the default, the
+    //! on-the-wire JSON form, and the internal logbook naming.
+
+    use super::AppMode;
+
+    #[test]
+    fn app_mode_default_is_off() {
+        // Default is the only state in which the UI badge reads "Off"
+        // and the system proxy is guaranteed not to be in flight. Any
+        // change to this invariant breaks the dashboard's first paint.
+        assert_eq!(AppMode::default(), AppMode::Off);
+    }
+
+    #[test]
+    fn app_mode_serializes_to_snake_case() {
+        // The frontend (`mode_state` event payload) parses these as
+        // JSON strings; the wire format MUST stay snake_case.
+        assert_eq!(
+            serde_json::to_string(&AppMode::Off).unwrap(),
+            "\"off\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AppMode::SystemProxy).unwrap(),
+            "\"system_proxy\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AppMode::Tun).unwrap(),
+            "\"tun\""
+        );
+    }
+
+    #[test]
+    fn app_mode_logbook_str_is_stable() {
+        // The logbook writer stores the mode as a string in the daily
+        // JSONL. Changing these values breaks log search and any
+        // downstream analytics the user has built on top of the file.
+        assert_eq!(AppMode::Off.logbook_str(), "off");
+        assert_eq!(AppMode::SystemProxy.logbook_str(), "system_proxy");
+        assert_eq!(AppMode::Tun.logbook_str(), "tun");
+    }
+}

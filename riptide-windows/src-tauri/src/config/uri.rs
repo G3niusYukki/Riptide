@@ -35,8 +35,10 @@ pub fn parse_share_uri(uri: &str) -> Result<ClashRawProxy, UriParseError> {
         parse_vless(rest)
     } else if let Some(rest) = uri.strip_prefix("vmess://") {
         parse_vmess(rest)
-    } else if let Some(rest) = uri.strip_prefix("hysteria2://") {
+    } else     if let Some(rest) = uri.strip_prefix("hysteria2://") {
         parse_hysteria2(rest)
+    } else if let Some(rest) = uri.strip_prefix("tuic://") {
+        parse_tuic(rest)
     } else {
         Err(UriParseError::InvalidScheme(
             uri.chars()
@@ -309,6 +311,34 @@ fn parse_hysteria2(rest: &str) -> Result<ClashRawProxy, UriParseError> {
         server: Some(server.to_string()),
         port: Some(port),
         proxy_type: Some("hysteria2".into()),
+        password: Some(password.to_string()),
+        sni,
+        skip_cert_verify,
+        udp: Some(true),
+        ..Default::default()
+    })
+}
+
+/// Parse TUIC URI: tuic://uuid:password@server:port?query#name
+fn parse_tuic(rest: &str) -> Result<ClashRawProxy, UriParseError> {
+    let (body, name) = split_fragment(rest);
+    let (userinfo, host_rest) = body.split_once('@')
+        .ok_or_else(|| UriParseError::MissingField("uuid:password@server:port".into()))?;
+    let (uuid, password) = userinfo.split_once(':')
+        .ok_or_else(|| UriParseError::MissingField("uuid:password".into()))?;
+    let (host_port, query) = host_rest.split_once('?').unwrap_or((host_rest, ""));
+    let (server, port_str) = host_port.split_once(':')
+        .ok_or_else(|| UriParseError::MissingField("server:port".into()))?;
+    let port: u16 = port_str.parse().map_err(|_| UriParseError::InvalidPort(port_str.into()))?;
+    let params = parse_query_params(query);
+    let sni = params.get("sni").cloned();
+    let skip_cert_verify = params.get("allowInsecure").map(|v| v == "1");
+    Ok(ClashRawProxy {
+        name: name.unwrap_or_else(|| format!("TUIC-{}-{}", server, port)),
+        server: Some(server.to_string()),
+        port: Some(port),
+        proxy_type: Some("tuic".into()),
+        uuid: Some(uuid.to_string()),
         password: Some(password.to_string()),
         sni,
         skip_cert_verify,
