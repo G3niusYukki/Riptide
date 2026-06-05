@@ -162,18 +162,27 @@ struct LogbookStoreTests {
     func querySkipsMalformed() async throws {
         let (store, dir) = try await makeStore()
         defer { cleanup(dir) }
-        try await store.append(makeEvent(message: "ok-1"))
-        try await store.append(makeEvent(message: "ok-2"))
+        // Pin every event to the same timestamp so all three land in the
+        // same UTC-day file regardless of how slow the test runner is.
+        let pinned = Date()
+        try await store.append(makeEvent(message: "ok-1", at: pinned))
+        try await store.append(makeEvent(message: "ok-2", at: pinned))
         try await store.flush()
+        // Filter to JSONL files only — the directory listing on macOS may
+        // include other entries (e.g. `.DS_Store`), and `contentsOfDirectory`
+        // makes no order guarantee, so `files[0]` is not portable.
         let files = try FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil
         )
-        let today = files[0]
+        guard let today = files.first(where: { $0.pathExtension == "jsonl" }) else {
+            Issue.record("expected a .jsonl file in \(dir.path)")
+            return
+        }
         let handle = try FileHandle(forWritingTo: today)
         try handle.seekToEnd()
         try handle.write(contentsOf: Data("\nnot-json\n".utf8))
         try handle.close()
-        try await store.append(makeEvent(message: "ok-3"))
+        try await store.append(makeEvent(message: "ok-3", at: pinned))
         try await store.flush()
         let results = try await store.query(.last24h())
         #expect(results.count == 3)
