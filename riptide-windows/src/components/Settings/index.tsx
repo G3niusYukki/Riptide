@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getVersion } from '@tauri-apps/api/app';
 import { NetworkTab } from './NetworkTab';
 import { DnsTab } from './DnsTab';
 import { SyncTab } from './SyncTab';
@@ -13,7 +14,11 @@ import { SUPPORTED_LANGUAGES } from '../../i18n';
 import i18n from '../../i18n';
 import * as tauri from '../../services/tauri';
 
-type Tab = 'network' | 'dns' | 'rewrite' | 'gateway' | 'sync' | 'assets' | 'recovery' | 'diagnostics' | 'appearance' | 'about';
+// NOTE: 'diagnostics' was removed (A1.1). It used to render <RecoveryTab/>,
+// which was a copy-paste mistake. The real diagnostics view (Logbook UI) is
+// scheduled for Phase C (C1 in WINDOWS-CATCHUP-PLAN.md) and will re-add a
+// proper DiagnosticsTab then.
+type Tab = 'network' | 'dns' | 'rewrite' | 'gateway' | 'sync' | 'assets' | 'recovery' | 'appearance' | 'about';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -28,6 +33,27 @@ export function SettingsPage() {
     void i18n.changeLanguage(code);
   };
 
+  // Read the real app version from Tauri (sourced from tauri.conf.json /
+  // Cargo.toml at build time). The version is fixed for a given binary, so a
+  // single mount-time fetch is enough. We fall back to an em-dash if the call
+  // somehow fails (e.g. running outside the Tauri runtime in dev tests).
+  const [appVersion, setAppVersion] = useState<string>('—');
+  useEffect(() => {
+    let cancelled = false;
+    void getVersion()
+      .then((v) => {
+        if (!cancelled) setAppVersion(v);
+      })
+      .catch((e) => {
+        // Surface to console so a future regression isn't silent, but don't
+        // block the About panel — the em-dash is informative enough.
+        console.error('Failed to read app version:', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'network', label: '网络' },
     { id: 'dns', label: 'DNS' },
@@ -36,7 +62,6 @@ export function SettingsPage() {
     { id: 'sync', label: '同步' },
     { id: 'assets', label: '资源' },
     { id: 'recovery', label: '恢复' },
-    { id: 'diagnostics', label: '诊断' },
     { id: 'appearance', label: '外观' },
     { id: 'about', label: '关于' },
   ];
@@ -68,7 +93,6 @@ export function SettingsPage() {
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
-      {active === 'diagnostics' && <RecoveryTab />}
       {active === 'appearance' && <AppearanceSettings />}
       {active === 'about' && (
         <div className="space-y-3">
@@ -107,7 +131,7 @@ export function SettingsPage() {
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
             <h3 className="text-lg font-semibold text-slate-100 mb-3">{t('settings.about')}</h3>
             <div className="text-xs text-slate-400 space-y-1.5">
-              <p className="font-medium text-slate-300">Riptide v2.0.0</p>
+              <p className="font-medium text-slate-300">Riptide v{appVersion}</p>
               <p>{t('settings.aboutText')}</p>
               <p className="text-slate-600">© 2026 Riptide Team</p>
               <button
