@@ -1,0 +1,113 @@
+# riptide-windows CI
+# Phase B / B2.1 — runs on every PR and push to master.
+#
+# Pipeline:
+#   1. checkout
+#   2. setup-node 20 (with npm cache keyed on package-lock.json)
+#   3. dtolnay/rust-toolchain@stable (1.75+)
+#   4. Swatinem/rust-cache@v2 (cargo target/ + ~/.cargo)
+#   5. npm ci
+#   6. cargo fmt --all -- --check
+#   7. cargo clippy --all-targets -- -D warnings
+#   8. cargo test
+#   9. npm run tsc -- --noEmit
+#  10. npm run test   (vitest run)
+#
+# Target wall time: < 12 min on windows-latest.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# Cancel in-flight runs on the same ref so PR pushes don't queue
+# up behind stale runs on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+
+jobs:
+  ci:
+    name: Build · Lint · Test (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: riptide-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: riptide-windows/package-lock.json
+
+      - name: Install Rust stable (>= 1.75)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: riptide-windows/src-tauri
+          shared-key: riptide-windows-cargo
+
+      - name: Show toolchain versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+          cargo --version
+          rustc --version
+
+      - name: npm ci
+        run: npm ci
+
+      # ── Rust checks ──────────────────────────────────────────
+      - name: cargo fmt --all -- --check
+        working-directory: riptide-windows/src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy --all-targets -- -D warnings
+        working-directory: riptide-windows/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: riptide-windows/src-tauri
+        run: cargo test --all --no-fail-fast
+
+      # ── Frontend checks ──────────────────────────────────────
+      - name: npm run tsc -- --noEmit
+        run: npm run tsc -- --noEmit
+
+      - name: npm run test (vitest)
+        run: npm run test
+
+      - name: Upload cargo test logs on failure
+        if: failure()
+        working-directory: riptide-windows/src-tauri
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-test-logs
+          path: |
+            target/test-results/**/*.log
+            target/debug/deps/**/*.dmp
+          if-no-files-found: ignore
+          retention-days: 7

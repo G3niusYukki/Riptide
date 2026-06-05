@@ -11,8 +11,8 @@
 > **Roadmap context**: this file ships as part of Phase A of
 > [`../docs/WINDOWS-CATCHUP-PLAN.md`](../docs/WINDOWS-CATCHUP-PLAN.md) — the
 > 12-week plan to bring Windows to parity with macOS v2.4.1. The catchup
-> plan is the source of truth for *what* is being built; this file is the
-> source of truth for *how* to build it on Windows.
+> plan is the source of truth for _what_ is being built; this file is the
+> source of truth for _how_ to build it on Windows.
 
 ---
 
@@ -71,19 +71,19 @@ gaps by inventing a Windows-only shortcut.
 
 ## 2. Environment & Toolchain
 
-| Item | Value | Notes |
-|---|---|---|
-| Windows version | **Windows 10 1809+** | WebView2 is required; Win 7 is not supported and the installer does not ship an offline WebView2 bootstrapper. |
-| Node.js | **20 LTS or newer** | `package.json` scripts assume Node 20+. `engines` is not currently enforced — fix it before bumping. |
-| Rust toolchain | **1.75+** stable | `cargo --version` must be ≥ 1.75. Use `rustup default stable`; do not pin to a specific patch unless CI is broken. |
-| Tauri | **2.10.x** (both JS and Rust) | The JS and Rust minor versions **must agree** — see § 5. |
-| WebView2 | shipped with Win 11; bootstrapper on Win 10 | Configured via `tauri.conf.json → bundle.windows.webviewInstallMode = "downloadBootstrapper"`. |
-| MSVC build tools | required for Rust on Windows | Install via the Visual Studio Build Tools 2022 workload "Desktop development with C++". |
-| WiX Toolset | 3.x | Required for MSI bundling. Tauri downloads WiX automatically; ensure corporate proxies do not block the GitHub download. |
-| NSIS | 3.x | Required for NSIS bundling. Tauri downloads NSIS automatically. |
+| Item             | Value                                       | Notes                                                                                                                    |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Windows version  | **Windows 10 1809+**                        | WebView2 is required; Win 7 is not supported and the installer does not ship an offline WebView2 bootstrapper.           |
+| Node.js          | **20 LTS or newer**                         | `package.json` scripts assume Node 20+. `engines` is not currently enforced — fix it before bumping.                     |
+| Rust toolchain   | **1.75+** stable                            | `cargo --version` must be ≥ 1.75. Use `rustup default stable`; do not pin to a specific patch unless CI is broken.       |
+| Tauri            | **2.10.x** (both JS and Rust)               | The JS and Rust minor versions **must agree** — see § 5.                                                                 |
+| WebView2         | shipped with Win 11; bootstrapper on Win 10 | Configured via `tauri.conf.json → bundle.windows.webviewInstallMode = "downloadBootstrapper"`.                           |
+| MSVC build tools | required for Rust on Windows                | Install via the Visual Studio Build Tools 2022 workload "Desktop development with C++".                                  |
+| WiX Toolset      | 3.x                                         | Required for MSI bundling. Tauri downloads WiX automatically; ensure corporate proxies do not block the GitHub download. |
+| NSIS             | 3.x                                         | Required for NSIS bundling. Tauri downloads NSIS automatically.                                                          |
 
 > **First-time setup gotcha**: if `cargo build` fails with `link.exe not
-> found`, the MSVC toolchain is not on `PATH`. Open the "x64 Native Tools
+found`, the MSVC toolchain is not on `PATH`. Open the "x64 Native Tools
 > Command Prompt for VS 2022" or run `vcvars64.bat` before invoking
 > Cargo.
 
@@ -250,11 +250,13 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
 # TypeScript / ESLint / Prettier
-npm run lint      # alias if present; otherwise use eslint directly
+npm run lint          # eslint --max-warnings=0
+npm run format:check  # prettier --check .
+npm run format        # prettier --write .
 ```
 
-CI (Phase B § 3 B2.1) fails on any of: clippy warning, rustfmt diff,
-`tsc` error, or vitest failure.
+CI (see § 11) fails on any of: clippy warning, rustfmt diff, `tsc`
+error, ESLint warning, prettier diff, or vitest failure.
 
 ---
 
@@ -265,13 +267,13 @@ Rust `tauri` crate to share the same minor version**. If they drift, the
 generated IPC bindings desync and `tauri build` either panics at codegen
 time or, worse, silently produces a bundle that crashes at runtime.
 
-| File | Field | Required value (as of v2.4.1) |
-|---|---|---|
-| `package.json` | `dependencies."@tauri-apps/api"` | `"~2.10"` (caret-tilde; allows patches) |
-| `package.json` | `devDependencies."@tauri-apps/cli"` | `"^2"` (caret; tracks minor) |
-| `src-tauri/Cargo.toml` | `dependencies.tauri` | `=2.10` (exact minor pin) |
-| `src-tauri/Cargo.toml` | `build-dependencies.tauri-build` | `=2.10` |
-| `src-tauri/Cargo.toml` | `dependencies.tauri-plugin-*` | `=2.10` (all eight plugins) |
+| File                   | Field                               | Required value (as of v2.4.1)           |
+| ---------------------- | ----------------------------------- | --------------------------------------- |
+| `package.json`         | `dependencies."@tauri-apps/api"`    | `"~2.10"` (caret-tilde; allows patches) |
+| `package.json`         | `devDependencies."@tauri-apps/cli"` | `"^2"` (caret; tracks minor)            |
+| `src-tauri/Cargo.toml` | `dependencies.tauri`                | `=2.10` (exact minor pin)               |
+| `src-tauri/Cargo.toml` | `build-dependencies.tauri-build`    | `=2.10`                                 |
+| `src-tauri/Cargo.toml` | `dependencies.tauri-plugin-*`       | `=2.10` (all eight plugins)             |
 
 **Rules:**
 
@@ -471,21 +473,170 @@ npm run tauri build
 
 ## 10. Known Limitations
 
-| Limitation | Why | Workaround |
-|---|---|---|
-| **Windows 7 not supported** | Tauri 2 requires WebView2, which Microsoft never shipped for Win 7. | Document the Win 10 1809 floor in README; the MSI bootstrapper auto-installs WebView2 on Win 10. |
-| **TUN mode requires `wintun.dll`** | mihomo's gVisor stack depends on the wintun userspace driver. | Ship `wintun.dll` next to `riptide.exe` and next to `mihomo.exe`; the installer copies both. |
-| **One UAC prompt on first TUN install** | The SCM-registered service must be installed as `SYSTEM`. | Show a one-shot "Install TUN Service" button in onboarding; subsequent launches are silent. |
-| **Hotkey conflicts** | `Ctrl+Alt+P` and `Ctrl+Alt+M` are popular with other apps. | `global-hotkey` returns false on conflict; we surface a toast and fall back to UI-only. |
-| **System proxy drift** | Other apps (Spotify, OneDrive) reset the WinHTTP proxy. | `system_proxy` 3-second drift detector auto-restores. Tunable in `Settings → Network`. |
-| **Auto-updater requires signing keypair** | Tauri 2 mandates `pubkey` in `tauri.conf.json`. | Phase D § 5 D5 generates the keypair and wires the CI secret. Until then, the in-app `check_update` opens the browser instead of auto-installing. |
-| **`MIHOMO_SHA256` must be filled** | Empty string disables verification (dev-only). | `core/mihomo_bootstrap.rs:35` is the pin; never tag a release with an empty hash. |
-| **Cargo test platform shim** | `platform/*_linux.rs` exist to make the crate compile on Linux CI hosts. | They contain no-op or stub implementations; do not call them from non-`#[cfg(target_os = "linux")]` code. |
-| **iOS / Linux desktop distribution** | Explicitly out of scope (top-level AGENTS.md). | Linux `cargo check` keeps the crate compiling; no packaging. |
+| Limitation                                | Why                                                                      | Workaround                                                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Windows 7 not supported**               | Tauri 2 requires WebView2, which Microsoft never shipped for Win 7.      | Document the Win 10 1809 floor in README; the MSI bootstrapper auto-installs WebView2 on Win 10.                                                  |
+| **TUN mode requires `wintun.dll`**        | mihomo's gVisor stack depends on the wintun userspace driver.            | Ship `wintun.dll` next to `riptide.exe` and next to `mihomo.exe`; the installer copies both.                                                      |
+| **One UAC prompt on first TUN install**   | The SCM-registered service must be installed as `SYSTEM`.                | Show a one-shot "Install TUN Service" button in onboarding; subsequent launches are silent.                                                       |
+| **Hotkey conflicts**                      | `Ctrl+Alt+P` and `Ctrl+Alt+M` are popular with other apps.               | `global-hotkey` returns false on conflict; we surface a toast and fall back to UI-only.                                                           |
+| **System proxy drift**                    | Other apps (Spotify, OneDrive) reset the WinHTTP proxy.                  | `system_proxy` 3-second drift detector auto-restores. Tunable in `Settings → Network`.                                                            |
+| **Auto-updater requires signing keypair** | Tauri 2 mandates `pubkey` in `tauri.conf.json`.                          | Phase D § 5 D5 generates the keypair and wires the CI secret. Until then, the in-app `check_update` opens the browser instead of auto-installing. |
+| **`MIHOMO_SHA256` must be filled**        | Empty string disables verification (dev-only).                           | `core/mihomo_bootstrap.rs:35` is the pin; never tag a release with an empty hash.                                                                 |
+| **Cargo test platform shim**              | `platform/*_linux.rs` exist to make the crate compile on Linux CI hosts. | They contain no-op or stub implementations; do not call them from non-`#[cfg(target_os = "linux")]` code.                                         |
+| **iOS / Linux desktop distribution**      | Explicitly out of scope (top-level AGENTS.md).                           | Linux `cargo check` keeps the crate compiling; no packaging.                                                                                      |
 
 ---
 
-## 11. Pointers to the Catchup Plan
+## 11. CI Workflows
+
+The Windows subtree ships **three** GitHub Actions workflows under
+`riptide-windows/.github/workflows/`. They are intentionally
+self-contained: a contributor who clones only `riptide-windows/`
+should be able to copy the workflows into a fork and get green
+checkmarks on a PR without pulling the rest of the monorepo.
+
+| File          | Triggers                                    | Purpose                                                             | Target wall time    |
+| ------------- | ------------------------------------------- | ------------------------------------------------------------------- | ------------------- |
+| `ci.yml`      | PR + push to `master` + manual              | Build · lint · test on `windows-latest`                             | **< 12 min**        |
+| `release.yml` | `v*.*.*` tag push + manual `inputs.version` | Build NSIS + MSI for `x64` and `arm64`, publish a GitHub Release    | **< 25 min / arch** |
+| `lint.yml`    | PR + manual                                 | Fast pre-merge feedback: rustfmt + clippy + tsc + eslint + prettier | **< 5 min**         |
+
+PR descriptions are standardized via
+`riptide-windows/.github/pull_request_template.md` — it forces the
+contributor to tick the "Tauri minor version" box (see § 5) and the
+test/lint boxes that map 1-to-1 onto the steps below.
+
+### 11.1 `ci.yml` — continuous integration
+
+Runs **one** job, `ci`, on `windows-latest` with a 15-minute timeout.
+Steps, in order:
+
+1. `actions/checkout@v4` with `fetch-depth: 0` (full git history
+   enables changelog tools).
+2. `actions/setup-node@v4` (Node 20) with `cache: npm` keyed on
+   `riptide-windows/package-lock.json`.
+3. `dtolnay/rust-toolchain@stable` (1.75+) with
+   `components: rustfmt, clippy`.
+4. `Swatinem/rust-cache@v2` with `workspaces:
+riptide-windows/src-tauri` and `shared-key: riptide-windows-cargo`
+   (shared across `ci.yml`, `release.yml`, `lint.yml`).
+5. `npm ci` (locked install — never `npm install`).
+6. `cargo fmt --all -- --check`.
+7. `cargo clippy --all-targets -- -D warnings`.
+8. `cargo test --all --no-fail-fast` (all suites, fail on the first
+   failure per suite; keeps the log readable).
+9. `npm run tsc -- --noEmit` (TypeScript type-check, no emit).
+10. `npm run test` (vitest run).
+
+A `concurrency` block cancels in-flight runs on the same ref so that
+pushing twice to the same branch does not queue up a stale run. On
+failure, the `target/test-results/` and `target/debug/deps/*.dmp`
+artifacts are uploaded for forensic inspection.
+
+> **Why a single job, not a matrix?** Splitting the pipeline across
+> jobs costs more in setup time and cache duplication than it saves;
+> `windows-latest` is a single SKU. The split between CI and lint
+> (below) is the right level of parallelism.
+
+### 11.2 `release.yml` — tag-driven release
+
+Triggers on `v*.*.*` tag push, or via `workflow_dispatch` with a
+manual `version` input. The pipeline is **two jobs**:
+
+1. **`build`** — runs in a `windows-latest × [x64, arm64]` matrix with
+   `fail-fast: false` so one arch's failure does not silently cancel
+   the other. The cross-compile is done by passing
+   `targets: ${{ matrix.rust_target }}` to
+   `dtolnay/rust-toolchain`. After `npm ci` the job runs
+   `npm run tauri build` (which produces both NSIS `.exe` and
+   `.msi` bundles) and uploads the bundles to a per-arch
+   `upload-artifact@v4` slot keyed on
+   `riptide-windows-${{ matrix.arch_label }}-${{ version }}`.
+
+2. **`publish`** — depends on `build`, runs on `ubuntu-latest` (we
+   only need the GitHub API and a POSIX shell for `sha256sum`).
+   Downloads both per-arch artifacts into `dist/`, flattens them
+   into a single tree, computes `SHA256SUMS.txt`, and hands the
+   files to `softprops/action-gh-release@v2` with
+   `generate_release_notes: true`. Prerelease detection is automatic
+   for tags containing `alpha`, `beta`, or `rc`.
+
+The `concurrency` group is `release-${{ github.ref }}` with
+`cancel-in-progress: false` — releases are never cancelled, only
+superseded by a fresh tag push.
+
+### 11.3 `lint.yml` — fast pre-merge feedback
+
+Triggers on **PR only** (push to `master` is intentionally
+excluded — the cheaper `ci.yml` already covers it). Runs the same
+lint stack as `ci.yml` but **without** `cargo test` or `vitest`, so
+the typical PR gets a green/red lint signal in under five minutes:
+
+1. `cargo fmt --all -- --check`
+2. `cargo clippy --all-targets -- -D warnings`
+3. `npm run tsc -- --noEmit`
+4. `npx eslint . --max-warnings=0`
+5. `npx prettier --check .`
+
+`eslint` and `prettier` are pulled in via `npm ci` against the
+lockfile; the devDependencies `eslint`, `prettier`,
+`@typescript-eslint/parser`,
+`@typescript-eslint/eslint-plugin`, `eslint-plugin-react`, and
+`eslint-plugin-react-hooks` are pinned in `package.json`. The
+configs live at `riptide-windows/.eslintrc.cjs` and
+`riptide-windows/.prettierrc` (with a matching `.prettierignore`).
+
+### 11.4 Cache strategy
+
+All three workflows share the same `Swatinem/rust-cache` key
+prefix family — `riptide-windows-{ci,lint,release-$arch}` — so a
+warm cache from `lint.yml` is reusable by `ci.yml` and
+`release.yml` on the same runner type. `npm` cache is keyed on
+`riptide-windows/package-lock.json` only; **never** key it on
+`package.json` (that defeats the lockfile guarantee).
+
+### 11.5 Tauri signing secrets (release only)
+
+`release.yml` reads two optional secrets:
+
+- `TAURI_SIGNING_PRIVATE_KEY` — PEM-encoded ed25519 key used by
+  Tauri's auto-updater.
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — passphrase for the key.
+
+Both are passed only to the `tauri build` step. The actual installer
+signing cert (Authenticode) is a Phase D concern; `release.yml` will
+grow a `signtool` step once D5 wires the CI secret.
+
+### 11.6 Local reproduction
+
+To mirror CI locally before pushing a PR:
+
+```powershell
+cd riptide-windows
+
+# JS deps (use ci, not install, to match CI exactly)
+npm ci
+
+# Rust checks
+cd src-tauri
+cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all
+cd ..
+
+# Frontend checks
+npm run tsc -- --noEmit
+npm run test
+npm run lint
+npm run format:check
+```
+
+If `npm run format:check` fails, run `npm run format` to autofix
+most formatting issues locally before pushing.
+
+---
+
+## 12. Pointers to the Catchup Plan
 
 This file is a **how to build** reference. For **what to build and in
 what order**, see:

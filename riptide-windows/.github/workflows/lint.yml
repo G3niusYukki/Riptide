@@ -1,0 +1,90 @@
+# riptide-windows Lint
+# Phase B / B2.3 — runs on every PR.
+#
+# Pipeline (in order):
+#   1. rustfmt --check
+#   2. cargo clippy --all-targets -- -D warnings
+#   3. tsc --noEmit
+#   4. eslint
+#   5. prettier --check
+#
+# Target wall time: < 5 min on windows-latest.
+
+name: Lint
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: riptide-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: riptide-windows/package-lock.json
+
+      - name: Install Rust stable (>= 1.75)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: riptide-windows/src-tauri
+          shared-key: riptide-windows-lint
+
+      - name: Show toolchain versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+          cargo --version
+          rustc --version
+
+      - name: npm ci
+        run: npm ci
+
+      # ── Rust lint ─────────────────────────────────────────────
+      - name: cargo fmt --all -- --check
+        working-directory: riptide-windows/src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy --all-targets -- -D warnings
+        working-directory: riptide-windows/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      # ── TypeScript lint ───────────────────────────────────────
+      - name: tsc --noEmit
+        run: npm run tsc -- --noEmit
+
+      - name: eslint
+        run: npm run lint
+
+      - name: prettier --check
+        run: npm run format:check
