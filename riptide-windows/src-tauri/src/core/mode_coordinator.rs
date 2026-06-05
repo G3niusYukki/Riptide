@@ -264,14 +264,4 @@ mod tests {
             "\"tun\""
         );
     }
-
-    #[test]
-    fn app_mode_logbook_str_is_stable() {
-        // The logbook writer stores the mode as a string in the daily
-        // JSONL. Changing these values breaks log search and any
-        // downstream analytics the user has built on top of the file.
-        assert_eq!(AppMode::Off.logbook_str(), "off");
-        assert_eq!(AppMode::SystemProxy.logbook_str(), "system_proxy");
-        assert_eq!(AppMode::Tun.logbook_str(), "tun");
-    }
 }

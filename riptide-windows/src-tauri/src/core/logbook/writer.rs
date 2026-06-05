@@ -353,7 +353,7 @@ mod tests {
             .collect()
     }
 
-    #[tokio::test(flavor = "current_thread", start_paused = false)]
+    #[tokio::test(flavor = "current_thread")]
     async fn writer_writes_jsonl_after_batch_window() {
         let (writer, dir) = fresh_writer("basic");
         writer.log_info("hello", LogCategory::App);

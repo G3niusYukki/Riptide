@@ -246,6 +246,34 @@ mod windows_impl {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        //! `ObservedProxy` projection round-trip.
+        //!
+        //! The drift detector compares `expected` (the value we wrote
+        //! via `enable()`) to `observed` (what `Sysproxy::get_system_proxy`
+        //! reads back from the WinINet registry). The projection MUST
+        //! carry every field — losing `host` or `port` would silently
+        //! turn a real drift into a no-op. We lock that down here so
+        //! the field set can't shrink without a failing test.
+
+        use super::*;
+
+        #[test]
+        fn observed_proxy_projects_all_fields() {
+            let raw = Sysproxy {
+                enable: true,
+                host: "127.0.0.1".to_string(),
+                port: 7890,
+                bypass: "<local>".to_string(),
+            };
+            let observed = ObservedProxy::from(&raw);
+            assert!(observed.enable);
+            assert_eq!(observed.host, "127.0.0.1");
+            assert_eq!(observed.port, 7890);
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -275,4 +303,47 @@ impl SystemProxyController {
     pub async fn is_enabled(&self) -> bool { false }
 
     pub fn get_current_proxy() -> anyhow::Result<()> { Ok(()) }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Cross-platform shape tests for the `SystemProxyController`
+    //! surface. The actual Windows registry writes (`enable` / `disable`)
+    //! hit the live WinINet config and are intentionally not unit-tested
+    //! here — those paths are covered by the manual QA matrix in
+    //! `docs/WINDOWS-CATCHUP-PLAN.md` § B1.3. The tests below lock down
+    //! the bits that have caused regressions in the past: the
+    //! non-Windows stub's "always-disabled" invariant and the
+    //! Windows-only `ObservedProxy` projection from a `Sysproxy` value
+    //! (the drift detector compares this shape against what the
+    //! registry actually says).
+
+    #[cfg(not(target_os = "windows"))]
+    use super::SystemProxyController;
+
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn non_windows_stub_starts_disabled() {
+        // The Linux/macOS stub is used when compiling on CI hosts and
+        // for cross-platform dev. A fresh controller must report
+        // "not enabled" so the UI's first paint doesn't falsely claim
+        // the system proxy is active.
+        let controller = SystemProxyController::new();
+        assert!(!controller.is_enabled().await);
+    }
+
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn non_windows_stub_enable_and_disable_are_idempotent() {
+        // On non-Windows, `enable` / `disable` are no-ops that return
+        // `Ok(())`. The state bit must not flip — the controller is a
+        // pure log-only stub. This guards against an accidental
+        // platform-specific regression where someone "fixed" the
+        // stub to track state and broke cross-platform builds.
+        let controller = SystemProxyController::new();
+        controller.enable(7890, Some(7891)).await.unwrap();
+        assert!(!controller.is_enabled().await, "stub must not track enable state");
+        controller.disable().await.unwrap();
+        assert!(!controller.is_enabled().await, "stub must not track disable state");
+    }
 }
