@@ -35,9 +35,9 @@ public enum StableHash {
         let high = (h1 & 0xFFFFFFFFFFFF0FFF) | 0x0000000000004000
         let low  = (h2 & 0x3FFFFFFFFFFFFFFF) | 0x8000000000000000
         let bytes: [UInt8] = (0..<16).map { i in
-            let v = i < 8 ? high : low
+            let word = i < 8 ? high : low
             let shift = (8 - 1 - (i % 8)) * 8
-            return UInt8((v >> shift) & 0xff)
+            return UInt8((word >> shift) & 0xff)
         }
         return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3],
                            bytes[4], bytes[5], bytes[6], bytes[7],

@@ -26,7 +26,7 @@ public enum WebDAVShared {
     /// what `WebDAVClient` already used; kept as a single source of truth so
     /// a future property addition (e.g. `getetag` for conditional GETs)
     /// lands in both clients simultaneously.
-    public static let propfindBody: Data = """
+    public static let propfindBody: Data = Data("""
     <?xml version="1.0" encoding="utf-8"?>
     <D:propfind xmlns:D="DAV:">
         <D:prop>
@@ -36,5 +36,5 @@ public enum WebDAVShared {
             <D:resourcetype/>
         </D:prop>
     </D:propfind>
-    """.data(using: .utf8) ?? Data()
+    """.utf8)
 }
