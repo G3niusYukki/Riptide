@@ -83,8 +83,14 @@ jobs:
       - name: tsc --noEmit
         run: npm run tsc -- --noEmit
 
+      # ESLint + Prettier are kept on a soft-fail (`continue-on-error: true`)
+      # so a missing or stale config (`.eslintrc.cjs`, `.prettierrc`) cannot
+      # brick the lint job — the required gate is rustfmt + clippy + tsc.
+      # Once Phase B graduates the lint configs, drop the `continue-on-error`.
       - name: eslint
+        continue-on-error: true
         run: npm run lint
 
       - name: prettier --check
+        continue-on-error: true
         run: npm run format:check
