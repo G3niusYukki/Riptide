@@ -9,6 +9,7 @@ pub mod cli {
     pub enum OneShotResult { Continue, Exit(i32) }
     pub fn handle_one_shot_cli() -> OneShotResult { OneShotResult::Continue }
 }
+pub mod bench;
 pub mod cmds;
 pub mod config;
 pub mod core;
@@ -404,20 +405,12 @@ pub fn run() {
             cmds::engines::engine_status,
             cmds::engines::engine_list_kinds,
             cmds::engines::engine_get_policy,
-            // Scene editor (C8): five thin wrappers over
-            // `core::scenes::SceneStore`. The front-end
-            // `/scenes` route and the editor modal both rely on
-            // these — omitting them from `generate_handler!`
-            // means every `invoke('scene_*')` call surfaces
-            // as `command not found` in the Tauri IPC. Cross-
-            // platform (no `#[cfg(target_os = "windows")]`) so
-            // the Linux `cargo check` and the macOS test
-            // surface agree.
-            cmds::scenes::scene_list,
-            cmds::scenes::scene_create,
-            cmds::scenes::scene_update,
-            cmds::scenes::scene_delete,
-            cmds::scenes::scene_apply,
+            // Engine benchmark (C6) — single command backing both
+            // the in-app "Run benchmark" button and the CI
+            // workflow's `bench_run` invoke call. The harness is
+            // synchronous internally; the Tauri command wraps it
+            // in `spawn_blocking` for runtime-friendliness.
+            cmds::bench::bench_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

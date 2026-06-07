@@ -14,6 +14,7 @@ pub mod rewrite;
 pub mod scenes;
 pub mod system;
 pub mod webdav;
+pub mod bench;
 
 // Windows-specific commands
 #[cfg(target_os = "windows")]
