@@ -18,9 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use tauri::State;
 
-use crate::cmds::config::AppState;
 use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookPaths, LogbookStore, LogbookWriter};
 
 /// Build a `LogbookStore` rooted at the default Windows logbook dir.
@@ -141,6 +139,7 @@ fn _writer_marker(_: Arc<LogbookWriter>) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cmds::config::AppState;
     use crate::core::logbook::LogCategory;
     use crate::core::logbook::LogLevel;
     use std::collections::BTreeMap;
