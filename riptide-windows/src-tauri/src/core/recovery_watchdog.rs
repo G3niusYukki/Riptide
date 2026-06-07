@@ -98,11 +98,7 @@ async fn run(app_handle: AppHandle) {
             continue;
         }
 
-        let reason: &'static str = if slept {
-            "sleep"
-        } else {
-            "network_change"
-        };
+        let reason: &'static str = if slept { "sleep" } else { "network_change" };
         log::info!(
             "Recovery watchdog: {} detected (gap={}s, gw={:?})",
             reason,
@@ -189,14 +185,13 @@ fn read_default_gateway() -> Option<String> {
     }
     let text = String::from_utf8_lossy(&output.stdout);
     // Look for a line beginning with "          0.0.0.0          0.0.0.0     <gateway> ..."
-    text.lines()
-        .find_map(|line| {
-            let trimmed = line.trim();
-            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() >= 3 && parts[0] == "0.0.0.0" && parts[1] == "0.0.0.0" {
-                Some(parts[2].to_string())
-            } else {
-                None
-            }
-        })
+    text.lines().find_map(|line| {
+        let trimmed = line.trim();
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() >= 3 && parts[0] == "0.0.0.0" && parts[1] == "0.0.0.0" {
+            Some(parts[2].to_string())
+        } else {
+            None
+        }
+    })
 }

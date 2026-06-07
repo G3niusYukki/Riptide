@@ -1,5 +1,5 @@
 //! Mihomo REST API client
-//! 
+//!
 //! Provides async access to mihomo's REST API endpoints on port 9090
 //! Reference: https://github.com/MetaCubeX/mihomo/blob/master/docs/api.md
 
@@ -16,16 +16,16 @@ const DEFAULT_TIMEOUT_MS: u32 = 5000;
 pub enum MihomoError {
     #[error("HTTP request failed: {0}")]
     RequestFailed(#[from] reqwest::Error),
-    
+
     #[error("API error: {message} (status: {status})")]
     ApiError { status: StatusCode, message: String },
-    
+
     #[error("Proxy '{name}' not found")]
     ProxyNotFound { name: String },
-    
+
     #[error("Connection '{id}' not found")]
     ConnectionNotFound { id: String },
-    
+
     #[error("Invalid response format: {0}")]
     InvalidResponse(String),
 }
@@ -159,17 +159,21 @@ impl MihomoApiClient {
     fn build_request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         let url = format!("{}{}", self.base_url, path);
         let mut request = self.client.request(method, &url);
-        
+
         if let Some(secret) = &self.secret {
             request = request.header("Authorization", format!("Bearer {}", secret));
         }
-        
+
         request
     }
 
     /// Check if mihomo API is healthy
     pub async fn health_check(&self) -> Result<bool, MihomoError> {
-        match self.build_request(reqwest::Method::GET, "/version").send().await {
+        match self
+            .build_request(reqwest::Method::GET, "/version")
+            .send()
+            .await
+        {
             Ok(response) => Ok(response.status().is_success()),
             Err(_) => Ok(false),
         }
@@ -177,29 +181,34 @@ impl MihomoApiClient {
 
     /// Get mihomo version
     pub async fn get_version(&self) -> Result<VersionInfo, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/version")
+        let response = self
+            .build_request(reqwest::Method::GET, "/version")
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let version = response.json().await?;
             Ok(version)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get all proxies (including groups)
     pub async fn get_proxies(&self) -> Result<HashMap<String, ProxyInfo>, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/proxies")
+        let response = self
+            .build_request(reqwest::Method::GET, "/proxies")
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let data: ProxiesResponse = response.json().await?;
-            
+
             // Convert JSON values to ProxyInfo
             let mut proxies = HashMap::new();
             for (name, value) in data.proxies {
@@ -207,38 +216,48 @@ impl MihomoApiClient {
                     .map_err(|e| MihomoError::InvalidResponse(e.to_string()))?;
                 proxies.insert(name, proxy_info);
             }
-            
+
             Ok(proxies)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get specific proxy info
     pub async fn get_proxy(&self, name: &str) -> Result<ProxyInfo, MihomoError> {
         let path = format!("/proxies/{}", urlencoding::encode(name));
-        let response = self.build_request(reqwest::Method::GET, &path)
+        let response = self
+            .build_request(reqwest::Method::GET, &path)
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let proxy = response.json().await?;
             Ok(proxy)
         } else if response.status() == StatusCode::NOT_FOUND {
-            Err(MihomoError::ProxyNotFound { name: name.to_string() })
+            Err(MihomoError::ProxyNotFound {
+                name: name.to_string(),
+            })
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get detailed proxy group information
     pub async fn get_proxy_group(&self, name: &str) -> Result<ProxyGroupDetail, MihomoError> {
         let path = format!("/proxies/{}", urlencoding::encode(name));
-        let response = self.build_request(reqwest::Method::GET, &path)
+        let response = self
+            .build_request(reqwest::Method::GET, &path)
             .send()
             .await?;
 
@@ -246,11 +265,16 @@ impl MihomoApiClient {
             let group = response.json().await?;
             Ok(group)
         } else if response.status() == StatusCode::NOT_FOUND {
-            Err(MihomoError::ProxyNotFound { name: name.to_string() })
+            Err(MihomoError::ProxyNotFound {
+                name: name.to_string(),
+            })
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
@@ -264,12 +288,13 @@ impl MihomoApiClient {
         let path = format!("/proxies/{}/delay", urlencoding::encode(name));
         let test_url = url.unwrap_or(DEFAULT_TEST_URL);
         let timeout = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
-        
-        let response = self.build_request(reqwest::Method::GET, &path)
+
+        let response = self
+            .build_request(reqwest::Method::GET, &path)
             .query(&[("url", test_url), ("timeout", &timeout.to_string())])
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             #[derive(Deserialize)]
             struct DelayResponse {
@@ -278,11 +303,16 @@ impl MihomoApiClient {
             let data: DelayResponse = response.json().await?;
             Ok(data.delay)
         } else if response.status() == StatusCode::NOT_FOUND {
-            Err(MihomoError::ProxyNotFound { name: name.to_string() })
+            Err(MihomoError::ProxyNotFound {
+                name: name.to_string(),
+            })
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
@@ -292,46 +322,57 @@ impl MihomoApiClient {
         let body = SwitchProxyRequest {
             name: proxy_name.to_string(),
         };
-        
-        let response = self.build_request(reqwest::Method::PUT, &path)
+
+        let response = self
+            .build_request(reqwest::Method::PUT, &path)
             .json(&body)
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             Ok(())
         } else if response.status() == StatusCode::NOT_FOUND {
-            Err(MihomoError::ProxyNotFound { name: group.to_string() })
+            Err(MihomoError::ProxyNotFound {
+                name: group.to_string(),
+            })
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get all active connections
     pub async fn get_connections(&self) -> Result<Vec<ConnectionInfo>, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/connections")
+        let response = self
+            .build_request(reqwest::Method::GET, "/connections")
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let data: ConnectionsResponse = response.json().await?;
             Ok(data.connections)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Close a specific connection
     pub async fn close_connection(&self, id: &str) -> Result<(), MihomoError> {
         let path = format!("/connections/{}", urlencoding::encode(id));
-        let response = self.build_request(reqwest::Method::DELETE, &path)
+        let response = self
+            .build_request(reqwest::Method::DELETE, &path)
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             Ok(())
         } else if response.status() == StatusCode::NOT_FOUND {
@@ -339,61 +380,77 @@ impl MihomoApiClient {
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Close all connections
     pub async fn close_all_connections(&self) -> Result<(), MihomoError> {
-        let response = self.build_request(reqwest::Method::DELETE, "/connections")
+        let response = self
+            .build_request(reqwest::Method::DELETE, "/connections")
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             Ok(())
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get traffic statistics
     pub async fn get_traffic(&self) -> Result<TrafficData, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/traffic")
+        let response = self
+            .build_request(reqwest::Method::GET, "/traffic")
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let data = response.json().await?;
             Ok(data)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get logs (returns raw text)
     pub async fn get_logs(&self, level: &str, lines: u32) -> Result<String, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/logs")
+        let response = self
+            .build_request(reqwest::Method::GET, "/logs")
             .query(&[("level", level), ("lines", &lines.to_string())])
             .send()
             .await?;
-        
+
         if response.status().is_success() {
             let text = response.text().await?;
             Ok(text)
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Get routing rules (from config or currently applied)
     pub async fn get_rules(&self) -> Result<Vec<RuleInfo>, MihomoError> {
-        let response = self.build_request(reqwest::Method::GET, "/rules")
+        let response = self
+            .build_request(reqwest::Method::GET, "/rules")
             .send()
             .await?;
 
@@ -407,14 +464,17 @@ impl MihomoApiClient {
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 
     /// Reload mihomo config
     pub async fn reload_config(&self, path: Option<&str>) -> Result<(), MihomoError> {
         let mut request = self.build_request(reqwest::Method::PUT, "/configs");
-        
+
         if let Some(path) = path {
             #[derive(Serialize)]
             struct ReloadRequest {
@@ -424,15 +484,18 @@ impl MihomoApiClient {
                 path: path.to_string(),
             });
         }
-        
+
         let response = request.send().await?;
-        
+
         if response.status().is_success() {
             Ok(())
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            Err(MihomoError::ApiError { status, message: text })
+            Err(MihomoError::ApiError {
+                status,
+                message: text,
+            })
         }
     }
 }
@@ -445,7 +508,7 @@ mod tests {
     fn test_client_creation() {
         let client = MihomoApiClient::default_with_secret(None);
         assert_eq!(client.base_url, DEFAULT_API_URL);
-        
+
         let client_with_secret = MihomoApiClient::default_with_secret(Some("test".to_string()));
         assert!(client_with_secret.secret.is_some());
     }

@@ -167,11 +167,17 @@ pub struct Config {
 impl Config {
     /// Construct a Clash YAML config.
     pub fn clash_yaml(body: impl Into<String>) -> Self {
-        Self { format: "clash_yaml".into(), body: body.into() }
+        Self {
+            format: "clash_yaml".into(),
+            body: body.into(),
+        }
     }
     /// Construct a sing-box JSON config.
     pub fn singbox_json(body: impl Into<String>) -> Self {
-        Self { format: "singbox_json".into(), body: body.into() }
+        Self {
+            format: "singbox_json".into(),
+            body: body.into(),
+        }
     }
 }
 
@@ -210,13 +216,20 @@ impl EngineError {
         EngineError::UnsupportedKind { engine, kind }
     }
     pub fn serialization(engine: &'static str, message: impl Into<String>) -> Self {
-        EngineError::Serialization { engine, message: message.into(), source: None }
+        EngineError::Serialization {
+            engine,
+            message: message.into(),
+            source: None,
+        }
     }
     pub fn other<E>(engine: &'static str, e: E) -> Self
     where
         E: std::error::Error + Send + Sync + 'static,
     {
-        EngineError::Other { engine, source: Box::new(e) }
+        EngineError::Other {
+            engine,
+            source: Box::new(e),
+        }
     }
 }
 

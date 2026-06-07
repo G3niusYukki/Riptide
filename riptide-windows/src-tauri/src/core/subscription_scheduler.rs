@@ -74,17 +74,23 @@ async fn tick(app_handle: &AppHandle) {
     let due: Vec<(String, String)> = {
         let profiles = state.profiles.lock().unwrap();
         let now = Utc::now();
-        profiles.iter().filter_map(|p| {
-            let url = p.metadata.source_url.as_ref()?;
-            let interval = p.metadata.update_interval_secs?;
-            let last = p.metadata.last_updated_at.unwrap_or(chrono::DateTime::<Utc>::MIN_UTC);
-            let elapsed = now.signed_duration_since(last).to_std().ok()?;
-            if elapsed.as_secs() >= interval && !url.is_empty() {
-                Some((p.id.clone(), p.name.clone()))
-            } else {
-                None
-            }
-        }).collect()
+        profiles
+            .iter()
+            .filter_map(|p| {
+                let url = p.metadata.source_url.as_ref()?;
+                let interval = p.metadata.update_interval_secs?;
+                let last = p
+                    .metadata
+                    .last_updated_at
+                    .unwrap_or(chrono::DateTime::<Utc>::MIN_UTC);
+                let elapsed = now.signed_duration_since(last).to_std().ok()?;
+                if elapsed.as_secs() >= interval && !url.is_empty() {
+                    Some((p.id.clone(), p.name.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     };
 
     for (id, name) in due {
@@ -92,23 +98,33 @@ async fn tick(app_handle: &AppHandle) {
         {
             match refresh_profile_impl(&id, &state).await {
                 Ok(_) => {
-                    let _ = app_handle.emit("profile_refreshed", RefreshedEvent {
-                        profile_id: id,
-                        profile_name: name,
-                    });
+                    let _ = app_handle.emit(
+                        "profile_refreshed",
+                        RefreshedEvent {
+                            profile_id: id,
+                            profile_name: name,
+                        },
+                    );
                 }
                 Err(e) => {
                     log::warn!("Auto-refresh failed for '{}': {}", name, e);
-                    let _ = app_handle.emit("profile_refresh_error", RefreshErrorEvent {
-                        profile_id: id,
-                        error: e,
-                    });
+                    let _ = app_handle.emit(
+                        "profile_refresh_error",
+                        RefreshErrorEvent {
+                            profile_id: id,
+                            error: e,
+                        },
+                    );
                 }
             }
         }
         #[cfg(not(target_os = "windows"))]
         {
-            log::info!("Subscription refresh skipped on non-Windows: {} ({})", name, id);
+            log::info!(
+                "Subscription refresh skipped on non-Windows: {} ({})",
+                name,
+                id
+            );
         }
     }
 }

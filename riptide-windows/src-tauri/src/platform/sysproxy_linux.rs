@@ -74,12 +74,7 @@ impl LinuxSysProxy {
 /// Set GNOME system proxy via `gsettings` CLI.
 async fn set_gnome_proxy(proxy_uri: &str) -> Result<()> {
     let status = tokio::process::Command::new("gsettings")
-        .args([
-            "set",
-            "org.gnome.system.proxy.http",
-            "host",
-            "127.0.0.1",
-        ])
+        .args(["set", "org.gnome.system.proxy.http", "host", "127.0.0.1"])
         .status()
         .await
         .context("gsettings not found — GNOME proxy requires gsettings")?;

@@ -4,25 +4,25 @@
 //! offering an alternative to the sysproxy crate for advanced use cases.
 //! Reference: Clash Verge Rev implementation approach
 
-use std::ptr;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
+use std::ptr;
 
 /// Errors that can occur when managing Windows system proxy
 #[derive(Debug, thiserror::Error)]
 pub enum SysproxyError {
     #[error("WinAPI error: {0}")]
     WinApiError(String),
-    
+
     #[error("Invalid proxy host: {0}")]
     InvalidHost(String),
-    
+
     #[error("Invalid proxy configuration")]
     InvalidConfiguration,
-    
+
     #[error("Failed to set system proxy: {0}")]
     SetProxyFailed(String),
-    
+
     #[error("Failed to get system proxy: {0}")]
     GetProxyFailed(String),
 }
@@ -128,7 +128,12 @@ impl WindowsSysProxyController {
     }
 
     /// Quick enable both HTTP and SOCKS proxy
-    pub fn enable_both_proxies(&self, host: &str, http_port: u16, socks_port: u16) -> Result<(), SysproxyError> {
+    pub fn enable_both_proxies(
+        &self,
+        host: &str,
+        http_port: u16,
+        socks_port: u16,
+    ) -> Result<(), SysproxyError> {
         let config = WindowsProxyConfig::combined_proxy(host, http_port, socks_port);
         self.enable(&config)
     }
@@ -144,10 +149,13 @@ impl Default for WindowsSysProxyController {
 fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), SysproxyError> {
     #[cfg(target_os = "windows")]
     {
-        use winapi::um::wininet::{InternetSetOptionA, INTERNET_OPTION_PROXY, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, INTERNET_OPTION_REFRESH};
+        use std::mem;
         use winapi::shared::minwindef::{DWORD, LPVOID, TRUE};
         use winapi::um::wininet::INTERNET_PROXY_INFO;
-        use std::mem;
+        use winapi::um::wininet::{
+            InternetSetOptionA, INTERNET_OPTION_PROXY, INTERNET_OPTION_PROXY_SETTINGS_CHANGED,
+            INTERNET_OPTION_REFRESH,
+        };
 
         unsafe {
             // Build wide strings (UTF-16) for WinAPI
@@ -188,9 +196,10 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
             );
 
             if result != TRUE {
-                return Err(SysproxyError::SetProxyFailed(
-                    format!("InternetSetOptionA failed with result: {}", result)
-                ));
+                return Err(SysproxyError::SetProxyFailed(format!(
+                    "InternetSetOptionA failed with result: {}",
+                    result
+                )));
             }
 
             // Notify system of proxy settings change
@@ -202,12 +211,7 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
             );
 
             // Refresh proxy settings
-            InternetSetOptionA(
-                ptr::null_mut(),
-                INTERNET_OPTION_REFRESH,
-                ptr::null_mut(),
-                0,
-            );
+            InternetSetOptionA(ptr::null_mut(), INTERNET_OPTION_REFRESH, ptr::null_mut(), 0);
         }
 
         log::info!("Windows system proxy set: enabled={}", config.enable);
@@ -231,11 +235,11 @@ fn set_system_proxy_internal(config: &WindowsProxyConfig) -> Result<(), Sysproxy
 fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
     #[cfg(target_os = "windows")]
     {
-        use winapi::um::wininet::{InternetQueryOptionW, INTERNET_OPTION_PROXY};
-        use winapi::shared::minwindef::{DWORD, LPVOID};
-        use winapi::um::wininet::INTERNET_PROXY_INFO;
         use std::mem;
         use std::os::windows::ffi::OsStringExt;
+        use winapi::shared::minwindef::{DWORD, LPVOID};
+        use winapi::um::wininet::INTERNET_PROXY_INFO;
+        use winapi::um::wininet::{InternetQueryOptionW, INTERNET_OPTION_PROXY};
 
         unsafe {
             let mut proxy_info: INTERNET_PROXY_INFO = mem::zeroed();
@@ -250,14 +254,16 @@ fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
 
             if result == 0 {
                 return Err(SysproxyError::GetProxyFailed(
-                    "InternetQueryOptionW failed".to_string()
+                    "InternetQueryOptionW failed".to_string(),
                 ));
             }
 
             let enable = proxy_info.dwAccessType == 3; // INTERNET_OPEN_TYPE_PROXY
 
             let proxy_server = if !proxy_info.lpszProxy.is_null() {
-                let len = (0..).take_while(|&i| *proxy_info.lpszProxy.offset(i) != 0).count();
+                let len = (0..)
+                    .take_while(|&i| *proxy_info.lpszProxy.offset(i) != 0)
+                    .count();
                 let wide_slice: &[u16] = std::slice::from_raw_parts(proxy_info.lpszProxy, len);
                 std::ffi::OsString::from_wide(wide_slice)
                     .to_string_lossy()
@@ -267,8 +273,11 @@ fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
             };
 
             let bypass_list = if !proxy_info.lpszProxyBypass.is_null() {
-                let len = (0..).take_while(|&i| *proxy_info.lpszProxyBypass.offset(i) != 0).count();
-                let wide_slice: &[u16] = std::slice::from_raw_parts(proxy_info.lpszProxyBypass, len);
+                let len = (0..)
+                    .take_while(|&i| *proxy_info.lpszProxyBypass.offset(i) != 0)
+                    .count();
+                let wide_slice: &[u16] =
+                    std::slice::from_raw_parts(proxy_info.lpszProxyBypass, len);
                 std::ffi::OsString::from_wide(wide_slice)
                     .to_string_lossy()
                     .to_string()
@@ -295,7 +304,7 @@ fn get_system_proxy_internal() -> Result<WindowsProxyConfig, SysproxyError> {
 /// High-level convenience function to set system proxy
 pub fn set_system_proxy(enable: bool, host: &str, port: u16) -> Result<(), SysproxyError> {
     let controller = WindowsSysProxyController::new();
-    
+
     if enable {
         let config = WindowsProxyConfig::http_proxy(host, port);
         controller.enable(&config)
@@ -327,11 +336,11 @@ mod tests {
         assert!(http_config.enable);
         assert!(http_config.proxy_server.contains("7890"));
         assert!(http_config.proxy_server.contains("http="));
-        
+
         let socks_config = WindowsProxyConfig::socks_proxy("127.0.0.1", 7891);
         assert!(socks_config.enable);
         assert!(socks_config.proxy_server.contains("socks="));
-        
+
         let combined = WindowsProxyConfig::combined_proxy("127.0.0.1", 7890, 7891);
         assert!(combined.enable);
         assert!(combined.proxy_server.contains("http="));
@@ -355,7 +364,7 @@ mod tests {
     fn test_sysproxy_error_display() {
         let err = SysproxyError::InvalidHost("test".to_string());
         assert!(err.to_string().contains("Invalid proxy host"));
-        
+
         let err = SysproxyError::InvalidConfiguration;
         assert_eq!(err.to_string(), "Invalid proxy configuration");
     }

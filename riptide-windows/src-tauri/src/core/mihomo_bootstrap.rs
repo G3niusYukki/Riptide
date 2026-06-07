@@ -188,8 +188,8 @@ fn extract_mihomo_exe(zip_bytes: &[u8], target: &Path) -> anyhow::Result<()> {
     }
 
     let reader = std::io::Cursor::new(zip_bytes);
-    let mut archive = zip::ZipArchive::new(reader)
-        .map_err(|e| anyhow!("Invalid zip archive: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(reader).map_err(|e| anyhow!("Invalid zip archive: {}", e))?;
 
     // Find the first `.exe` entry — releases sometimes nest it under a folder.
     let exe_index = (0..archive.len())
@@ -208,8 +208,8 @@ fn extract_mihomo_exe(zip_bytes: &[u8], target: &Path) -> anyhow::Result<()> {
     let tmp = target.with_extension("exe.download");
 
     {
-        let mut out = fs::File::create(&tmp)
-            .with_context(|| format!("Failed to create {:?}", tmp))?;
+        let mut out =
+            fs::File::create(&tmp).with_context(|| format!("Failed to create {:?}", tmp))?;
         let mut buffer = [0u8; 64 * 1024];
         loop {
             let n = entry.read(&mut buffer)?;
@@ -235,8 +235,8 @@ fn emit_progress(app_handle: &AppHandle, progress: BootstrapProgress) {
 /// settings button). Re-downloads even if the binary exists, by deleting first.
 #[tauri::command]
 pub async fn download_mihomo(app_handle: AppHandle) -> Result<String, String> {
-    let target = crate::utils::dirs::get_mihomo_binary_path(&app_handle)
-        .map_err(|e| e.to_string())?;
+    let target =
+        crate::utils::dirs::get_mihomo_binary_path(&app_handle).map_err(|e| e.to_string())?;
     if target.exists() {
         fs::remove_file(&target).map_err(|e| format!("Failed to remove old binary: {}", e))?;
     }

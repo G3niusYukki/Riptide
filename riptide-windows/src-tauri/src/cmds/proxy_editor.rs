@@ -103,7 +103,10 @@ pub async fn add_profile_proxy(
         let mut doc = parse_yaml_document(&profile.content)?;
         {
             let seq = proxies_sequence_mut(&mut doc)?;
-            if seq.iter().any(|item| name_of(item).as_deref() == Some(&proxy.name)) {
+            if seq
+                .iter()
+                .any(|item| name_of(item).as_deref() == Some(&proxy.name))
+            {
                 return Err(format!("Proxy '{}' already exists", proxy.name));
             }
             seq.push(proxy_to_value(&proxy)?);
@@ -114,7 +117,12 @@ pub async fn add_profile_proxy(
         new_content
     };
 
-    log::info!("Added proxy '{}' to profile '{}' ({} bytes)", proxy.name, profile_id, new_content.len());
+    log::info!(
+        "Added proxy '{}' to profile '{}' ({} bytes)",
+        proxy.name,
+        profile_id,
+        new_content.len()
+    );
     Ok(())
 }
 

@@ -6,8 +6,13 @@ pub mod cli;
 // Re-export OneShotResult for main.rs on all platforms
 #[cfg(not(target_os = "windows"))]
 pub mod cli {
-    pub enum OneShotResult { Continue, Exit(i32) }
-    pub fn handle_one_shot_cli() -> OneShotResult { OneShotResult::Continue }
+    pub enum OneShotResult {
+        Continue,
+        Exit(i32),
+    }
+    pub fn handle_one_shot_cli() -> OneShotResult {
+        OneShotResult::Continue
+    }
 }
 pub mod bench;
 pub mod cmds;
@@ -30,13 +35,13 @@ pub mod utils;
 use tauri::Manager;
 
 #[cfg(not(test))]
+use crate::cmds::config::AppState;
+#[cfg(not(test))]
 use crate::core::mihomo::MihomoManager;
 #[cfg(not(test))]
 use crate::core::mode_coordinator::ModeCoordinator;
 #[cfg(not(test))]
 use crate::core::sysproxy::SystemProxyController;
-#[cfg(not(test))]
-use crate::cmds::config::AppState;
 #[cfg(not(test))]
 use crate::notify::NotificationDispatcher;
 #[cfg(all(not(test), target_os = "windows"))]
@@ -112,7 +117,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .manage(AppState::new())
-        .manage(std::sync::Arc::new(crate::core::engines::EngineRouter::default_mihomo()))
+        .manage(std::sync::Arc::new(
+            crate::core::engines::EngineRouter::default_mihomo(),
+        ))
         .setup(|app| {
             // Initialize state
             let app_handle = app.handle().clone();
@@ -140,12 +147,15 @@ pub fn run() {
             // it up here guarantees the very first business-path `log_*` call
             // lands in the daily JSONL file. Failure to spawn falls back to
             // no-op slots — diagnostic logging is best-effort.
-            let logbook_writer = std::sync::Arc::new(crate::core::logbook::LogbookWriter::spawn_default());
+            let logbook_writer =
+                std::sync::Arc::new(crate::core::logbook::LogbookWriter::spawn_default());
             let app_state = app.state::<AppState>();
             app_state.install_logbook_writer(logbook_writer.clone());
             let logbook_for_inject = logbook_writer.clone();
             crate::core::mode_coordinator::set_logbook_writer(Some(logbook_for_inject.clone()));
-            crate::core::subscription_scheduler::set_logbook_writer(Some(logbook_for_inject.clone()));
+            crate::core::subscription_scheduler::set_logbook_writer(Some(
+                logbook_for_inject.clone(),
+            ));
             crate::core::service::set_logbook_writer(Some(logbook_for_inject.clone()));
             crate::core::sysproxy::set_logbook_writer(Some(logbook_for_inject.clone()));
             crate::core::recovery_watchdog::set_logbook_writer(Some(logbook_for_inject));
@@ -230,8 +240,13 @@ pub fn run() {
             // Notify the front-end that boot finished. C11 (Notification
             // subsystem) wires this through the Tauri event bus; the
             // in-app toast surfaces as "Riptide is ready — v2.4.1 loaded".
-            let version = app.config().version.clone().unwrap_or_else(|| "unknown".into());
-            app.state::<NotificationDispatcher>().startup_complete(version);
+            let version = app
+                .config()
+                .version
+                .clone()
+                .unwrap_or_else(|| "unknown".into());
+            app.state::<NotificationDispatcher>()
+                .startup_complete(version);
 
             Ok(())
         })

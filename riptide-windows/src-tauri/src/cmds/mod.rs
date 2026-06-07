@@ -1,20 +1,20 @@
 //! Tauri command handlers for Riptide Windows
 
-pub mod proxy;
-pub mod proxy_editor;
+pub mod bench;
 pub mod config;
-pub mod engines;
-pub mod logbook;
 pub mod dns;
-pub mod uri_serializer;
+pub mod engines;
 #[cfg(target_os = "windows")]
 pub mod gateway;
+pub mod logbook;
 pub mod mode;
+pub mod proxy;
+pub mod proxy_editor;
 pub mod rewrite;
 pub mod scenes;
 pub mod system;
+pub mod uri_serializer;
 pub mod webdav;
-pub mod bench;
 
 // Windows-specific commands
 #[cfg(target_os = "windows")]

@@ -92,10 +92,8 @@ mod tests {
         // Use a fresh per-test tempdir so we don't collide with the
         // user's real %APPDATA%\Riptide\singbox in case it happens to
         // exist (it shouldn't on a dev box, but be defensive).
-        let tmp = std::env::temp_dir().join(format!(
-            "riptide-singbox-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("riptide-singbox-test-{}", uuid::Uuid::new_v4()));
         let downloader = SingBoxDownloader::with_base(&tmp);
         let result = downloader.ensure_present().await;
         assert!(
@@ -108,10 +106,8 @@ mod tests {
     /// Task spec test 2: pre-staged stub file -> returned path.
     #[tokio::test]
     async fn downloader_returns_path_when_present() {
-        let tmp = std::env::temp_dir().join(format!(
-            "riptide-singbox-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("riptide-singbox-test-{}", uuid::Uuid::new_v4()));
         let paths = SingBoxPaths::resolve(&tmp);
         // The downloader doesn't auto-create the directory, so mirror the
         // pre-install layout: create the singbox/ dir, drop a stub exe.

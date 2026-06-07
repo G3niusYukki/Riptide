@@ -14,9 +14,7 @@ pub fn enable_ics(outbound_interface: &str, _subnet: &str) -> Result<(), String>
     // The simplest approach: use netsh to set the sharing interface.
 
     let output = Command::new("netsh")
-        .args([
-            "routing", "ip", "nat", "install",
-        ])
+        .args(["routing", "ip", "nat", "install"])
         .output()
         .map_err(|e| format!("Failed to install NAT: {}", e))?;
 
@@ -30,8 +28,11 @@ pub fn enable_ics(outbound_interface: &str, _subnet: &str) -> Result<(), String>
     // Add the public interface (outbound)
     let output = Command::new("netsh")
         .args([
-            "routing", "ip", "nat",
-            "add", "interface",
+            "routing",
+            "ip",
+            "nat",
+            "add",
+            "interface",
             outbound_interface,
         ])
         .output()
@@ -100,7 +101,11 @@ pub fn connected_devices() -> Vec<ConnectedDevice> {
         if parts.len() >= 3 {
             let ip = parts[0].to_string();
             let mac = parts[1].to_string();
-            let iface = if parts.len() >= 4 { parts[3].to_string() } else { String::new() };
+            let iface = if parts.len() >= 4 {
+                parts[3].to_string()
+            } else {
+                String::new()
+            };
 
             // Filter: only include dynamic entries (not multicast/broadcast)
             if mac != "ff-ff-ff-ff-ff-ff" && mac != "00-00-00-00-00-00" && mac.contains('-') {

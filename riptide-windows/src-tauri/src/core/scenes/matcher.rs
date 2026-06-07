@@ -50,7 +50,11 @@ pub fn match_ipset(cidr: &str, ip: &str) -> bool {
         if bits == 0 {
             return true;
         }
-        let mask = if bits >= 32 { u32::MAX } else { u32::MAX << (32 - bits) };
+        let mask = if bits >= 32 {
+            u32::MAX
+        } else {
+            u32::MAX << (32 - bits)
+        };
         return (target & mask) == (net & mask);
     }
     if let (Some((net, bits)), Some(target)) = (parse_v6_cidr(cidr), parse_v6(ip)) {
@@ -190,7 +194,9 @@ fn parse_v6_groups(s: &str) -> Option<[u16; 8]> {
     if groups.len() != 8 {
         return None;
     }
-    Some([groups[0], groups[1], groups[2], groups[3], groups[4], groups[5], groups[6], groups[7]])
+    Some([
+        groups[0], groups[1], groups[2], groups[3], groups[4], groups[5], groups[6], groups[7],
+    ])
 }
 
 fn hex_u16(s: &str) -> Option<u16> {
@@ -214,7 +220,7 @@ fn parse_v6_cidr(s: &str) -> Option<([u16; 8], u32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::scenes::types::{ModeOverride, Matcher, Scene};
+    use crate::core::scenes::types::{Matcher, ModeOverride, Scene};
 
     fn scene(matchers: Vec<Matcher>) -> Scene {
         Scene {
@@ -230,7 +236,10 @@ mod tests {
 
     #[test]
     fn process_pattern_matches_basename_case_insensitive() {
-        assert!(match_process_pattern("chrome.exe", "C:\\Program Files\\Chrome\\chrome.exe"));
+        assert!(match_process_pattern(
+            "chrome.exe",
+            "C:\\Program Files\\Chrome\\chrome.exe"
+        ));
         assert!(match_process_pattern("CHROME.EXE", "chrome.exe"));
         assert!(!match_process_pattern("chrome.exe", "firefox.exe"));
     }
@@ -266,7 +275,10 @@ mod tests {
     fn ipset_matches_ipv6_cidr() {
         // /8 hits the first group only
         assert!(match_ipset("fd00::/8", "fd12:3456:789a::1"));
-        assert!(match_ipset("fd00::/8", "fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"));
+        assert!(match_ipset(
+            "fd00::/8",
+            "fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+        ));
         assert!(!match_ipset("fd00::/8", "fe00::1"));
         // /16 hits the first two groups
         assert!(match_ipset("2001:db8::/32", "2001:db8::1"));
@@ -294,8 +306,12 @@ mod tests {
     fn scene_applies_uses_logical_or() {
         // Any matcher firing is enough.
         let s = scene(vec![
-            Matcher::Process { pattern: "x.exe".into() },
-            Matcher::Domain { pattern: "example.com".into() },
+            Matcher::Process {
+                pattern: "x.exe".into(),
+            },
+            Matcher::Domain {
+                pattern: "example.com".into(),
+            },
         ]);
         assert!(scene_applies(&s, "x.exe", "", ""));
         assert!(scene_applies(&s, "", "api.example.com", ""));
@@ -304,7 +320,9 @@ mod tests {
 
     #[test]
     fn disabled_scene_never_applies() {
-        let mut s = scene(vec![Matcher::Process { pattern: "*".into() }]);
+        let mut s = scene(vec![Matcher::Process {
+            pattern: "*".into(),
+        }]);
         s.enabled = false;
         assert!(!scene_applies(&s, "anything", "anything", "1.2.3.4"));
     }
@@ -316,9 +334,15 @@ mod tests {
         // kinds" gate on the frontend side; on the Rust side we just
         // confirm the union works end-to-end.
         let s = scene(vec![
-            Matcher::Process { pattern: "x.exe".into() },
-            Matcher::Domain { pattern: "example.com".into() },
-            Matcher::IpSet { value: "10.0.0.0/8".into() },
+            Matcher::Process {
+                pattern: "x.exe".into(),
+            },
+            Matcher::Domain {
+                pattern: "example.com".into(),
+            },
+            Matcher::IpSet {
+                value: "10.0.0.0/8".into(),
+            },
         ]);
         assert!(scene_applies(&s, "x.exe", "any", "9.9.9.9"));
         assert!(scene_applies(&s, "y.exe", "example.com", "9.9.9.9"));

@@ -201,9 +201,24 @@ mod tests {
             status: DimensionStatus::Completed,
             iterations: 3,
             samples: vec![
-                MetricSample { iteration: 1, duration_ms: 1.0, success: true, error: None },
-                MetricSample { iteration: 2, duration_ms: 2.0, success: true, error: None },
-                MetricSample { iteration: 3, duration_ms: 3.0, success: true, error: None },
+                MetricSample {
+                    iteration: 1,
+                    duration_ms: 1.0,
+                    success: true,
+                    error: None,
+                },
+                MetricSample {
+                    iteration: 2,
+                    duration_ms: 2.0,
+                    success: true,
+                    error: None,
+                },
+                MetricSample {
+                    iteration: 3,
+                    duration_ms: 3.0,
+                    success: true,
+                    error: None,
+                },
             ],
             summary: MetricSummary {
                 p50_ms: Some(2.0),
@@ -236,7 +251,14 @@ mod tests {
         });
         let json: serde_json::Value = serde_json::to_value(&report).unwrap();
         // Top-level keys
-        for k in ["started_at", "finished_at", "platform", "engine", "engine_binary", "dimensions"] {
+        for k in [
+            "started_at",
+            "finished_at",
+            "platform",
+            "engine",
+            "engine_binary",
+            "dimensions",
+        ] {
             assert!(json.get(k).is_some(), "missing top-level key: {k}");
         }
         assert_eq!(json["engine"], "mihomo");

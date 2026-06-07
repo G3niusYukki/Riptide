@@ -59,7 +59,9 @@ pub fn webdav_set_config(
 #[tauri::command]
 pub async fn webdav_test_connection() -> Result<(), String> {
     let cfg = webdav::load_config();
-    webdav::test_connection(&cfg).await.map_err(|e| e.to_string())
+    webdav::test_connection(&cfg)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -70,7 +72,9 @@ pub async fn webdav_backup_now() -> Result<(), String> {
         .await
         .map_err(|e| format!("join: {}", e))?
         .map_err(|e| e.to_string())?;
-    webdav::upload_backup(&cfg, bytes).await.map_err(|e| e.to_string())
+    webdav::upload_backup(&cfg, bytes)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

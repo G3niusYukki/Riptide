@@ -107,7 +107,8 @@ pub async fn scene_apply(
     let domain = domain.unwrap_or_default();
     let ip = ip.unwrap_or_default();
     let result = default_store().apply(&process, &domain, &ip).await?;
-    if let (Some(id), Some(name), Some(mode)) = (&result.matched, &result.scene_name, &result.mode) {
+    if let (Some(id), Some(name), Some(mode)) = (&result.matched, &result.scene_name, &result.mode)
+    {
         log::info!(
             "scene_apply matched scene '{}' ({}): mode = {}",
             name,
@@ -172,10 +173,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn scene_apply_returns_none_on_empty_store() {
         let (store, _dir) = fresh_store("empty-apply");
-        let result: SceneApplyResult = store
-            .apply("", "no-match.test", "9.9.9.9")
-            .await
-            .unwrap();
+        let result: SceneApplyResult = store.apply("", "no-match.test", "9.9.9.9").await.unwrap();
         assert!(result.matched.is_none());
         assert!(result.mode.is_none());
         assert!(result.scene_name.is_none());
@@ -304,27 +302,38 @@ mod ipc_tests {
     #[tokio::test(flavor = "current_thread")]
     async fn scene_list_full_returns_vec_of_scenes() {
         let dir = fresh_dir("ipc-vec");
-        let store = SceneStore::new(ScenePaths { file: dir.join("scenes.json") });
+        let store = SceneStore::new(ScenePaths {
+            file: dir.join("scenes.json"),
+        });
         let _app = build_mock_app();
 
         let created = store
-            .create(blank_scene("alpha", ModeOverride::Tun, vec![Matcher::Process {
-                pattern: "chrome.exe".into(),
-            }]))
+            .create(blank_scene(
+                "alpha",
+                ModeOverride::Tun,
+                vec![Matcher::Process {
+                    pattern: "chrome.exe".into(),
+                }],
+            ))
             .await
             .expect("create ok");
         let _ = store
             .create(blank_scene(
                 "beta",
                 ModeOverride::SystemProxy,
-                vec![Matcher::Domain { pattern: "example.com".into() }],
+                vec![Matcher::Domain {
+                    pattern: "example.com".into(),
+                }],
             ))
             .await
             .expect("create ok");
 
         let list: Vec<Scene> = store.list().await.expect("list ok");
         assert_eq!(list.len(), 2, "two scenes must round-trip");
-        let alpha = list.iter().find(|s| s.id == created.id).expect("alpha present");
+        let alpha = list
+            .iter()
+            .find(|s| s.id == created.id)
+            .expect("alpha present");
         assert_eq!(alpha.name, "alpha");
         assert_eq!(alpha.mode, ModeOverride::Tun);
         assert!(alpha.enabled);
@@ -353,24 +362,34 @@ mod ipc_tests {
     #[tokio::test(flavor = "current_thread")]
     async fn scene_apply_with_ipv6_ipset_round_trips() {
         let dir = fresh_dir("ipc-ipv6");
-        let store = SceneStore::new(ScenePaths { file: dir.join("scenes.json") });
+        let store = SceneStore::new(ScenePaths {
+            file: dir.join("scenes.json"),
+        });
 
         store
             .create(blank_scene(
                 "v6-scene",
                 ModeOverride::Direct,
-                vec![Matcher::IpSet { value: "fd00::/8".into() }],
+                vec![Matcher::IpSet {
+                    value: "fd00::/8".into(),
+                }],
             ))
             .await
             .expect("create ok");
 
         // IPv6 target inside the /8 — must hit.
-        let r = store.apply("any.exe", "any.test", "fd12:3456:789a::1").await.unwrap();
+        let r = store
+            .apply("any.exe", "any.test", "fd12:3456:789a::1")
+            .await
+            .unwrap();
         assert!(r.matched.is_some(), "ipv6 match should fire");
         assert_eq!(r.mode, Some(ModeOverride::Direct));
 
         // IPv6 target outside the /8 — must miss.
-        let r = store.apply("any.exe", "any.test", "2001:db8::1").await.unwrap();
+        let r = store
+            .apply("any.exe", "any.test", "2001:db8::1")
+            .await
+            .unwrap();
         assert!(r.matched.is_none(), "ipv6 outside cidr must miss");
     }
 }

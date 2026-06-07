@@ -27,4 +27,4 @@ pub mod types;
 
 pub use matcher::{match_ipset, match_process_pattern};
 pub use store::{SceneApplyResult, ScenePaths, SceneStore};
-pub use types::{ModeOverride, Matcher, Scene, SceneId, SceneSummary};
+pub use types::{Matcher, ModeOverride, Scene, SceneId, SceneSummary};

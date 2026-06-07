@@ -1,7 +1,7 @@
 //! Tauri commands for gateway / ICS mode management.
 
-use tauri::command;
 use crate::core::gateway;
+use tauri::command;
 
 /// Enable ICS / gateway mode.
 #[command]

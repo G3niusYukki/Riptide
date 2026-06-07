@@ -38,8 +38,7 @@ pub fn load_active_id() -> Option<String> {
 
 /// Persist the active profile id. Passing `None` clears the pointer.
 pub fn save_active_id(id: Option<&str>) -> Result<(), String> {
-    WindowsDirs::ensure_dirs()
-        .map_err(|e| format!("Failed to ensure config dir: {}", e))?;
+    WindowsDirs::ensure_dirs().map_err(|e| format!("Failed to ensure config dir: {}", e))?;
 
     let state = ActiveState {
         active_profile_id: id.map(|s| s.to_string()),
@@ -51,10 +50,8 @@ pub fn save_active_id(id: Option<&str>) -> Result<(), String> {
     // Write to a temp file then rename so we never leave a half-written file
     // behind if the process is killed mid-write.
     let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, json)
-        .map_err(|e| format!("Failed to write {:?}: {}", tmp, e))?;
-    fs::rename(&tmp, &path)
-        .map_err(|e| format!("Failed to commit active.json: {}", e))?;
+    fs::write(&tmp, json).map_err(|e| format!("Failed to write {:?}: {}", tmp, e))?;
+    fs::rename(&tmp, &path).map_err(|e| format!("Failed to commit active.json: {}", e))?;
     Ok(())
 }
 
@@ -64,7 +61,9 @@ mod tests {
 
     #[test]
     fn serializes_none_as_empty_object() {
-        let state = ActiveState { active_profile_id: None };
+        let state = ActiveState {
+            active_profile_id: None,
+        };
         let json = serde_json::to_string(&state).unwrap();
         assert_eq!(json, "{}");
     }

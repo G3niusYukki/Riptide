@@ -251,17 +251,11 @@ mod tests {
     fn app_mode_serializes_to_snake_case() {
         // The frontend (`mode_state` event payload) parses these as
         // JSON strings; the wire format MUST stay snake_case.
-        assert_eq!(
-            serde_json::to_string(&AppMode::Off).unwrap(),
-            "\"off\""
-        );
+        assert_eq!(serde_json::to_string(&AppMode::Off).unwrap(), "\"off\"");
         assert_eq!(
             serde_json::to_string(&AppMode::SystemProxy).unwrap(),
             "\"system_proxy\""
         );
-        assert_eq!(
-            serde_json::to_string(&AppMode::Tun).unwrap(),
-            "\"tun\""
-        );
+        assert_eq!(serde_json::to_string(&AppMode::Tun).unwrap(), "\"tun\"");
     }
 }

@@ -25,5 +25,7 @@ impl LinuxTray {
         log::debug!("Tray tooltip: {text}");
     }
 
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 }

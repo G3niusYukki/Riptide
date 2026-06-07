@@ -14,12 +14,12 @@ pub mod mode_coordinator;
 pub mod recovery_watchdog;
 pub mod region_presets;
 pub mod scenes;
-pub mod singbox;
 pub mod secrets;
-pub mod subscription_scheduler;
-pub mod sysproxy;
 #[cfg(target_os = "windows")]
 pub mod service;
+pub mod singbox;
+pub mod subscription_scheduler;
+pub mod sysproxy;
 #[cfg(not(target_os = "windows"))]
 pub mod service {
     pub use super::service_linux::*;

@@ -1,7 +1,7 @@
 //! Windows-specific directory utilities using APPDATA
 
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 pub struct WindowsDirs;
 
@@ -34,9 +34,15 @@ impl WindowsDirs {
         }
     }
 
-    pub fn profiles_dir() -> PathBuf { Self::config_dir().join("profiles") }
-    pub fn mihomo_dir() -> PathBuf   { Self::config_dir().join("mihomo") }
-    pub fn logs_dir() -> PathBuf     { Self::config_dir().join("logs") }
+    pub fn profiles_dir() -> PathBuf {
+        Self::config_dir().join("profiles")
+    }
+    pub fn mihomo_dir() -> PathBuf {
+        Self::config_dir().join("mihomo")
+    }
+    pub fn logs_dir() -> PathBuf {
+        Self::config_dir().join("logs")
+    }
 
     pub fn ensure_dirs() -> std::io::Result<()> {
         std::fs::create_dir_all(Self::profiles_dir())?;

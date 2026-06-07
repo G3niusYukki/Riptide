@@ -23,7 +23,5 @@ pub mod proxy_engine;
 pub mod router;
 
 pub use mihomo_engine::MihomoEngine;
-pub use proxy_engine::{
-    Config, EngineError, ProxyEngine, ProxyEngineKind, ProxyKind, ProxyNode,
-};
+pub use proxy_engine::{Config, EngineError, ProxyEngine, ProxyEngineKind, ProxyKind, ProxyNode};
 pub use router::{EngineRouter, Policy};

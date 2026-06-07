@@ -120,7 +120,11 @@ mod windows_impl {
             }
 
             self.start_guard().await;
-            log::info!("System proxy enabled: HTTP={}, SOCKS={:?} (guard armed)", http_port, socks_port);
+            log::info!(
+                "System proxy enabled: HTTP={}, SOCKS={:?} (guard armed)",
+                http_port,
+                socks_port
+            );
             Ok(())
         }
 
@@ -203,20 +207,26 @@ mod windows_impl {
                 }
             };
 
-            let matches = observed.enable && observed.host == expected.host && observed.port == expected.port;
+            let matches =
+                observed.enable && observed.host == expected.host && observed.port == expected.port;
             if matches {
                 reapply_count = 0;
                 backed_off = false;
                 continue;
             }
 
-            if backed_off { continue; }
+            if backed_off {
+                continue;
+            }
 
             reapply_count += 1;
             let gave_up = reapply_count >= MAX_REAPPLY_BEFORE_BACKOFF;
             if gave_up {
                 backed_off = true;
-                log::error!("System proxy drift could not be corrected after {} attempts; backing off", reapply_count);
+                log::error!(
+                    "System proxy drift could not be corrected after {} attempts; backing off",
+                    reapply_count
+                );
             } else {
                 let to_apply = expected.clone();
                 let res = tokio::task::spawn_blocking(move || to_apply.set_system_proxy()).await;
@@ -286,7 +296,9 @@ pub struct SystemProxyController;
 
 #[cfg(not(target_os = "windows"))]
 impl SystemProxyController {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     pub async fn bind_app_handle(&self, _handle: AppHandle) {}
 
@@ -300,9 +312,13 @@ impl SystemProxyController {
         Ok(())
     }
 
-    pub async fn is_enabled(&self) -> bool { false }
+    pub async fn is_enabled(&self) -> bool {
+        false
+    }
 
-    pub fn get_current_proxy() -> anyhow::Result<()> { Ok(()) }
+    pub fn get_current_proxy() -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -342,8 +358,14 @@ mod tests {
         // stub to track state and broke cross-platform builds.
         let controller = SystemProxyController::new();
         controller.enable(7890, Some(7891)).await.unwrap();
-        assert!(!controller.is_enabled().await, "stub must not track enable state");
+        assert!(
+            !controller.is_enabled().await,
+            "stub must not track enable state"
+        );
         controller.disable().await.unwrap();
-        assert!(!controller.is_enabled().await, "stub must not track disable state");
+        assert!(
+            !controller.is_enabled().await,
+            "stub must not track disable state"
+        );
     }
 }

@@ -142,11 +142,7 @@ pub struct LogEntry {
 
 impl LogEntry {
     /// Build a new entry stamped with the current UTC time.
-    pub fn new(
-        level: LogLevel,
-        category: LogCategory,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn new(level: LogLevel, category: LogCategory, message: impl Into<String>) -> Self {
         let ts = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
         Self {
             ts,
@@ -298,7 +294,8 @@ mod tests {
     #[test]
     fn entry_deserializes_skips_missing_fields() {
         // `fields` defaults to empty BTreeMap when omitted.
-        let json = r#"{"ts":"2026-06-05T22:00:00.123Z","level":"info","category":"app","message":"x"}"#;
+        let json =
+            r#"{"ts":"2026-06-05T22:00:00.123Z","level":"info","category":"app","message":"x"}"#;
         let entry: LogEntry = serde_json::from_str(json).unwrap();
         assert!(entry.fields.is_empty());
     }

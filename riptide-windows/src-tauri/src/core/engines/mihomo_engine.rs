@@ -67,10 +67,8 @@ impl ProxyEngine for MihomoEngine {
         // anything in `node.extra` is merged through so protocol
         // knobs (flow / fp / pbk / sid / …) survive.
         let mut doc = serde_yaml::Mapping::new();
-        let proxies_yaml: Vec<serde_yaml::Value> = nodes
-            .iter()
-            .map(proxy_node_to_clash_yaml)
-            .collect();
+        let proxies_yaml: Vec<serde_yaml::Value> =
+            nodes.iter().map(proxy_node_to_clash_yaml).collect();
         doc.insert(
             serde_yaml::Value::String("proxies".into()),
             serde_yaml::Value::Sequence(proxies_yaml),
@@ -88,10 +86,22 @@ fn proxy_node_to_clash_yaml(node: &ProxyNode) -> serde_yaml::Value {
     use serde_yaml::{Mapping, Value};
 
     let mut m = Mapping::new();
-    m.insert(Value::String("name".into()), Value::String(node.name.clone()));
-    m.insert(Value::String("type".into()), Value::String(node.kind.as_str().into()));
-    m.insert(Value::String("server".into()), Value::String(node.server.clone()));
-    m.insert(Value::String("port".into()), Value::Number(node.port.into()));
+    m.insert(
+        Value::String("name".into()),
+        Value::String(node.name.clone()),
+    );
+    m.insert(
+        Value::String("type".into()),
+        Value::String(node.kind.as_str().into()),
+    );
+    m.insert(
+        Value::String("server".into()),
+        Value::String(node.server.clone()),
+    );
+    m.insert(
+        Value::String("port".into()),
+        Value::Number(node.port.into()),
+    );
 
     if let Some(s) = &node.secret {
         // mihomo uses different field names per protocol (cipher vs

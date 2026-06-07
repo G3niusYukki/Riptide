@@ -30,5 +30,5 @@
 pub mod dispatcher;
 
 pub use dispatcher::{
-    DEDUP_WINDOW, DispatcherEvent, MockSink, NotificationDispatcher, NotifySink, TauriNotifySink,
+    DispatcherEvent, MockSink, NotificationDispatcher, NotifySink, TauriNotifySink, DEDUP_WINDOW,
 };

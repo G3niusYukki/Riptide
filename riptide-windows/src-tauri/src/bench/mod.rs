@@ -30,4 +30,7 @@ pub mod report;
 
 pub use engine::EngineKind;
 pub use harness::run_benchmark;
-pub use report::{BenchmarkReport, DimensionResult, DimensionStatus, MetricSample, MetricSummary, SkippedDimension};
+pub use report::{
+    BenchmarkReport, DimensionResult, DimensionStatus, MetricSample, MetricSummary,
+    SkippedDimension,
+};

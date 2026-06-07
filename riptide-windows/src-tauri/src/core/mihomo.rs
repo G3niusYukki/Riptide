@@ -1,7 +1,7 @@
 //! mihomo sidecar process management
 
-use std::process::{Child, Command, Stdio};
 use std::fs;
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use tauri::{AppHandle, Emitter};
@@ -191,7 +191,7 @@ impl MihomoManager {
         let port = *self.api_port.lock().await;
         let secret = self.api_secret.lock().await.clone();
         let base_url = format!("http://127.0.0.1:{}", port);
-        
+
         Ok(MihomoApiClient::new(base_url, secret))
     }
 
@@ -365,22 +365,10 @@ async fn watch_for_exit(
                 let was_expected = *expected_arc.lock().unwrap();
                 if was_expected {
                     log::info!("mihomo exited cleanly with code {:?}", exit_code);
-                    let _ = app.emit(
-                        "mihomo_exited",
-                        MihomoCrashEvent {
-                            exit_code,
-                            mode,
-                        },
-                    );
+                    let _ = app.emit("mihomo_exited", MihomoCrashEvent { exit_code, mode });
                 } else {
                     log::error!("mihomo crashed (exit code {:?})", exit_code);
-                    let _ = app.emit(
-                        "mihomo_crashed",
-                        MihomoCrashEvent {
-                            exit_code,
-                            mode,
-                        },
-                    );
+                    let _ = app.emit("mihomo_crashed", MihomoCrashEvent { exit_code, mode });
 
                     // If we were in TUN mode and the user opted into the kill
                     // switch, arm it now to stop traffic from silently leaking

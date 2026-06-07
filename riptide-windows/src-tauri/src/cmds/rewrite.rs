@@ -1,7 +1,7 @@
 //! Tauri commands for HTTP rewrite rules management.
 
-use tauri::command;
 use crate::config::rewrite::{self, RewriteRule};
+use tauri::command;
 
 #[command]
 pub fn get_rewrite_rules() -> Vec<RewriteRule> {

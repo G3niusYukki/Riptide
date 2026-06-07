@@ -146,7 +146,9 @@ fn spawn_mode_switch(app: AppHandle, target: ModeTarget) {
                     log::warn!("Tray TUN switch: no profile resolved: {}", e);
                     return;
                 }
-                coordinator.switch_to_tun(&mihomo, &sysproxy, &app_state).await
+                coordinator
+                    .switch_to_tun(&mihomo, &sysproxy, &app_state)
+                    .await
             }
         };
 

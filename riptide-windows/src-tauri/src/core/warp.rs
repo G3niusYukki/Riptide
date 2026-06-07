@@ -222,7 +222,10 @@ pub async fn register_warp_profile(
     let private_key_b64 = encode_b64(secret.to_bytes().as_ref());
     let public_key_b64 = encode_b64(public.as_bytes());
 
-    log::info!("Registering anonymous WARP peer (pubkey {})", &public_key_b64);
+    log::info!(
+        "Registering anonymous WARP peer (pubkey {})",
+        &public_key_b64
+    );
     let response = register_anonymous_warp(&public_key_b64).await?;
     let reserved = reserved_from_client_id(&response.config.client_id)?;
 

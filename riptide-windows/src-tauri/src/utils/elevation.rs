@@ -66,9 +66,7 @@ pub fn relaunch_elevated(args: &[&str]) -> anyhow::Result<i32> {
 
     let exe = std::env::current_exe()?;
 
-    let to_wide = |s: &OsStr| -> Vec<u16> {
-        s.encode_wide().chain(std::iter::once(0)).collect()
-    };
+    let to_wide = |s: &OsStr| -> Vec<u16> { s.encode_wide().chain(std::iter::once(0)).collect() };
 
     let verb: Vec<u16> = "runas\0".encode_utf16().collect();
     let file = to_wide(exe.as_os_str());

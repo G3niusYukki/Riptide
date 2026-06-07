@@ -46,7 +46,8 @@ impl LogbookPaths {
 
     /// Path of the JSONL file for the UTC day containing `date`.
     pub fn file_path(&self, date: DateTime<Utc>) -> PathBuf {
-        self.directory.join(format!("{}.jsonl", self.day_string(date)))
+        self.directory
+            .join(format!("{}.jsonl", self.day_string(date)))
     }
 
     /// Stable `YYYY-MM-DD` string for `date` (always UTC). Used both for
@@ -174,7 +175,10 @@ mod b3_4_tests {
             Some("2024-02-29.jsonl")
         );
         assert_eq!(
-            paths.file_path(non_leap_feb).file_name().and_then(|s| s.to_str()),
+            paths
+                .file_path(non_leap_feb)
+                .file_name()
+                .and_then(|s| s.to_str()),
             Some("2026-02-28.jsonl")
         );
     }

@@ -4,8 +4,8 @@
 //! - Ctrl+Alt+P: Toggle proxy on/off
 //! - Ctrl+Alt+M: Toggle proxy mode (System Proxy / TUN)
 
-use global_hotkey::{GlobalHotKeyManager, GlobalHotKeyEvent};
-use global_hotkey::hotkey::{HotKey, Modifiers, Code};
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager};
 use std::sync::Arc;
 use std::thread;
 use tauri::{AppHandle, Emitter};
@@ -57,21 +57,21 @@ unsafe impl Sync for HotkeyManager {}
 impl HotkeyManager {
     /// Create a new hotkey manager
     pub fn new() -> Result<Self, HotkeyError> {
-        let manager = GlobalHotKeyManager::new()
-            .map_err(|e| HotkeyError::InitFailed(e.to_string()))?;
-        
+        let manager =
+            GlobalHotKeyManager::new().map_err(|e| HotkeyError::InitFailed(e.to_string()))?;
+
         Ok(Self {
             manager: Arc::new(manager),
             registered_keys: Vec::new(),
             app_handle: None,
         })
     }
-    
+
     /// Set the app handle for emitting events
     pub fn set_app_handle(&mut self, app_handle: AppHandle) {
         self.app_handle = Some(app_handle);
     }
-    
+
     /// Register default hotkeys
     /// - Ctrl+Alt+P: Toggle proxy
     /// - Ctrl+Alt+M: Toggle mode
@@ -116,7 +116,7 @@ impl HotkeyManager {
             }
         }
     }
-    
+
     /// Register a custom hotkey
     pub fn register_hotkey(
         &mut self,
@@ -126,36 +126,38 @@ impl HotkeyManager {
         description: String,
     ) -> Result<(), HotkeyError> {
         let hotkey = HotKey::new(modifiers, key);
-        self.manager.register(hotkey)
+        self.manager
+            .register(hotkey)
             .map_err(|e| HotkeyError::RegistrationFailed(e.to_string()))?;
-        
+
         self.registered_keys.push(HotkeyConfig {
             action,
             hotkey,
             description,
         });
-        
+
         Ok(())
     }
-    
+
     /// Unregister all hotkeys
     pub fn unregister_all(&mut self) -> Result<(), HotkeyError> {
         for config in &self.registered_keys {
-            self.manager.unregister(config.hotkey)
+            self.manager
+                .unregister(config.hotkey)
                 .map_err(|e| HotkeyError::UnregistrationFailed(e.to_string()))?;
         }
-        
+
         self.registered_keys.clear();
         log::info!("Unregistered all global hotkeys");
-        
+
         Ok(())
     }
-    
+
     /// Get list of registered hotkeys
     pub fn get_registered_hotkeys(&self) -> &[HotkeyConfig] {
         &self.registered_keys
     }
-    
+
     /// Start listening for hotkey events
     /// This spawns a new thread that listens for hotkey events
     pub fn start_listener<F>(&self, callback: F)
@@ -163,12 +165,12 @@ impl HotkeyManager {
         F: Fn(HotkeyAction) + Send + 'static,
     {
         let registered_keys = self.registered_keys.clone();
-        
+
         thread::spawn(move || {
             let receiver = GlobalHotKeyEvent::receiver();
-            
+
             log::info!("Global hotkey listener started");
-            
+
             loop {
                 if let Ok(event) = receiver.recv() {
                     // Find which action corresponds to this hotkey
@@ -183,7 +185,7 @@ impl HotkeyManager {
             }
         });
     }
-    
+
     /// Emit a hotkey event to the frontend
     pub fn emit_hotkey_event(&self, action: HotkeyAction) {
         if let Some(ref app_handle) = self.app_handle {
@@ -191,7 +193,7 @@ impl HotkeyManager {
                 HotkeyAction::ToggleProxy => "hotkey-toggle-proxy",
                 HotkeyAction::ToggleMode => "hotkey-toggle-mode",
             };
-            
+
             if let Err(e) = app_handle.emit(event_name, ()) {
                 log::error!("Failed to emit hotkey event: {}", e);
             }
@@ -251,9 +253,12 @@ pub fn init_hotkeys(app_handle: AppHandle) -> Result<HotkeyManager, HotkeyError>
 
 /// Command to get registered hotkeys (for frontend)
 #[tauri::command]
-pub fn get_hotkeys(state: tauri::State<'_, std::sync::Mutex<HotkeyManager>>) -> Result<Vec<String>, String> {
+pub fn get_hotkeys(
+    state: tauri::State<'_, std::sync::Mutex<HotkeyManager>>,
+) -> Result<Vec<String>, String> {
     let manager = state.lock().map_err(|e| e.to_string())?;
-    let descriptions: Vec<String> = manager.get_registered_hotkeys()
+    let descriptions: Vec<String> = manager
+        .get_registered_hotkeys()
         .iter()
         .map(|c| c.description.clone())
         .collect();
@@ -263,13 +268,13 @@ pub fn get_hotkeys(state: tauri::State<'_, std::sync::Mutex<HotkeyManager>>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_hotkey_manager_creation() {
         let manager = HotkeyManager::new();
         assert!(manager.is_ok());
     }
-    
+
     #[test]
     fn test_hotkey_action_enum() {
         let actions = vec![HotkeyAction::ToggleProxy, HotkeyAction::ToggleMode];

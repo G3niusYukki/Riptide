@@ -69,7 +69,8 @@ pub fn run_benchmark(
     };
 
     let binary = resolve_binary(engine);
-    let mut report = BenchmarkReport::new_started(engine, binary.as_ref().map(|p| p.display().to_string()));
+    let mut report =
+        BenchmarkReport::new_started(engine, binary.as_ref().map(|p| p.display().to_string()));
 
     for dim in &dims {
         let result = run_dimension(engine, binary.as_deref(), *dim, iters);
@@ -98,10 +99,7 @@ fn run_dimension(
         return skipped(
             dim,
             iterations,
-            format!(
-                "{} binary not found on this platform",
-                engine.as_str()
-            ),
+            format!("{} binary not found on this platform", engine.as_str()),
         );
     };
 
@@ -265,7 +263,8 @@ fn run_http_connect_p50(binary: &std::path::Path, iterations: u32) -> DimensionR
             let mut stream = std::net::TcpStream::connect(addr)?;
             stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
             stream.set_write_timeout(Some(std::time::Duration::from_secs(2)))?;
-            stream.write_all(b"CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")?;
+            stream
+                .write_all(b"CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")?;
             let mut buf = [0u8; 64];
             let _ = stream.read(&mut buf)?;
             Ok(started.elapsed().as_secs_f64() * 1000.0)
@@ -340,11 +339,8 @@ fn summarize(samples: &[MetricSample]) -> MetricSummary {
         None
     };
     let stddev_ms = if sorted.len() >= 2 {
-        let variance = sorted
-            .iter()
-            .map(|v| (v - mean_ms).powi(2))
-            .sum::<f64>()
-            / sorted.len() as f64;
+        let variance =
+            sorted.iter().map(|v| (v - mean_ms).powi(2)).sum::<f64>() / sorted.len() as f64;
         variance.sqrt()
     } else {
         0.0
@@ -404,9 +400,16 @@ mod tests {
         match report.engine_binary {
             None => {
                 assert!(
-                    report.dimensions.iter().all(|d| d.status == DimensionStatus::Skipped),
+                    report
+                        .dimensions
+                        .iter()
+                        .all(|d| d.status == DimensionStatus::Skipped),
                     "no mihomo binary: all dimensions should be Skipped, got {:?}",
-                    report.dimensions.iter().map(|d| (&d.name, d.status)).collect::<Vec<_>>()
+                    report
+                        .dimensions
+                        .iter()
+                        .map(|d| (&d.name, d.status))
+                        .collect::<Vec<_>>()
                 );
                 for d in &report.dimensions {
                     let reason = d.reason.as_deref().unwrap_or("");
@@ -461,9 +464,24 @@ mod tests {
     #[test]
     fn http_connect_p50_local_listener_summarizes() {
         let summary = summarize(&[
-            MetricSample { iteration: 1, duration_ms: 1.0, success: true, error: None },
-            MetricSample { iteration: 2, duration_ms: 2.0, success: true, error: None },
-            MetricSample { iteration: 3, duration_ms: 3.0, success: true, error: None },
+            MetricSample {
+                iteration: 1,
+                duration_ms: 1.0,
+                success: true,
+                error: None,
+            },
+            MetricSample {
+                iteration: 2,
+                duration_ms: 2.0,
+                success: true,
+                error: None,
+            },
+            MetricSample {
+                iteration: 3,
+                duration_ms: 3.0,
+                success: true,
+                error: None,
+            },
         ]);
         assert_eq!(summary.successful, 3);
         assert_eq!(summary.total, 3);

@@ -6,9 +6,9 @@
 use crate::cmds::config::{resolve_active_profile_content, AppState};
 use crate::core::mihomo::{MihomoManager, TunOptions, TunnelMode};
 use crate::core::windows_proxy::WindowsProxyManager;
-use crate::core::windows_sysproxy::{WindowsSysProxyController, WindowsProxyConfig};
-use tauri::{AppHandle, State};
+use crate::core::windows_sysproxy::{WindowsProxyConfig, WindowsSysProxyController};
 use std::sync::Mutex;
+use tauri::{AppHandle, State};
 
 /// State wrapper for WindowsProxyManager
 pub struct WindowsProxyState(pub Mutex<WindowsProxyManager>);
@@ -63,10 +63,7 @@ pub fn get_windows_proxy_pid(state: State<'_, WindowsProxyState>) -> Result<Opti
 
 /// Enable system proxy with HTTP configuration
 #[tauri::command]
-pub fn enable_windows_system_proxy(
-    host: String,
-    port: u16,
-) -> Result<(), String> {
+pub fn enable_windows_system_proxy(host: String, port: u16) -> Result<(), String> {
     let controller = WindowsSysProxyController::new();
     controller
         .enable_http_proxy(&host, port)
@@ -75,10 +72,7 @@ pub fn enable_windows_system_proxy(
 
 /// Enable system proxy with SOCKS configuration
 #[tauri::command]
-pub fn enable_windows_socks_proxy(
-    host: String,
-    port: u16,
-) -> Result<(), String> {
+pub fn enable_windows_socks_proxy(host: String, port: u16) -> Result<(), String> {
     let controller = WindowsSysProxyController::new();
     controller
         .enable_socks_proxy(&host, port)
@@ -192,7 +186,10 @@ pub async fn get_tun_status(mihomo: State<'_, MihomoManager>) -> Result<TUNStatu
 /// Update the runtime TUN options (device name, stack, MTU, …). Takes effect
 /// next time TUN mode is started or the proxy is restarted.
 #[tauri::command]
-pub fn set_tun_options(mihomo: State<'_, MihomoManager>, options: TunOptions) -> Result<(), String> {
+pub fn set_tun_options(
+    mihomo: State<'_, MihomoManager>,
+    options: TunOptions,
+) -> Result<(), String> {
     mihomo.set_tun_options(options);
     Ok(())
 }

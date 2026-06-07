@@ -12,14 +12,15 @@ pub async fn enable_system_proxy(
     http_port: u16,
     socks_port: Option<u16>,
 ) -> Result<(), String> {
-    state.enable(http_port, socks_port).await.map_err(|e| e.to_string())
+    state
+        .enable(http_port, socks_port)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Disable system proxy
 #[tauri::command]
-pub async fn disable_system_proxy(
-    state: State<'_, SystemProxyController>,
-) -> Result<(), String> {
+pub async fn disable_system_proxy(state: State<'_, SystemProxyController>) -> Result<(), String> {
     state.disable().await.map_err(|e| e.to_string())
 }
 
@@ -44,9 +45,13 @@ pub async fn install_tun_service() -> Result<(), String> {
         .await
         .map_err(|e| format!("Task join failed: {}", e))?
         .map_err(|e| e.to_string())?;
-    if code == 0 { Ok(()) }
-    else if code == 1223 { Err("Installation cancelled (UAC prompt was declined)".into()) }
-    else { Err(format!("Elevated installer exited with code {}", code)) }
+    if code == 0 {
+        Ok(())
+    } else if code == 1223 {
+        Err("Installation cancelled (UAC prompt was declined)".into())
+    } else {
+        Err(format!("Elevated installer exited with code {}", code))
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -56,18 +61,25 @@ pub async fn uninstall_tun_service() -> Result<(), String> {
     if elevation::is_elevated() {
         return service::uninstall_service().map_err(|e| e.to_string());
     }
-    let code = tokio::task::spawn_blocking(|| elevation::relaunch_elevated(&["--uninstall-service"]))
-        .await
-        .map_err(|e| format!("Task join failed: {}", e))?
-        .map_err(|e| e.to_string())?;
-    if code == 0 { Ok(()) }
-    else if code == 1223 { Err("Uninstall cancelled (UAC prompt was declined)".into()) }
-    else { Err(format!("Elevated uninstaller exited with code {}", code)) }
+    let code =
+        tokio::task::spawn_blocking(|| elevation::relaunch_elevated(&["--uninstall-service"]))
+            .await
+            .map_err(|e| format!("Task join failed: {}", e))?
+            .map_err(|e| e.to_string())?;
+    if code == 0 {
+        Ok(())
+    } else if code == 1223 {
+        Err("Uninstall cancelled (UAC prompt was declined)".into())
+    } else {
+        Err(format!("Elevated uninstaller exited with code {}", code))
+    }
 }
 
 #[cfg(target_os = "windows")]
 #[tauri::command]
-pub fn is_elevated() -> bool { crate::utils::elevation::is_elevated() }
+pub fn is_elevated() -> bool {
+    crate::utils::elevation::is_elevated()
+}
 
 #[cfg(target_os = "windows")]
 #[tauri::command]
@@ -85,7 +97,9 @@ pub async fn stop_tun_service() -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 #[tauri::command]
-pub fn get_tun_service_status() -> ServiceStatusKind { service::query_status() }
+pub fn get_tun_service_status() -> ServiceStatusKind {
+    service::query_status()
+}
 
 // ── Update check (cross-platform) ───────────────────────────────
 
@@ -99,22 +113,33 @@ pub struct UpdateInfo {
 
 #[tauri::command]
 pub async fn check_update(app_handle: tauri::AppHandle) -> Result<UpdateInfo, String> {
-    let current_version = app_handle.config().version.clone().unwrap_or_else(|| "0.0.0".to_string());
+    let current_version = app_handle
+        .config()
+        .version
+        .clone()
+        .unwrap_or_else(|| "0.0.0".to_string());
     let client = reqwest::Client::builder()
         .user_agent("Riptide-Update-Checker")
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
     let url = "https://api.github.com/repos/RiptideTeam/Riptide/releases/latest";
-    let response = client.get(url)
+    let response = client
+        .get(url)
         .header("Accept", "application/vnd.github.v3+json")
-        .send().await
+        .send()
+        .await
         .map_err(|e| format!("Failed to check for updates: {}", e))?;
     if !response.status().is_success() {
         return Err(format!("GitHub API returned {}", response.status()));
     }
     #[derive(serde::Deserialize)]
-    struct ReleaseResponse { tag_name: String, html_url: String }
-    let release: ReleaseResponse = response.json().await
+    struct ReleaseResponse {
+        tag_name: String,
+        html_url: String,
+    }
+    let release: ReleaseResponse = response
+        .json()
+        .await
         .map_err(|e| format!("Failed to parse release info: {}", e))?;
     let latest = release.tag_name.trim_start_matches('v');
     Ok(UpdateInfo {

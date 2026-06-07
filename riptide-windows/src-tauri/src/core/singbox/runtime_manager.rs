@@ -108,9 +108,15 @@ mod tests {
     fn runtime_manager_status_is_uninstalled_by_default() {
         let mgr = SingBoxRuntimeManager::new();
         let status = mgr.status();
-        assert!(!status.installed, "default status should report not installed");
+        assert!(
+            !status.installed,
+            "default status should report not installed"
+        );
         assert!(!status.running, "default status should report not running");
-        assert!(status.version.is_none(), "default status should report no version");
+        assert!(
+            status.version.is_none(),
+            "default status should report no version"
+        );
     }
 
     #[test]

@@ -109,10 +109,7 @@ fn preset_for(region: Region) -> Preset {
                 enhanced_mode: Some("fake-ip".into()),
                 fake_ip: Some(true),
                 fake_ip_range: Some("198.18.0.1/16".into()),
-                default_nameserver: Some(vec![
-                    "223.5.5.5".into(),
-                    "119.29.29.29".into(),
-                ]),
+                default_nameserver: Some(vec!["223.5.5.5".into(), "119.29.29.29".into()]),
                 nameserver: Some(vec![
                     "https://dns.alidns.com/dns-query".into(),
                     "https://doh.pub/dns-query".into(),

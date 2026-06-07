@@ -197,9 +197,15 @@ mod tests {
 
     #[test]
     fn matcher_kinds_are_stable_strings() {
-        let mp = Matcher::Process { pattern: "*".into() };
-        let md = Matcher::Domain { pattern: "example.com".into() };
-        let mi = Matcher::IpSet { value: "10.0.0.0/8".into() };
+        let mp = Matcher::Process {
+            pattern: "*".into(),
+        };
+        let md = Matcher::Domain {
+            pattern: "example.com".into(),
+        };
+        let mi = Matcher::IpSet {
+            value: "10.0.0.0/8".into(),
+        };
         assert_eq!(mp.kind_str(), "process");
         assert_eq!(md.kind_str(), "domain");
         assert_eq!(mi.kind_str(), "ipset");
@@ -214,9 +220,15 @@ mod tests {
             mode: ModeOverride::Tun,
             enabled: true,
             matchers: vec![
-                Matcher::IpSet { value: "10.0.0.0/8".into() },
-                Matcher::Process { pattern: "a.exe".into() },
-                Matcher::Process { pattern: "b.exe".into() },
+                Matcher::IpSet {
+                    value: "10.0.0.0/8".into(),
+                },
+                Matcher::Process {
+                    pattern: "a.exe".into(),
+                },
+                Matcher::Process {
+                    pattern: "b.exe".into(),
+                },
             ],
             created_at: "2026-06-07T00:00:00Z".into(),
             updated_at: "2026-06-07T00:00:00Z".into(),

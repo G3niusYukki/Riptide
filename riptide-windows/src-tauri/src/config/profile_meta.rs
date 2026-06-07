@@ -122,7 +122,8 @@ mod tests {
 
     #[test]
     fn parses_canonical_userinfo() {
-        let info = parse_subscription_userinfo("upload=100; download=200; total=300; expire=1735689600");
+        let info =
+            parse_subscription_userinfo("upload=100; download=200; total=300; expire=1735689600");
         assert_eq!(info.upload, Some(100));
         assert_eq!(info.download, Some(200));
         assert_eq!(info.total, Some(300));
@@ -148,7 +149,10 @@ mod tests {
     fn metadata_path_derived_from_yaml() {
         let p = PathBuf::from("/tmp/foo__abc.yaml");
         let meta = metadata_path_for(&p).unwrap();
-        assert_eq!(meta.file_name().unwrap().to_string_lossy(), "foo__abc.meta.json");
+        assert_eq!(
+            meta.file_name().unwrap().to_string_lossy(),
+            "foo__abc.meta.json"
+        );
     }
 
     #[test]

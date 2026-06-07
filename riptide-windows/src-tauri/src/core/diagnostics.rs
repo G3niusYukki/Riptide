@@ -135,10 +135,7 @@ fn collect_active_profile(app_handle: &AppHandle) -> Option<ProfileSummary> {
     Some(ProfileSummary {
         name: profile.name.clone(),
         node_count: profile.node_count,
-        last_updated: profile
-            .metadata
-            .last_updated_at
-            .map(|t| t.to_rfc3339()),
+        last_updated: profile.metadata.last_updated_at.map(|t| t.to_rfc3339()),
         has_subscription: profile.metadata.source_url.is_some(),
     })
 }
@@ -162,11 +159,7 @@ fn os_version_string() -> String {
 }
 
 fn query_mihomo_version(path: &str) -> Option<String> {
-    let out = Command::new(path)
-        .arg("-v")
-        .no_window()
-        .output()
-        .ok()?;
+    let out = Command::new(path).arg("-v").no_window().output().ok()?;
     if !out.status.success() {
         return None;
     }

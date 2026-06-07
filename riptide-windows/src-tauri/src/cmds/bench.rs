@@ -76,9 +76,7 @@ fn parse_engine(s: Option<String>) -> Result<EngineKind, String> {
     }
 }
 
-fn parse_dimensions(
-    s: Option<Vec<String>>,
-) -> Result<Option<Vec<DimensionId>>, String> {
+fn parse_dimensions(s: Option<Vec<String>>) -> Result<Option<Vec<DimensionId>>, String> {
     let Some(list) = s else {
         return Ok(None);
     };
@@ -103,9 +101,18 @@ mod tests {
     #[test]
     fn parse_engine_defaults_to_mihomo() {
         assert_eq!(parse_engine(None).unwrap(), EngineKind::Mihomo);
-        assert_eq!(parse_engine(Some(String::new())).unwrap(), EngineKind::Mihomo);
-        assert_eq!(parse_engine(Some("mihomo".into())).unwrap(), EngineKind::Mihomo);
-        assert_eq!(parse_engine(Some("singbox".into())).unwrap(), EngineKind::Singbox);
+        assert_eq!(
+            parse_engine(Some(String::new())).unwrap(),
+            EngineKind::Mihomo
+        );
+        assert_eq!(
+            parse_engine(Some("mihomo".into())).unwrap(),
+            EngineKind::Mihomo
+        );
+        assert_eq!(
+            parse_engine(Some("singbox".into())).unwrap(),
+            EngineKind::Singbox
+        );
         assert!(parse_engine(Some("nope".into())).is_err());
     }
 
@@ -116,12 +123,9 @@ mod tests {
     fn parse_dimensions_handles_all_shapes() {
         assert!(parse_dimensions(None).unwrap().is_none());
         assert!(parse_dimensions(Some(vec![])).unwrap().is_none());
-        let parsed = parse_dimensions(Some(vec![
-            "http_connect_p50".into(),
-            "startup".into(),
-        ]))
-        .unwrap()
-        .unwrap();
+        let parsed = parse_dimensions(Some(vec!["http_connect_p50".into(), "startup".into()]))
+            .unwrap()
+            .unwrap();
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0], DimensionId::HttpConnectP50);
         assert_eq!(parsed[1], DimensionId::Startup);

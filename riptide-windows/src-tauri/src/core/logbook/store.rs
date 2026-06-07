@@ -253,9 +253,7 @@ fn export_blocking(entries: &[LogEntry], dest: &Path) -> Result<u32, String> {
             .map_err(|e| format!("Write failed: {}", e))?;
         count = count.saturating_add(1);
     }
-    writer
-        .flush()
-        .map_err(|e| format!("Flush failed: {}", e))?;
+    writer.flush().map_err(|e| format!("Flush failed: {}", e))?;
     Ok(count)
 }
 
@@ -314,8 +312,8 @@ fn matches_query(entry: &LogEntry, q: &LogbookQuery) -> bool {
 
 fn write_lines(path: &Path, lines: &[&str]) -> Result<(), String> {
     use std::io::Write;
-    let file = std::fs::File::create(path)
-        .map_err(|e| format!("Failed to rewrite {:?}: {}", path, e))?;
+    let file =
+        std::fs::File::create(path).map_err(|e| format!("Failed to rewrite {:?}: {}", path, e))?;
     let mut writer = std::io::BufWriter::new(file);
     for line in lines {
         writer
@@ -375,9 +373,7 @@ mod tests {
     }
 
     fn entry(day: u32, level: LogLevel, cat: LogCategory, msg: &str) -> LogEntry {
-        let ts = Utc
-            .with_ymd_and_hms(2026, 6, day, 12, 0, 0)
-            .unwrap();
+        let ts = Utc.with_ymd_and_hms(2026, 6, day, 12, 0, 0).unwrap();
         let mut e = LogEntry::with_timestamp(ts, level, cat, msg);
         e.fields.insert("k".into(), "v".into());
         e
@@ -400,7 +396,9 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn query_empty_dir_returns_empty() {
         let dir = fresh_dir("empty");
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert!(out.is_empty());
     }
@@ -408,14 +406,22 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn query_returns_all_entries_in_date_order() {
         let dir = fresh_dir("all");
-        write_file(&dir, "2026-06-05", &[
-            entry(5, LogLevel::Info, LogCategory::App, "first"),
-            entry(5, LogLevel::Error, LogCategory::Mihomo, "second"),
-        ]);
-        write_file(&dir, "2026-06-06", &[
-            entry(6, LogLevel::Info, LogCategory::Service, "third"),
-        ]);
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        write_file(
+            &dir,
+            "2026-06-05",
+            &[
+                entry(5, LogLevel::Info, LogCategory::App, "first"),
+                entry(5, LogLevel::Error, LogCategory::Mihomo, "second"),
+            ],
+        );
+        write_file(
+            &dir,
+            "2026-06-06",
+            &[entry(6, LogLevel::Info, LogCategory::Service, "third")],
+        );
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 3);
         assert_eq!(out[0].message, "first");
@@ -426,12 +432,18 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn query_filters_by_level_and_category() {
         let dir = fresh_dir("filter");
-        write_file(&dir, "2026-06-05", &[
-            entry(5, LogLevel::Info, LogCategory::App, "i-app"),
-            entry(5, LogLevel::Warning, LogCategory::Service, "w-svc"),
-            entry(5, LogLevel::Error, LogCategory::Mihomo, "e-mihomo"),
-        ]);
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        write_file(
+            &dir,
+            "2026-06-05",
+            &[
+                entry(5, LogLevel::Info, LogCategory::App, "i-app"),
+                entry(5, LogLevel::Warning, LogCategory::Service, "w-svc"),
+                entry(5, LogLevel::Error, LogCategory::Mihomo, "e-mihomo"),
+            ],
+        );
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let q = LogbookQuery {
             levels: vec![LogLevel::Warning, LogLevel::Error],
             categories: vec![],
@@ -454,7 +466,9 @@ mod tests {
         writeln!(f, "{}", serde_json::to_string(&e).unwrap()).unwrap();
         writeln!(f, "this is not json").unwrap();
         writeln!(f, "").unwrap();
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].message, "ok");
@@ -463,16 +477,19 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn clear_by_category_rewrites_files_and_counts_removals() {
         let dir = fresh_dir("clear-cat");
-        write_file(&dir, "2026-06-05", &[
-            entry(5, LogLevel::Info, LogCategory::App, "keep"),
-            entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-1"),
-            entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-2"),
-        ]);
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
-        let removed = store
-            .clear(Some(LogCategory::Mihomo), None)
-            .await
-            .unwrap();
+        write_file(
+            &dir,
+            "2026-06-05",
+            &[
+                entry(5, LogLevel::Info, LogCategory::App, "keep"),
+                entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-1"),
+                entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-2"),
+            ],
+        );
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
+        let removed = store.clear(Some(LogCategory::Mihomo), None).await.unwrap();
         assert_eq!(removed, 2);
         let remaining = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(remaining.len(), 1);
@@ -482,9 +499,19 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn clear_by_date_prunes_whole_files() {
         let dir = fresh_dir("clear-date");
-        write_file(&dir, "2026-06-04", &[entry(4, LogLevel::Info, LogCategory::App, "old")]);
-        write_file(&dir, "2026-06-05", &[entry(5, LogLevel::Info, LogCategory::App, "new")]);
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        write_file(
+            &dir,
+            "2026-06-04",
+            &[entry(4, LogLevel::Info, LogCategory::App, "old")],
+        );
+        write_file(
+            &dir,
+            "2026-06-05",
+            &[entry(5, LogLevel::Info, LogCategory::App, "new")],
+        );
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let cutoff = Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap();
         let _ = store.clear(None, Some(cutoff)).await.unwrap();
         let remaining = store.query(LogbookQuery::default()).await.unwrap();
@@ -496,9 +523,19 @@ mod tests {
     async fn export_writes_sorted_jsonl_to_dest() {
         let dir = fresh_dir("export");
         // Insert in non-chronological order on disk — export must sort.
-        write_file(&dir, "2026-06-06", &[entry(6, LogLevel::Info, LogCategory::App, "b")]);
-        write_file(&dir, "2026-06-05", &[entry(5, LogLevel::Info, LogCategory::App, "a")]);
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        write_file(
+            &dir,
+            "2026-06-06",
+            &[entry(6, LogLevel::Info, LogCategory::App, "b")],
+        );
+        write_file(
+            &dir,
+            "2026-06-05",
+            &[entry(5, LogLevel::Info, LogCategory::App, "a")],
+        );
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let dest = dir.join("exported.jsonl");
         let count = store
             .export(LogbookQuery::default(), dest.clone())
@@ -518,7 +555,9 @@ mod tests {
     async fn store_sees_what_writer_wrote() {
         // End-to-end smoke: writer + store on the same dir.
         let dir = fresh_dir("e2e");
-        let writer = LogbookWriter::spawn(LogbookPaths { directory: dir.clone() });
+        let writer = LogbookWriter::spawn(LogbookPaths {
+            directory: dir.clone(),
+        });
         writer.log_info("hello", LogCategory::App);
         writer.log_warning("careful", LogCategory::Service);
 
@@ -529,7 +568,9 @@ mod tests {
         // Drop the writer so its background task exits cleanly.
         drop(writer);
 
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 2);
         let messages: Vec<&str> = out.iter().map(|e| e.message.as_str()).collect();
@@ -611,13 +652,20 @@ mod b3_4_tests {
             ],
         );
 
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         let q = LogbookQuery {
             limit: Some(100),
             ..Default::default()
         };
         let out = store.query(q).await.unwrap();
-        assert_eq!(out.len(), 5, "all 5 entries must be returned, got {}", out.len());
+        assert_eq!(
+            out.len(),
+            5,
+            "all 5 entries must be returned, got {}",
+            out.len()
+        );
 
         // Order is file order then line order — verify by message.
         let mut messages: Vec<String> = out.iter().map(|e| e.message.clone()).collect();
@@ -645,7 +693,9 @@ mod b3_4_tests {
                 entry_at(5, 12, LogLevel::Error, LogCategory::Helper, "e-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
 
         // Only error → 2 entries
         let q_err = LogbookQuery {
@@ -683,7 +733,9 @@ mod b3_4_tests {
                 entry_at(5, 12, LogLevel::Info, LogCategory::App, "x-app-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
 
         // Service only → 2 entries
         let q_svc = LogbookQuery {
@@ -705,10 +757,10 @@ mod b3_4_tests {
         assert_eq!(out_am.len(), 3);
         // LogCategory does not derive Ord, so collect into a HashSet
         // (it does derive Hash + Eq) for the equality check.
-        let cats: std::collections::HashSet<_> =
-            out_am.iter().map(|e| e.category).collect();
-        let expected: std::collections::HashSet<_> =
-            [LogCategory::App, LogCategory::Mihomo].into_iter().collect();
+        let cats: std::collections::HashSet<_> = out_am.iter().map(|e| e.category).collect();
+        let expected: std::collections::HashSet<_> = [LogCategory::App, LogCategory::Mihomo]
+            .into_iter()
+            .collect();
         assert_eq!(cats, expected);
     }
 
@@ -721,12 +773,18 @@ mod b3_4_tests {
             write_file(
                 &dir,
                 &format!("2026-06-{day:02}"),
-                &[
-                    entry_at(day, hour, LogLevel::Info, LogCategory::App, &format!("d{day}-h{hour}")),
-                ],
+                &[entry_at(
+                    day,
+                    hour,
+                    LogLevel::Info,
+                    LogCategory::App,
+                    &format!("d{day}-h{hour}"),
+                )],
             );
         }
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
 
         // Range covers only day 6 (UTC). Expect 2 entries.
         let from = Utc.with_ymd_and_hms(2026, 6, 6, 0, 0, 0).unwrap();
@@ -785,7 +843,9 @@ mod b3_4_tests {
                 entry_at(6, 10, LogLevel::Info, LogCategory::App, "a-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
 
         // Sanity: 8 entries total
         let initial = store.query(LogbookQuery::default()).await.unwrap();
@@ -811,7 +871,10 @@ mod b3_4_tests {
             .clear(Some(LogCategory::Dns), None)
             .await
             .expect("clear ok");
-        assert_eq!(zero, 0, "clear of absent category must return 0, got {zero}");
+        assert_eq!(
+            zero, 0,
+            "clear of absent category must return 0, got {zero}"
+        );
     }
 
     // ── Test 6: export 生成目标文件 ────────────────────────────────────
@@ -836,7 +899,9 @@ mod b3_4_tests {
             ],
         );
 
-        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
+        let store = LogbookStore::new(LogbookPaths {
+            directory: dir.clone(),
+        });
         // Export only errors → 1 entry
         let dest = dir.join("only-errors.jsonl");
         let q = LogbookQuery {
@@ -844,10 +909,7 @@ mod b3_4_tests {
             limit: Some(100),
             ..Default::default()
         };
-        let count = store
-            .export(q, dest.clone())
-            .await
-            .expect("export ok");
+        let count = store.export(q, dest.clone()).await.expect("export ok");
         assert_eq!(count, 1, "exactly one error must be exported, got {count}");
 
         // Verify dest file exists, is a single valid JSONL line, sorted.
@@ -859,14 +921,13 @@ mod b3_4_tests {
         assert_eq!(entry.level, LogLevel::Error);
 
         // Round-trip: re-read the dest via the store and confirm the count.
-        let store2 = LogbookStore::new(LogbookPaths { directory: dir.parent().unwrap().to_path_buf() });
+        let store2 = LogbookStore::new(LogbookPaths {
+            directory: dir.parent().unwrap().to_path_buf(),
+        });
         // We just want to sanity-check that the file is valid JSONL;
         // read it back as raw lines and confirm count.
         let reread = std::fs::read_to_string(&dest).unwrap();
-        let reread_lines: Vec<&str> = reread
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .collect();
+        let reread_lines: Vec<&str> = reread.lines().filter(|l| !l.trim().is_empty()).collect();
         assert_eq!(reread_lines.len(), 1);
         // Touch store2 to make sure it's wired (compile-check).
         let _ = store2.paths().directory;

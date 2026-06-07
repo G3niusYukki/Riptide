@@ -28,9 +28,11 @@ pub async fn serialize_proxies_to_uris(
     // reliably populated, so we accept the parameter and return an
     // explanatory error pointing the caller to the per-proxy command.
     let _ = profile_id;
-    Err("serialize_proxies_to_uris requires AppState (pending B3 producer wire-up); \
+    Err(
+        "serialize_proxies_to_uris requires AppState (pending B3 producer wire-up); \
          call serialize_proxy_to_uri for each proxy until then"
-        .into())
+            .into(),
+    )
 }
 
 #[cfg(not(target_os = "windows"))]

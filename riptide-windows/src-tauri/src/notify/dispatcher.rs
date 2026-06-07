@@ -262,7 +262,11 @@ impl NotificationDispatcher {
         // Front-end event is the canonical surface. Failure to emit is
         // logged but not surfaced — the user still has the native toast.
         if let Err(e) = self.sink.emit(event, &payload) {
-            log::warn!("NotificationDispatcher: emit {} failed: {}", event.as_str(), e);
+            log::warn!(
+                "NotificationDispatcher: emit {} failed: {}",
+                event.as_str(),
+                e
+            );
         }
 
         // Native toast is best-effort. Permission-denied → swallow the
@@ -299,7 +303,11 @@ impl NotificationDispatcher {
         } else {
             format!("'{profile}' will refresh in {days_left} day(s)")
         };
-        self.dispatch(DispatcherEvent::SubscriptionExpiring, "Subscription expiring", body);
+        self.dispatch(
+            DispatcherEvent::SubscriptionExpiring,
+            "Subscription expiring",
+            body,
+        );
     }
 
     /// A profile finished (re)loading. `profile` is the human-readable

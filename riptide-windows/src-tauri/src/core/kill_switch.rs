@@ -11,8 +11,8 @@
 //! Config + state are persisted to `%APPDATA%\Riptide\kill_switch.json` so a
 //! crash that triggered the switch is visible across app restarts.
 
-use serde::{Deserialize, Serialize};
 use crate::utils::process::CommandExt;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -62,7 +62,15 @@ impl KillSwitchState {
 pub fn arm() -> Result<(), String> {
     log::warn!("Arming kill switch — installing blackhole default route");
     let output = Command::new("route")
-        .args(["add", "0.0.0.0", "mask", "0.0.0.0", "127.0.0.1", "metric", "1"])
+        .args([
+            "add",
+            "0.0.0.0",
+            "mask",
+            "0.0.0.0",
+            "127.0.0.1",
+            "metric",
+            "1",
+        ])
         .no_window()
         .output()
         .map_err(|e| format!("Failed to run route.exe: {}", e))?;

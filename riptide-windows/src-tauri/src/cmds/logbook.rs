@@ -19,7 +19,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 
-use crate::core::logbook::{LogCategory, LogEntry, LogLevel, LogbookPaths, LogbookStore, LogbookWriter};
+use crate::core::logbook::{
+    LogCategory, LogEntry, LogLevel, LogbookPaths, LogbookStore, LogbookWriter,
+};
 
 /// Build a `LogbookStore` rooted at the default Windows logbook dir.
 /// One fresh store per call — `LogbookStore` is just a thin handle, so
@@ -150,7 +152,9 @@ mod tests {
         assert!(parse_ts(Some(""), "x").unwrap().is_none());
         assert!(parse_ts(Some("  "), "x").unwrap().is_none());
 
-        let ts = parse_ts(Some("2026-06-05T22:00:00Z"), "x").unwrap().unwrap();
+        let ts = parse_ts(Some("2026-06-05T22:00:00Z"), "x")
+            .unwrap()
+            .unwrap();
         assert_eq!(
             ts.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
             "2026-06-05T22:00:00Z"
@@ -160,7 +164,10 @@ mod tests {
     #[test]
     fn parse_ts_rejects_garbage_with_field_name() {
         let err = parse_ts(Some("not-a-date"), "from").unwrap_err();
-        assert!(err.contains("from"), "error should name the field, got {err}");
+        assert!(
+            err.contains("from"),
+            "error should name the field, got {err}"
+        );
         assert!(err.contains("not-a-date"));
     }
 

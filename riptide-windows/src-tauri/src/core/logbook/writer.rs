@@ -275,7 +275,11 @@ async fn flush_blocking(paths: &LogbookPaths, batch: &mut Vec<LogEntry>) {
     let paths = paths.clone();
     let result = tokio::task::spawn_blocking(move || {
         if let Err(e) = paths.create_dir_if_needed() {
-            log::warn!("Logbook: failed to create directory {:?}: {}", paths.directory, e);
+            log::warn!(
+                "Logbook: failed to create directory {:?}: {}",
+                paths.directory,
+                e
+            );
             return;
         }
         for (day, entries) in &by_day {
@@ -348,7 +352,9 @@ mod tests {
             Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let _ = std::fs::remove_dir_all(&p);
-        let paths = LogbookPaths { directory: p.clone() };
+        let paths = LogbookPaths {
+            directory: p.clone(),
+        };
         (LogbookWriter::spawn(paths), p)
     }
 
@@ -378,9 +384,7 @@ mod tests {
     async fn writer_writes_jsonl_after_batch_window() {
         let (writer, dir) = fresh_writer("basic");
         writer.log_info("hello", LogCategory::App);
-        let day = writer
-            .paths
-            .day_string(Utc::now());
+        let day = writer.paths.day_string(Utc::now());
         wait_for_file(&dir, &day).await;
 
         let lines = read_lines(&dir.join(format!("{day}.jsonl")));
@@ -491,7 +495,9 @@ mod tests {
             Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let _ = std::fs::remove_dir_all(&p);
-        let paths = LogbookPaths { directory: p.clone() };
+        let paths = LogbookPaths {
+            directory: p.clone(),
+        };
         let writer = LogbookWriter::spawn(paths);
         assert_eq!(writer.directory(), p.as_path());
     }
@@ -550,7 +556,9 @@ mod b3_4_tests {
             Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let _ = std::fs::remove_dir_all(&p);
-        let paths = LogbookPaths { directory: p.clone() };
+        let paths = LogbookPaths {
+            directory: p.clone(),
+        };
         (LogbookWriter::spawn(paths), p)
     }
 
@@ -636,7 +644,10 @@ mod b3_4_tests {
         wait_for_file(&dir, &day).await;
 
         let size_after = std::fs::metadata(&path).expect("file").len();
-        assert!(size_after > 0, "file size should be > 0 after one write, got {size_after}");
+        assert!(
+            size_after > 0,
+            "file size should be > 0 after one write, got {size_after}"
+        );
     }
 
     // ── Test 2: 多条 entry 都被持久化 ─────────────────────────────────
@@ -695,7 +706,10 @@ mod b3_4_tests {
                 .unwrap_or_else(|e| panic!("line {idx} not valid JSON after drop: {e} — {l:?}"));
             assert!(entry.message.starts_with("tail-"));
         }
-        assert!(size > 0, "file size must be > 0 after drop flush, got {size}");
+        assert!(
+            size > 0,
+            "file size must be > 0 after drop flush, got {size}"
+        );
     }
 
     // ── Test 4: fire-and-forget — 模拟 IO 错误不 panic ─────────────────
@@ -795,7 +809,8 @@ mod b3_4_tests {
         // on 2026-06-05 regardless of the host clock.
         let ts = Utc.with_ymd_and_hms(2026, 6, 5, 8, 30, 0).unwrap();
         for i in 0..3 {
-            let entry = LogEntry::with_timestamp(ts, LogLevel::Info, LogCategory::App, format!("sd-{i}"));
+            let entry =
+                LogEntry::with_timestamp(ts, LogLevel::Info, LogCategory::App, format!("sd-{i}"));
             writer.send(entry);
         }
 
@@ -808,7 +823,11 @@ mod b3_4_tests {
             .map(|e| e.file_name().to_string_lossy().to_string())
             .filter(|n| n.ends_with(".jsonl"))
             .collect();
-        assert_eq!(files.len(), 1, "same-day entries must share one file, got {files:?}");
+        assert_eq!(
+            files.len(),
+            1,
+            "same-day entries must share one file, got {files:?}"
+        );
         assert_eq!(files[0], "2026-06-05.jsonl");
     }
 
@@ -820,9 +839,24 @@ mod b3_4_tests {
         let d1 = Utc.with_ymd_and_hms(2026, 6, 5, 23, 59, 0).unwrap();
         let d2 = Utc.with_ymd_and_hms(2026, 6, 6, 0, 0, 1).unwrap();
         let d3 = Utc.with_ymd_and_hms(2026, 6, 6, 12, 0, 0).unwrap();
-        writer.send(LogEntry::with_timestamp(d1, LogLevel::Info, LogCategory::App, "d1-a"));
-        writer.send(LogEntry::with_timestamp(d2, LogLevel::Info, LogCategory::App, "d2-a"));
-        writer.send(LogEntry::with_timestamp(d3, LogLevel::Info, LogCategory::App, "d2-b"));
+        writer.send(LogEntry::with_timestamp(
+            d1,
+            LogLevel::Info,
+            LogCategory::App,
+            "d1-a",
+        ));
+        writer.send(LogEntry::with_timestamp(
+            d2,
+            LogLevel::Info,
+            LogCategory::App,
+            "d2-a",
+        ));
+        writer.send(LogEntry::with_timestamp(
+            d3,
+            LogLevel::Info,
+            LogCategory::App,
+            "d2-b",
+        ));
 
         wait_for_n_lines(&dir, "2026-06-05", 1).await;
         wait_for_n_lines(&dir, "2026-06-06", 2).await;
@@ -835,9 +869,12 @@ mod b3_4_tests {
             .collect();
         assert_eq!(
             files,
-            ["2026-06-05.jsonl".to_string(), "2026-06-06.jsonl".to_string()]
-                .into_iter()
-                .collect()
+            [
+                "2026-06-05.jsonl".to_string(),
+                "2026-06-06.jsonl".to_string()
+            ]
+            .into_iter()
+            .collect()
         );
 
         // Spot-check the contents per file.
@@ -876,7 +913,8 @@ mod b3_4_tests {
             .append(true)
             .open(&target)
             .expect("open for append");
-        f.write_all(b"this is not json at all\n{\"ts\":\"broken\n").expect("write garbage");
+        f.write_all(b"this is not json at all\n{\"ts\":\"broken\n")
+            .expect("write garbage");
         f.flush().expect("flush garbage");
         drop(f);
 
@@ -891,10 +929,7 @@ mod b3_4_tests {
         let mut good_after: usize = 0;
         for _ in 0..200 {
             let raw = std::fs::read_to_string(&target).expect("read");
-            good_after = raw
-                .lines()
-                .filter(|l| l.contains("after-garbage-"))
-                .count();
+            good_after = raw.lines().filter(|l| l.contains("after-garbage-")).count();
             if good_after >= 5 {
                 break;
             }
@@ -914,4 +949,3 @@ mod b3_4_tests {
         assert!(raw.contains("this is not json at all"));
     }
 }
-

@@ -35,24 +35,20 @@ pub fn parse_share_uri(uri: &str) -> Result<ClashRawProxy, UriParseError> {
         parse_vless(rest)
     } else if let Some(rest) = uri.strip_prefix("vmess://") {
         parse_vmess(rest)
-    } else     if let Some(rest) = uri.strip_prefix("hysteria2://") {
+    } else if let Some(rest) = uri.strip_prefix("hysteria2://") {
         parse_hysteria2(rest)
     } else if let Some(rest) = uri.strip_prefix("tuic://") {
         parse_tuic(rest)
     } else {
         Err(UriParseError::InvalidScheme(
-            uri.chars()
-                .take_while(|c| *c != ':')
-                .collect::<String>(),
+            uri.chars().take_while(|c| *c != ':').collect::<String>(),
         ))
     }
 }
 
 /// Base64 decode helper (supports both standard and URL-safe Base64)
 fn decode_base64(s: &str) -> Result<String, UriParseError> {
-    let s = s
-        .replace('-', "+")
-        .replace('_', "/");
+    let s = s.replace('-', "+").replace('_', "/");
 
     // Pad if needed
     let padded = match s.len() % 4 {
@@ -360,9 +356,11 @@ fn parse_hysteria2(rest: &str) -> Result<ClashRawProxy, UriParseError> {
 /// Parse TUIC URI: tuic://uuid:password@server:port?query#name
 fn parse_tuic(rest: &str) -> Result<ClashRawProxy, UriParseError> {
     let (body, name) = split_fragment(rest);
-    let (userinfo, host_rest) = body.split_once('@')
+    let (userinfo, host_rest) = body
+        .split_once('@')
         .ok_or_else(|| UriParseError::MissingField("uuid:password@server:port".into()))?;
-    let (uuid, password_raw) = userinfo.split_once(':')
+    let (uuid, password_raw) = userinfo
+        .split_once(':')
         .ok_or_else(|| UriParseError::MissingField("uuid:password".into()))?;
     // The serializer percent-encodes the password before emitting the
     // URI, so decode it back. We try the full URL decode first; if that
@@ -372,9 +370,12 @@ fn parse_tuic(rest: &str) -> Result<ClashRawProxy, UriParseError> {
         .map(|s| s.into_owned())
         .unwrap_or_else(|_| password_raw.to_string());
     let (host_port, query) = host_rest.split_once('?').unwrap_or((host_rest, ""));
-    let (server, port_str) = host_port.split_once(':')
+    let (server, port_str) = host_port
+        .split_once(':')
         .ok_or_else(|| UriParseError::MissingField("server:port".into()))?;
-    let port: u16 = port_str.parse().map_err(|_| UriParseError::InvalidPort(port_str.into()))?;
+    let port: u16 = port_str
+        .parse()
+        .map_err(|_| UriParseError::InvalidPort(port_str.into()))?;
     let params = parse_query_params(query);
     let sni = params.get("sni").cloned();
     let skip_cert_verify = params.get("allowInsecure").map(|v| v == "1");
@@ -476,8 +477,7 @@ mod tests {
     fn test_parse_shadowsocks() {
         // Base64 encode "aes-256-gcm:password" = YWVzLTI1Ni1nY206cGFzc3dvcmQ=
         let b64 = "YWVzLTI1Ni1nY206cGFzc3dvcmQ";
-        let result =
-            parse_share_uri(&format!("ss://{}@1.2.3.4:8388#SSNode", b64));
+        let result = parse_share_uri(&format!("ss://{}@1.2.3.4:8388#SSNode", b64));
         assert!(result.is_ok());
         let proxy = result.unwrap();
         assert_eq!(proxy.proxy_type, Some("ss".into()));

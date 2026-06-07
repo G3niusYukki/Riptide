@@ -34,7 +34,9 @@ pub async fn mode_switch_to_tun(
     sysproxy: State<'_, SystemProxyController>,
     app_state: State<'_, AppState>,
 ) -> Result<(), String> {
-    coordinator.switch_to_tun(&mihomo, &sysproxy, &app_state).await
+    coordinator
+        .switch_to_tun(&mihomo, &sysproxy, &app_state)
+        .await
 }
 
 #[tauri::command]

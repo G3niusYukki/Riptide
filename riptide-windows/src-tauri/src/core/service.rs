@@ -171,10 +171,13 @@ pub fn install_service() -> anyhow::Result<()> {
 }
 
 pub fn uninstall_service() -> anyhow::Result<()> {
-    let manager =
-        ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(map_scm_error)?;
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .map_err(map_scm_error)?;
     let service = manager
-        .open_service(SERVICE_NAME, ServiceAccess::DELETE | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS)
+        .open_service(
+            SERVICE_NAME,
+            ServiceAccess::DELETE | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS,
+        )
         .map_err(map_scm_error)?;
     // Best-effort stop before delete so a running instance gets cleaned up.
     if let Ok(status) = service.query_status() {
@@ -188,10 +191,13 @@ pub fn uninstall_service() -> anyhow::Result<()> {
 }
 
 pub fn start_service() -> anyhow::Result<()> {
-    let manager =
-        ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(map_scm_error)?;
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .map_err(map_scm_error)?;
     let service = manager
-        .open_service(SERVICE_NAME, ServiceAccess::START | ServiceAccess::QUERY_STATUS)
+        .open_service(
+            SERVICE_NAME,
+            ServiceAccess::START | ServiceAccess::QUERY_STATUS,
+        )
         .map_err(map_scm_error)?;
     service.start(&[] as &[&OsStr]).map_err(map_scm_error)?;
     log::info!("Service '{}' start requested", SERVICE_NAME);
@@ -199,8 +205,8 @@ pub fn start_service() -> anyhow::Result<()> {
 }
 
 pub fn stop_service() -> anyhow::Result<()> {
-    let manager =
-        ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).map_err(map_scm_error)?;
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .map_err(map_scm_error)?;
     let service = manager
         .open_service(SERVICE_NAME, ServiceAccess::STOP)
         .map_err(map_scm_error)?;
@@ -231,7 +237,10 @@ pub fn query_status() -> ServiceStatusKind {
 }
 
 pub fn is_service_installed() -> bool {
-    !matches!(query_status(), ServiceStatusKind::NotInstalled | ServiceStatusKind::Unknown)
+    !matches!(
+        query_status(),
+        ServiceStatusKind::NotInstalled | ServiceStatusKind::Unknown
+    )
 }
 
 /// Translate the windows-service error types into anyhow with a hint about

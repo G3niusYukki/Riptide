@@ -10,8 +10,8 @@ use crate::config::parser::parse_clash_config;
 use crate::config::profile_meta::{self, ProfileMetadata, DEFAULT_UPDATE_INTERVAL_SECS};
 use crate::config::profiles::{Profile, ValidationResult};
 use crate::core::logbook::LogbookWriter;
-use tauri::State;
 use std::sync::{Arc, Mutex};
+use tauri::State;
 
 /// In-memory cache of the disk-backed profile list plus the active profile id,
 /// plus the diagnostic Logbook writer (installed at startup, optional).
@@ -130,13 +130,16 @@ pub async fn create_profile(
     let mut profile = Profile::new(name, content);
     profile.set_node_count(proxy_count);
 
-    storage::save_profile(&mut profile)
-        .map_err(|e| format!("Failed to save profile: {}", e))?;
+    storage::save_profile(&mut profile).map_err(|e| format!("Failed to save profile: {}", e))?;
 
     let mut profiles = state.profiles.lock().unwrap();
     profiles.push(profile.clone());
 
-    log::info!("Created profile '{}' ({} proxies)", profile.name, proxy_count);
+    log::info!(
+        "Created profile '{}' ({} proxies)",
+        profile.name,
+        proxy_count
+    );
     Ok(profile)
 }
 
@@ -146,8 +149,8 @@ pub async fn create_profile(
 pub async fn list_profiles(state: State<'_, AppState>) -> Result<Vec<Profile>, String> {
     use crate::config::profiles::storage;
 
-    let mut profiles = storage::list_profiles()
-        .map_err(|e| format!("Failed to list profiles: {}", e))?;
+    let mut profiles =
+        storage::list_profiles().map_err(|e| format!("Failed to list profiles: {}", e))?;
 
     let active_id = state.active_profile_id.lock().unwrap().clone();
     for profile in &mut profiles {
@@ -292,8 +295,7 @@ pub async fn import_profile_from_url(
         last_updated_at: Some(chrono::Utc::now()),
         subscription,
     };
-    storage::save_profile(&mut profile)
-        .map_err(|e| format!("Failed to save profile: {}", e))?;
+    storage::save_profile(&mut profile).map_err(|e| format!("Failed to save profile: {}", e))?;
     if let Some(ref path) = profile.path {
         if let Err(e) = profile_meta::save(path, &profile.metadata) {
             log::warn!("Failed to write profile metadata: {}", e);
@@ -316,16 +318,12 @@ pub async fn import_profile_from_url(
 /// and store it as a minimal Clash profile.
 #[cfg(target_os = "windows")]
 #[tauri::command]
-pub async fn import_share_uri(
-    uri: String,
-    state: State<'_, AppState>,
-) -> Result<Profile, String> {
+pub async fn import_share_uri(uri: String, state: State<'_, AppState>) -> Result<Profile, String> {
     use crate::config::parser::{serialize_clash_config, ClashRawConfig};
     use crate::config::profiles::storage;
     use crate::config::uri::parse_share_uri;
 
-    let proxy = parse_share_uri(&uri)
-        .map_err(|e| format!("Failed to parse share URI: {}", e))?;
+    let proxy = parse_share_uri(&uri).map_err(|e| format!("Failed to parse share URI: {}", e))?;
     let name = proxy.name.clone();
 
     let config = ClashRawConfig {
@@ -339,13 +337,12 @@ pub async fn import_share_uri(
         mode: Some("rule".into()),
         ..Default::default()
     };
-    let yaml = serialize_clash_config(&config)
-        .map_err(|e| format!("Failed to generate config: {}", e))?;
+    let yaml =
+        serialize_clash_config(&config).map_err(|e| format!("Failed to generate config: {}", e))?;
 
     let mut profile = Profile::new(name, yaml);
     profile.set_node_count(1);
-    storage::save_profile(&mut profile)
-        .map_err(|e| format!("Failed to save profile: {}", e))?;
+    storage::save_profile(&mut profile).map_err(|e| format!("Failed to save profile: {}", e))?;
 
     state.profiles.lock().unwrap().push(profile.clone());
 
@@ -361,12 +358,12 @@ pub async fn import_profile_from_file(
     state: State<'_, AppState>,
 ) -> Result<Profile, String> {
     use crate::config::profiles::storage;
-    use std::path::PathBuf;
     use std::fs;
+    use std::path::PathBuf;
 
     let source_path = PathBuf::from(&path);
-    let content = fs::read_to_string(&source_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let content =
+        fs::read_to_string(&source_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     if parse_clash_config(&content).is_err() {
         return Err("File is not a valid Clash config".into());
@@ -381,8 +378,7 @@ pub async fn import_profile_from_file(
 
     let mut profile = Profile::new(name, content);
     profile.set_node_count(proxy_count);
-    storage::save_profile(&mut profile)
-        .map_err(|e| format!("Failed to save profile: {}", e))?;
+    storage::save_profile(&mut profile).map_err(|e| format!("Failed to save profile: {}", e))?;
 
     state.profiles.lock().unwrap().push(profile.clone());
 
@@ -578,7 +574,12 @@ pub async fn validate_config(content: String) -> Result<ValidationResult, String
 
     let config = match parse_clash_config(&content) {
         Ok(config) => config,
-        Err(e) => return Ok(ValidationResult::invalid(format!("YAML parse error: {}", e))),
+        Err(e) => {
+            return Ok(ValidationResult::invalid(format!(
+                "YAML parse error: {}",
+                e
+            )))
+        }
     };
 
     let proxy_count = config.proxies.as_ref().map(|p| p.len()).unwrap_or(0);
@@ -587,8 +588,8 @@ pub async fn validate_config(content: String) -> Result<ValidationResult, String
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join(format!("riptide_validate_{}.yaml", uuid::Uuid::new_v4()));
     {
-        let mut file = File::create(&temp_file)
-            .map_err(|e| format!("Failed to create temp file: {}", e))?;
+        let mut file =
+            File::create(&temp_file).map_err(|e| format!("Failed to create temp file: {}", e))?;
         file.write_all(content.as_bytes())
             .map_err(|e| format!("Failed to write temp file: {}", e))?;
     }
@@ -642,7 +643,11 @@ pub async fn validate_config(content: String) -> Result<ValidationResult, String
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn create_profile(_name: String, _content: String, _state: State<'_, AppState>) -> Result<Profile, String> {
+pub async fn create_profile(
+    _name: String,
+    _content: String,
+    _state: State<'_, AppState>,
+) -> Result<Profile, String> {
     Err("Profile management only available on Windows".into())
 }
 
@@ -660,31 +665,49 @@ pub async fn delete_profile(_id: String, _state: State<'_, AppState>) -> Result<
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn update_profile(_id: String, _content: String, _state: State<'_, AppState>) -> Result<(), String> {
+pub async fn update_profile(
+    _id: String,
+    _content: String,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
     Err("Profile management only available on Windows".into())
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn import_profile_from_url(_url: String, _name: Option<String>, _state: State<'_, AppState>) -> Result<Profile, String> {
+pub async fn import_profile_from_url(
+    _url: String,
+    _name: Option<String>,
+    _state: State<'_, AppState>,
+) -> Result<Profile, String> {
     Err("Profile management only available on Windows".into())
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn import_share_uri(_uri: String, _state: State<'_, AppState>) -> Result<Profile, String> {
+pub async fn import_share_uri(
+    _uri: String,
+    _state: State<'_, AppState>,
+) -> Result<Profile, String> {
     Err("Profile management only available on Windows".into())
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn import_profile_from_file(_path: String, _state: State<'_, AppState>) -> Result<Profile, String> {
+pub async fn import_profile_from_file(
+    _path: String,
+    _state: State<'_, AppState>,
+) -> Result<Profile, String> {
     Err("Profile management only available on Windows".into())
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
-pub async fn export_profile(_id: String, _path: String, _state: State<'_, AppState>) -> Result<(), String> {
+pub async fn export_profile(
+    _id: String,
+    _path: String,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
     Err("Profile management only available on Windows".into())
 }
 
@@ -726,7 +749,12 @@ mod tests {
         // No profiles in state, so any id should be rejected.
         // We can't easily build a `State<'_, AppState>` here without a full Tauri app,
         // but we can exercise the inner logic by inlining it.
-        let exists = state.profiles.lock().unwrap().iter().any(|p| p.id == "bogus");
+        let exists = state
+            .profiles
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|p| p.id == "bogus");
         assert!(!exists);
     }
 }

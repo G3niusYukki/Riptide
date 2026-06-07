@@ -103,8 +103,7 @@ fn hex_decode(s: &str) -> anyhow::Result<Vec<u8>> {
     (0..s.len())
         .step_by(2)
         .map(|i| {
-            u8::from_str_radix(&s[i..i + 2], 16)
-                .map_err(|e| anyhow!("invalid hex byte: {}", e))
+            u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow!("invalid hex byte: {}", e))
         })
         .collect()
 }
@@ -147,7 +146,9 @@ pub async fn test_connection(cfg: &WebDAVConfig) -> anyhow::Result<()> {
     // server with these credentials" probe.
     let parent_path = {
         let path = url.path().to_string();
-        path.rsplit_once('/').map(|(p, _)| p.to_string()).unwrap_or_else(|| "/".to_string())
+        path.rsplit_once('/')
+            .map(|(p, _)| p.to_string())
+            .unwrap_or_else(|| "/".to_string())
     };
     url.set_path(&parent_path);
     let mut headers = HeaderMap::new();
@@ -204,8 +205,8 @@ pub async fn download_backup(cfg: &WebDAVConfig) -> anyhow::Result<Vec<u8>> {
 pub fn build_backup_zip() -> anyhow::Result<Vec<u8>> {
     let mut cursor = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut cursor);
-    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+    let options: zip::write::FileOptions<'_, ()> =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     let config_dir = WindowsDirs::config_dir();
     let profiles_dir = WindowsDirs::profiles_dir();
@@ -217,7 +218,12 @@ pub fn build_backup_zip() -> anyhow::Result<Vec<u8>> {
             if !path.is_file() {
                 continue;
             }
-            add_file_to_zip(&mut zip, &path, &format!("profiles/{}", entry.file_name().to_string_lossy()), options)?;
+            add_file_to_zip(
+                &mut zip,
+                &path,
+                &format!("profiles/{}", entry.file_name().to_string_lossy()),
+                options,
+            )?;
         }
     }
 

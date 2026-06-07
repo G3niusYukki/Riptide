@@ -248,12 +248,8 @@ fn read_blocking(paths: &ScenePaths) -> Result<SceneFile, String> {
     if raw.trim().is_empty() {
         return Ok(SceneFile::empty());
     }
-    let file: SceneFile = serde_json::from_str(&raw).map_err(|e| {
-        format!(
-            "Failed to parse {:?}: {e}",
-            paths.file
-        )
-    })?;
+    let file: SceneFile =
+        serde_json::from_str(&raw).map_err(|e| format!("Failed to parse {:?}: {e}", paths.file))?;
     Ok(file)
 }
 
@@ -398,15 +394,23 @@ mod tests {
 
         // Create #1 + #2
         let s1 = store
-            .create(scene("alpha", ModeOverride::Tun, vec![Matcher::Process {
-                pattern: "chrome.exe".into(),
-            }]))
+            .create(scene(
+                "alpha",
+                ModeOverride::Tun,
+                vec![Matcher::Process {
+                    pattern: "chrome.exe".into(),
+                }],
+            ))
             .await
             .unwrap();
         let s2 = store
-            .create(scene("beta", ModeOverride::SystemProxy, vec![Matcher::Domain {
-                pattern: "example.com".into(),
-            }]))
+            .create(scene(
+                "beta",
+                ModeOverride::SystemProxy,
+                vec![Matcher::Domain {
+                    pattern: "example.com".into(),
+                }],
+            ))
             .await
             .unwrap();
         assert!(!s1.id.is_empty(), "create must mint a UUID v4");
@@ -464,9 +468,13 @@ mod tests {
 
         // Scene A: domain "example.com" → direct
         store
-            .create(scene("A-domain", ModeOverride::Direct, vec![Matcher::Domain {
-                pattern: "example.com".into(),
-            }]))
+            .create(scene(
+                "A-domain",
+                ModeOverride::Direct,
+                vec![Matcher::Domain {
+                    pattern: "example.com".into(),
+                }],
+            ))
             .await
             .unwrap();
         // Scene B: process "chrome.exe" → tun, but disabled
@@ -484,25 +492,38 @@ mod tests {
         store.create(disabled).await.unwrap();
         // Scene C: ipset "10.0.0.0/8" → system_proxy
         store
-            .create(scene("C-ipset", ModeOverride::SystemProxy, vec![Matcher::IpSet {
-                value: "10.0.0.0/8".into(),
-            }]))
+            .create(scene(
+                "C-ipset",
+                ModeOverride::SystemProxy,
+                vec![Matcher::IpSet {
+                    value: "10.0.0.0/8".into(),
+                }],
+            ))
             .await
             .unwrap();
 
         // 1) Domain match on "api.example.com" → A
-        let r = store.apply("any.exe", "api.example.com", "9.9.9.9").await.unwrap();
+        let r = store
+            .apply("any.exe", "api.example.com", "9.9.9.9")
+            .await
+            .unwrap();
         assert_eq!(r.scene_name.as_deref(), Some("A-domain"));
         assert_eq!(r.mode, Some(ModeOverride::Direct));
 
         // 2) Process match would be on B but B is disabled → fall
         // through to C via the IP match on 10.0.0.5.
-        let r = store.apply("chrome.exe", "no-match.test", "10.0.0.5").await.unwrap();
+        let r = store
+            .apply("chrome.exe", "no-match.test", "10.0.0.5")
+            .await
+            .unwrap();
         assert_eq!(r.scene_name.as_deref(), Some("C-ipset"));
         assert_eq!(r.mode, Some(ModeOverride::SystemProxy));
 
         // 3) No match anywhere → matched = None
-        let r = store.apply("firefox.exe", "no-match.test", "9.9.9.9").await.unwrap();
+        let r = store
+            .apply("firefox.exe", "no-match.test", "9.9.9.9")
+            .await
+            .unwrap();
         assert!(r.matched.is_none());
         assert!(r.mode.is_none());
         assert!(r.scene_name.is_none());

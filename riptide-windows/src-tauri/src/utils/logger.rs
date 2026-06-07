@@ -41,9 +41,7 @@ pub fn init_logger() -> anyhow::Result<()> {
         .with_target(true);
 
     // Stderr layer — present for dev but quiet by default. ANSI on.
-    let stderr_layer = fmt::layer()
-        .with_writer(std::io::stderr)
-        .with_target(true);
+    let stderr_layer = fmt::layer().with_writer(std::io::stderr).with_target(true);
 
     tracing_subscriber::registry()
         .with(filter)

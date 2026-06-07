@@ -3,9 +3,9 @@
 //! This module provides Windows-optimized process management for the mihomo proxy,
 //! including better process tracking and Windows-specific process control.
 
-use std::process::{Command, Child};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
+use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::AppHandle;
 
@@ -14,19 +14,19 @@ use tauri::AppHandle;
 pub enum ProxyError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Process is not running")]
     ProcessNotRunning,
-    
+
     #[error("Process already running")]
     ProcessAlreadyRunning,
-    
+
     #[error("Failed to get process exit code")]
     ProcessExitCodeError,
 }
 
 /// Windows-specific proxy manager for mihomo process
-/// 
+///
 /// This manager handles the lifecycle of the mihomo proxy process on Windows,
 /// providing Windows-optimized process control and monitoring.
 pub struct WindowsProxyManager {
@@ -38,7 +38,7 @@ pub struct WindowsProxyManager {
 
 impl WindowsProxyManager {
     /// Create a new Windows proxy manager
-    /// 
+    ///
     /// # Arguments
     /// * `mihomo_path` - Path to the mihomo executable
     /// * `config_path` - Path to the mihomo configuration file
@@ -53,25 +53,25 @@ impl WindowsProxyManager {
     }
 
     /// Create a new Windows proxy manager from app handle
-    /// 
+    ///
     /// Automatically resolves paths using the app's data directory
     pub fn from_app_handle(app_handle: &AppHandle) -> anyhow::Result<Self> {
         let mihomo_path = crate::utils::dirs::get_mihomo_binary_path(app_handle)?;
         let config_path = crate::utils::dirs::get_config_path(app_handle)?;
         let working_dir = crate::utils::dirs::get_app_data_dir(app_handle)?;
-        
+
         Ok(Self::new(mihomo_path, config_path, working_dir))
     }
 
     /// Start the mihomo proxy process
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` if the process started successfully
     /// * `Err(ProxyError::ProcessAlreadyRunning)` if a process is already running
     /// * `Err(ProxyError::Io)` if there was an IO error starting the process
     pub fn start(&self) -> Result<(), ProxyError> {
         let mut handle = self.process_handle.lock().unwrap();
-        
+
         if handle.is_some() {
             // Check if the existing process is actually still running
             if Self::child_alive(&handle) {
@@ -99,16 +99,16 @@ impl WindowsProxyManager {
     }
 
     /// Stop the mihomo proxy process
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` if the process was stopped (or wasn't running)
     /// * `Err(ProxyError::Io)` if there was an error killing the process
     pub fn stop(&self) -> Result<(), ProxyError> {
         let mut handle = self.process_handle.lock().unwrap();
-        
+
         if let Some(mut child) = handle.take() {
             log::info!("Stopping mihomo process (PID: {:?})", child.id());
-            
+
             // Try to kill the process
             match child.kill() {
                 Ok(()) => {
@@ -127,7 +127,7 @@ impl WindowsProxyManager {
         } else {
             log::debug!("mihomo process was not running");
         }
-        
+
         Ok(())
     }
 
@@ -205,14 +205,19 @@ impl WindowsProxyManagerBuilder {
     }
 
     pub fn build(self) -> anyhow::Result<WindowsProxyManager> {
-        let mihomo_path = self.mihomo_path
+        let mihomo_path = self
+            .mihomo_path
             .ok_or_else(|| anyhow::anyhow!("mihomo_path is required"))?;
-        let config_path = self.config_path
+        let config_path = self
+            .config_path
             .ok_or_else(|| anyhow::anyhow!("config_path is required"))?;
-        let working_dir = self.working_dir
-            .unwrap_or_else(|| std::env::temp_dir());
+        let working_dir = self.working_dir.unwrap_or_else(|| std::env::temp_dir());
 
-        Ok(WindowsProxyManager::new(mihomo_path, config_path, working_dir))
+        Ok(WindowsProxyManager::new(
+            mihomo_path,
+            config_path,
+            working_dir,
+        ))
     }
 }
 
@@ -230,13 +235,13 @@ mod tests {
     fn test_proxy_error_display() {
         let io_err = ProxyError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            "file not found"
+            "file not found",
         ));
         assert!(io_err.to_string().contains("IO error"));
-        
+
         let not_running = ProxyError::ProcessNotRunning;
         assert_eq!(not_running.to_string(), "Process is not running");
-        
+
         let already_running = ProxyError::ProcessAlreadyRunning;
         assert_eq!(already_running.to_string(), "Process already running");
     }
@@ -245,7 +250,7 @@ mod tests {
     fn test_builder_missing_fields() {
         let result = WindowsProxyManagerBuilder::new().build();
         assert!(result.is_err());
-        
+
         let result = WindowsProxyManagerBuilder::new()
             .mihomo_path(PathBuf::from("/test/mihomo.exe"))
             .build();

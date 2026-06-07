@@ -53,7 +53,9 @@ pub struct EngineRouter {
 impl EngineRouter {
     /// Build a router with the supplied policy.
     pub fn new(policy: Policy) -> Self {
-        Self { policy: Mutex::new(policy) }
+        Self {
+            policy: Mutex::new(policy),
+        }
     }
 
     /// Router with the ADR-0005 default policy.
@@ -75,13 +77,19 @@ impl EngineRouter {
 
     /// Read the current policy without taking the lock twice.
     pub fn current_policy(&self) -> Policy {
-        *self.policy.lock().expect("EngineRouter policy mutex poisoned")
+        *self
+            .policy
+            .lock()
+            .expect("EngineRouter policy mutex poisoned")
     }
 
     /// Replace the active policy. Returns the previous value so
     /// callers can log the transition.
     pub fn set_policy(&self, new_policy: Policy) -> Policy {
-        let mut guard = self.policy.lock().expect("EngineRouter policy mutex poisoned");
+        let mut guard = self
+            .policy
+            .lock()
+            .expect("EngineRouter policy mutex poisoned");
         let prev = *guard;
         *guard = new_policy;
         prev
@@ -110,21 +118,30 @@ mod tests {
     fn engine_for_trojan_returns_mihomo() {
         // Default policy: every kind except Reality/AnyTls → mihomo.
         let router = EngineRouter::default_mihomo();
-        assert_eq!(router.engine_for(ProxyKind::Trojan), ProxyEngineKind::Mihomo);
+        assert_eq!(
+            router.engine_for(ProxyKind::Trojan),
+            ProxyEngineKind::Mihomo
+        );
     }
 
     #[test]
     fn engine_for_reality_returns_singbox() {
         // Reality is forced to sing-box regardless of policy.
         let router = EngineRouter::default_mihomo();
-        assert_eq!(router.engine_for(ProxyKind::Reality), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::Reality),
+            ProxyEngineKind::Singbox
+        );
     }
 
     #[test]
     fn engine_for_anytls_returns_singbox() {
         // AnyTls is forced to sing-box regardless of policy.
         let router = EngineRouter::default_mihomo();
-        assert_eq!(router.engine_for(ProxyKind::AnyTls), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::AnyTls),
+            ProxyEngineKind::Singbox
+        );
     }
 
     #[test]
@@ -136,16 +153,37 @@ mod tests {
         // rules win — they short-circuit the policy match).
         let router = EngineRouter::new(Policy::ExplicitSingbox);
 
-        assert_eq!(router.engine_for(ProxyKind::Shadowsocks), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::Vmess), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::Vless), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::Trojan), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::Hysteria2), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::Shadowsocks),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::Vmess),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::Vless),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::Trojan),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::Hysteria2),
+            ProxyEngineKind::Singbox
+        );
         assert_eq!(router.engine_for(ProxyKind::Tuic), ProxyEngineKind::Singbox);
 
         // Reality/AnyTls forced rules still win.
-        assert_eq!(router.engine_for(ProxyKind::Reality), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::AnyTls), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::Reality),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::AnyTls),
+            ProxyEngineKind::Singbox
+        );
     }
 
     #[test]
@@ -160,15 +198,27 @@ mod tests {
         assert_eq!(router.current_policy(), Policy::ExplicitSingbox);
 
         // And the routing table moves with the policy.
-        assert_eq!(router.engine_for(ProxyKind::Shadowsocks), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::Shadowsocks),
+            ProxyEngineKind::Singbox
+        );
 
         // Reality/AnyTls unchanged by the policy flip.
-        assert_eq!(router.engine_for(ProxyKind::Reality), ProxyEngineKind::Singbox);
-        assert_eq!(router.engine_for(ProxyKind::AnyTls), ProxyEngineKind::Singbox);
+        assert_eq!(
+            router.engine_for(ProxyKind::Reality),
+            ProxyEngineKind::Singbox
+        );
+        assert_eq!(
+            router.engine_for(ProxyKind::AnyTls),
+            ProxyEngineKind::Singbox
+        );
 
         let prev = router.set_policy(Policy::DefaultMihomo);
         assert_eq!(prev, Policy::ExplicitSingbox);
         assert_eq!(router.current_policy(), Policy::DefaultMihomo);
-        assert_eq!(router.engine_for(ProxyKind::Shadowsocks), ProxyEngineKind::Mihomo);
+        assert_eq!(
+            router.engine_for(ProxyKind::Shadowsocks),
+            ProxyEngineKind::Mihomo
+        );
     }
 }

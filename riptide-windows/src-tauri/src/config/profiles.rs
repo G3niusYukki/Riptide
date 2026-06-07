@@ -58,14 +58,17 @@ impl Profile {
     /// Get proxies from profile by parsing YAML and extracting proxy nodes.
     pub fn get_proxies(&self) -> Vec<Proxy> {
         match crate::config::parser::parse_clash_config(&self.content) {
-            Ok(config) => {
-                config.proxies.unwrap_or_default().into_iter().map(|p| Proxy {
+            Ok(config) => config
+                .proxies
+                .unwrap_or_default()
+                .into_iter()
+                .map(|p| Proxy {
                     name: p.name,
                     server: p.server.unwrap_or_default(),
                     port: p.port.unwrap_or(0),
                     proxy_type: p.proxy_type.unwrap_or_else(|| "unknown".to_string()),
-                }).collect()
-            }
+                })
+                .collect(),
             Err(_) => Vec::new(),
         }
     }
@@ -73,15 +76,18 @@ impl Profile {
     /// Get proxy groups from profile by parsing YAML and extracting groups.
     pub fn get_proxy_groups(&self) -> Vec<ProxyGroup> {
         match crate::config::parser::parse_clash_config(&self.content) {
-            Ok(config) => {
-                config.proxy_groups.unwrap_or_default().into_iter().map(|g| ProxyGroup {
+            Ok(config) => config
+                .proxy_groups
+                .unwrap_or_default()
+                .into_iter()
+                .map(|g| ProxyGroup {
                     name: g.name.unwrap_or_default(),
                     group_type: g.group_type.unwrap_or_else(|| "select".to_string()),
                     proxies: g.proxies.unwrap_or_default(),
                     url: g.url,
                     interval: g.interval,
-                }).collect()
-            }
+                })
+                .collect(),
             Err(_) => Vec::new(),
         }
     }
@@ -171,7 +177,13 @@ pub mod storage {
     pub fn generate_profile_filename(name: &str, id: &str) -> String {
         let sanitized: String = name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let id_simple = id.replace('-', "");
         // Double underscore separator avoids collisions with user-provided underscores in names.
@@ -187,14 +199,17 @@ pub mod storage {
         // Re-hyphenate into canonical UUID form.
         Some(format!(
             "{}-{}-{}-{}-{}",
-            &tail[0..8], &tail[8..12], &tail[12..16], &tail[16..20], &tail[20..32]
+            &tail[0..8],
+            &tail[8..12],
+            &tail[12..16],
+            &tail[16..20],
+            &tail[20..32]
         ))
     }
 
     /// Save a profile to disk. The filename embeds `profile.id` so IDs survive reloads.
     pub fn save_profile(profile: &mut Profile) -> Result<(), String> {
-        WindowsDirs::ensure_dirs()
-            .map_err(|e| format!("Failed to create directories: {}", e))?;
+        WindowsDirs::ensure_dirs().map_err(|e| format!("Failed to create directories: {}", e))?;
 
         if profile.path.is_none() {
             let filename = generate_profile_filename(&profile.name, &profile.id);
@@ -212,8 +227,8 @@ pub mod storage {
 
     /// Load a profile from disk. Recovers the stable ID from the filename.
     pub fn load_profile(path: &PathBuf) -> Result<Profile, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read profile file: {}", e))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read profile file: {}", e))?;
 
         let stem = path
             .file_stem()
@@ -229,8 +244,8 @@ pub mod storage {
             None => (stem.to_string(), uuid::Uuid::new_v4().to_string()),
         };
 
-        let metadata = fs::metadata(path)
-            .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+        let metadata =
+            fs::metadata(path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
         let created_at = metadata
             .created()
@@ -260,7 +275,10 @@ pub mod storage {
     }
 
     /// Update a profile's content and persist. Updates `node_count` from parsed config.
-    pub fn update_profile_content(profile: &mut Profile, new_content: String) -> Result<(), String> {
+    pub fn update_profile_content(
+        profile: &mut Profile,
+        new_content: String,
+    ) -> Result<(), String> {
         let path = profile
             .path
             .clone()
@@ -278,14 +296,12 @@ pub mod storage {
     pub fn delete_profile_file(path: &PathBuf) -> Result<(), String> {
         // Best-effort: clean up the sidecar so we don't leave orphan metadata.
         crate::config::profile_meta::delete(path);
-        fs::remove_file(path)
-            .map_err(|e| format!("Failed to delete profile file: {}", e))
+        fs::remove_file(path).map_err(|e| format!("Failed to delete profile file: {}", e))
     }
 
     /// List all profiles in the profiles directory
     pub fn list_profiles() -> Result<Vec<Profile>, String> {
-        WindowsDirs::ensure_dirs()
-            .map_err(|e| format!("Failed to create directories: {}", e))?;
+        WindowsDirs::ensure_dirs().map_err(|e| format!("Failed to create directories: {}", e))?;
 
         let profiles_dir = get_profiles_dir();
 
@@ -295,12 +311,16 @@ pub mod storage {
             .map_err(|e| format!("Failed to read profiles directory: {}", e))?;
 
         for entry in entries {
-            let entry = entry
-                .map_err(|e| format!("Failed to read directory entry: {}", e))?;
+            let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
 
             let path = entry.path();
 
-            if path.is_file() && path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+            if path.is_file()
+                && path
+                    .extension()
+                    .map(|e| e == "yaml" || e == "yml")
+                    .unwrap_or(false)
+            {
                 match load_profile(&path) {
                     Ok(profile) => profiles.push(profile),
                     Err(e) => log::warn!("Failed to load profile from {:?}: {}", path, e),
@@ -315,8 +335,7 @@ pub mod storage {
     pub fn export_profile(profile: &Profile, dest_path: &PathBuf) -> Result<(), String> {
         let content = profile.content.clone();
 
-        fs::write(dest_path, content)
-            .map_err(|e| format!("Failed to export profile: {}", e))
+        fs::write(dest_path, content).map_err(|e| format!("Failed to export profile: {}", e))
     }
 
     #[cfg(test)]
