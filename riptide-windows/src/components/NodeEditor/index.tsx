@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Plus, Trash2, Edit3, Save, ArrowLeft } from 'lucide-react';
+import { X, Plus, Trash2, Edit3, Save, ArrowLeft, QrCode, Share2 } from 'lucide-react';
 import * as tauri from '../../services/tauri';
 import type { ClashProxy } from '../../services/tauri';
+import { NodeQRSheet } from './NodeQRSheet';
 
 const PROTOCOL_OPTIONS: { value: string; label: string }[] = [
   { value: 'ss', label: 'Shadowsocks' },
@@ -44,6 +45,10 @@ export function NodeEditor({ profileId, profileName, onClose }: Props) {
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
   const [draft, setDraft] = useState<ClashProxy>(emptyProxy());
   const [saving, setSaving] = useState(false);
+
+  // QR sheet — when set, opens the share-as-QR modal filtered to the
+  // given set of proxies. `null` means closed.
+  const [qrTarget, setQrTarget] = useState<ClashProxy[] | null>(null);
 
   useEffect(() => {
     void reload();
@@ -155,6 +160,8 @@ export function NodeEditor({ profileId, profileName, onClose }: Props) {
               onAdd={startAdd}
               onEdit={startEdit}
               onDelete={handleDelete}
+              onShareOne={(p) => setQrTarget([p])}
+              onShareAll={() => setQrTarget(proxies)}
             />
           ) : (
             <FormView draft={draft} onChange={setDraft} />
@@ -180,6 +187,15 @@ export function NodeEditor({ profileId, profileName, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {qrTarget && (
+        <NodeQRSheet
+          profileId={profileId}
+          profileName={profileName}
+          proxies={qrTarget}
+          onClose={() => setQrTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -190,24 +206,39 @@ function ListView({
   onAdd,
   onEdit,
   onDelete,
+  onShareOne,
+  onShareAll,
 }: {
   proxies: ClashProxy[];
   loading: boolean;
   onAdd: () => void;
   onEdit: (p: ClashProxy) => void;
   onDelete: (name: string) => void;
+  onShareOne: (p: ClashProxy) => void;
+  onShareAll: () => void;
 }) {
   return (
     <>
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-slate-500">{proxies.length} 个节点</p>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium"
-        >
-          <Plus size={13} />
-          新建节点
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onShareAll}
+            disabled={proxies.length === 0}
+            data-testid="node-editor-share-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Share2 size={13} />
+            Share All
+          </button>
+          <button
+            onClick={onAdd}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium"
+          >
+            <Plus size={13} />
+            新建节点
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -233,6 +264,14 @@ function ListView({
                 </p>
               </div>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onShareOne(p)}
+                  className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition-colors"
+                  title="Share as QR Code"
+                  data-testid="node-editor-share-one"
+                >
+                  <QrCode size={13} />
+                </button>
                 <button
                   onClick={() => onEdit(p)}
                   className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
