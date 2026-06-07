@@ -157,6 +157,22 @@ export const updateProfileProxy = (profileId: string, originalName: string, prox
 export const deleteProfileProxy = (profileId: string, name: string) =>
   invoke<void>('delete_profile_proxy', { profileId, name });
 
+// Share-URI serialization (Phase C, C3).
+//
+// The Rust side exposes two commands:
+//   * `serialize_proxy_to_uri(proxy)` — turn one ClashProxy into a share
+//     URI (ss://, vmess://, vless://, trojan://, hysteria2://, tuic://).
+//   * `serialize_proxies_to_uris(profileId)` — turn every proxy in a
+//     profile into a share URI. NOTE: the Rust side currently stubs this
+//     out (it requires AppState wiring that is in flight as part of
+//     Phase B); the frontend caller iterates `listProfileProxies` and
+//     invokes `serializeProxyToUri` for each entry. We still expose the
+//     single-profile command for components that need it directly.
+export const serializeProxyToUri = (proxy: ClashProxy) =>
+  invoke<string>('serialize_proxy_to_uri', { proxy });
+export const serializeProxiesToUris = (profileId: string) =>
+  invoke<[string, string][]>('serialize_proxies_to_uris', { profileId });
+
 // System commands
 export const enableSystemProxy = (httpPort: number, socksPort?: number) =>
   invoke<void>('enable_system_proxy', { httpPort, socksPort });
@@ -340,6 +356,115 @@ export const checkUpdate = () => invoke<UpdateInfo>('check_update');
 // Log commands
 export const getLogs = (level?: string, lines?: number) =>
   invoke<string>('get_logs', { level, lines });
+
+// MITM (HTTPS interception) — Phase C7.3 / C7.4 stub.
+//
+// The Rust `mitm` module is **not yet implemented** on Windows
+// (mitm0% per WINDOWS-CATCHUP-PLAN.md). The 5 wrappers below are
+// shape-stable stubs that reject with a `not_implemented` error so the
+// Settings UI can render the experimental tab without crashing.
+// The real commands land in v2.5.0 (Phase D).
+//
+// Field names are snake_case to match the future Rust serde structs
+// (mirrors `MITMConfig` / `CAState` / `HostRule` in `types/mitm.ts`).
+import type { MITMConfig, CAState } from '../types/mitm';
+
+const MITM_NOT_IMPLEMENTED =
+  'MITM is currently experimental on Windows. Backend implementation lands in v2.5.0.';
+
+/** Read the global MITM config. */
+export const getMitmConfig = (): Promise<MITMConfig> =>
+  Promise.reject(new Error(MITM_NOT_IMPLEMENTED));
+
+/** Persist the global MITM config. */
+export const setMitmConfig = (_config: MITMConfig): Promise<void> =>
+  Promise.reject(new Error(MITM_NOT_IMPLEMENTED));
+
+/** Query the current CA root certificate state. */
+export const getCaState = (): Promise<CAState> =>
+  Promise.reject(new Error(MITM_NOT_IMPLEMENTED));
+
+/** Trigger CA install into the system trust store. */
+export const installCa = (): Promise<CAState> =>
+  Promise.reject(new Error(MITM_NOT_IMPLEMENTED));
+
+/** Remove the CA from the system trust store. */
+export const uninstallCa = (): Promise<CAState> =>
+  Promise.reject(new Error(MITM_NOT_IMPLEMENTED));
+
+// Overrides — partial YAML overlays on top of the active profile.
+//
+// Phase C2 (C2.4 + C2.5) wires the UI shell ahead of the Rust backend.
+// Each wrapper below is a typed `invoke` call so the TS side compiles
+// against the same contract the Rust side will land in a follow-up
+// task. They are not yet registered on the Tauri command handler, so
+// every call rejects with a clearly-typed `NotImplementedError` until
+// the `core/override/` module lands in v2.5.0. UI components catch the
+// rejection and render an explicit "backend pending" state instead of
+// crashing the page.
+
+import type { Override, ApplyResult, OverrideId } from '../types/override';
+
+const BACKEND_DEFERRED =
+  'Rust Override backend (Phase C2 follow-up, v2.5.0). UI shell ships ahead of the implementation; calls always reject until the Rust module is wired.';
+
+class NotImplementedError extends Error {
+  readonly isNotImplemented = true;
+  constructor(command: string) {
+    super(`tauri command '${command}' is not implemented: ${BACKEND_DEFERRED}`);
+    this.name = 'NotImplementedError';
+  }
+}
+
+const notImplemented = (command: string): Promise<never> =>
+  Promise.reject(new NotImplementedError(command));
+
+export const listOverrides = (): Promise<Override[]> => notImplemented('list_overrides');
+
+export const createOverride = (name: string, rawYAML: string): Promise<Override> => {
+  void name;
+  void rawYAML;
+  return notImplemented('create_override');
+};
+
+export const updateOverride = (
+  id: OverrideId,
+  name: string,
+  rawYAML: string,
+): Promise<Override> => {
+  void id;
+  void name;
+  void rawYAML;
+  return notImplemented('update_override');
+};
+
+export const deleteOverride = (id: OverrideId): Promise<void> => {
+  void id;
+  return notImplemented('delete_override');
+};
+
+export const previewOverride = (
+  id: OverrideId,
+  profileId: string | null = null,
+): Promise<ApplyResult> => {
+  void id;
+  void profileId;
+  return notImplemented('preview_override');
+};
+
+export const applyOverride = (
+  id: OverrideId,
+  profileId: string | null = null,
+): Promise<ApplyResult> => {
+  void id;
+  void profileId;
+  return notImplemented('apply_override');
+};
+
+/** Narrowing helper: true when an error came from a not-implemented wrapper. */
+export const isNotImplementedError = (err: unknown): err is NotImplementedError =>
+  err instanceof NotImplementedError ||
+  (typeof err === 'object' && err !== null && (err as { isNotImplemented?: boolean }).isNotImplemented === true);
 
 // Logbook — persistent diagnostic event store (Phase B B3).
 // Backend layout: JSONL per UTC day under `%APPDATA%\Riptide\logbook\YYYY-MM-DD.jsonl`.

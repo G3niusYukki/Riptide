@@ -9,16 +9,18 @@ import { RecoveryTab } from './RecoveryTab';
 import { RewriteTab } from './RewriteTab';
 import { AppearanceSettings } from '../AppearanceSettings';
 import { GatewayTab } from './GatewayTab';
+import { MITMTab } from './MITMTab';
 import { useRiptideStore } from '../../stores/riptide';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import i18n from '../../i18n';
 import * as tauri from '../../services/tauri';
 
-// NOTE: 'diagnostics' was removed (A1.1). It used to render <RecoveryTab/>,
-// which was a copy-paste mistake. The real diagnostics view (Logbook UI) is
-// scheduled for Phase C (C1 in WINDOWS-CATCHUP-PLAN.md) and will re-add a
-// proper DiagnosticsTab then.
-type Tab = 'network' | 'dns' | 'rewrite' | 'gateway' | 'sync' | 'assets' | 'recovery' | 'appearance' | 'about';
+// Phase A 1.1 removed the placeholder 'diagnostics' tab. The full
+// diagnostics view (Logbook) now lives at /logbook in its own route
+// (Phase C C1) and is linked from the Sidebar; Settings keeps the
+// recovery/runtime knobs that belong alongside the other configuration
+// surfaces.
+type Tab = 'network' | 'dns' | 'rewrite' | 'gateway' | 'sync' | 'assets' | 'recovery' | 'mitm' | 'appearance' | 'about';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -62,6 +64,7 @@ export function SettingsPage() {
     { id: 'sync', label: '同步' },
     { id: 'assets', label: '资源' },
     { id: 'recovery', label: '恢复' },
+    { id: 'mitm', label: 'MITM' },
     { id: 'appearance', label: '外观' },
     { id: 'about', label: '关于' },
   ];
@@ -93,6 +96,7 @@ export function SettingsPage() {
       {active === 'sync' && <SyncTab />}
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
+      {active === 'mitm' && <MITMTab />}
       {active === 'appearance' && <AppearanceSettings />}
       {active === 'about' && (
         <div className="space-y-3">
