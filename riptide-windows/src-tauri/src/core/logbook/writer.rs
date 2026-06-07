@@ -43,16 +43,33 @@ pub struct LogbookWriter {
 impl LogbookWriter {
     /// Spawn the background flusher and return a writer handle.
     ///
-    /// The background task is owned by `tauri::async_runtime` and lives
-    /// for the lifetime of the process. Drop the writer to stop producing;
-    /// the task will drain the queue and exit.
+    /// In production builds the background task is owned by
+    /// `tauri::async_runtime` (which fronts Tauri's tokio runtime) and
+    /// lives for the lifetime of the process. Drop the writer to stop
+    /// producing; the task will drain the queue and exit.
+    ///
+    /// In test builds we use `tokio::spawn` directly. `tauri::async_runtime::spawn`
+    /// is a no-op when the Tauri runtime has not been initialized (which is
+    /// always the case in a bare `cargo test --lib` binary), so the background
+    /// flusher would never run. `tokio::spawn` with the `current_thread`
+    /// runtime set up by `#[tokio::test(flavor = "current_thread")]`
+    /// is the right path for the 27 logbook tests.
     pub fn spawn(paths: LogbookPaths) -> Self {
         let (tx, rx) = mpsc::unbounded_channel::<LogEntry>();
         let paths = Arc::new(paths);
         let task_paths = paths.clone();
-        tauri::async_runtime::spawn(async move {
-            run_loop(rx, task_paths).await;
-        });
+        #[cfg(test)]
+        {
+            tokio::spawn(async move {
+                run_loop(rx, task_paths).await;
+            });
+        }
+        #[cfg(not(test))]
+        {
+            tauri::async_runtime::spawn(async move {
+                run_loop(rx, task_paths).await;
+            });
+        }
         Self { tx, paths }
     }
 
@@ -318,7 +335,11 @@ mod tests {
     use std::time::Duration;
 
     /// Build a writer rooted at a unique temp dir. Returns the writer and
-    /// the temp path so tests can read back what was written.
+    /// the temp path (the writer's directory) so tests can read back what
+    /// was written. We use `LogbookPaths { directory: p }` directly rather
+    /// than `LogbookPaths::resolve(&p)` (which would append a `/logbook`
+    /// subdir) so the temp path the helper returns is exactly the on-disk
+    /// location the writer flushes to.
     fn fresh_writer(tag: &str) -> (LogbookWriter, std::path::PathBuf) {
         let mut p = std::env::temp_dir();
         p.push(format!(
@@ -327,7 +348,7 @@ mod tests {
             Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let _ = std::fs::remove_dir_all(&p);
-        let paths = LogbookPaths::resolve(&p);
+        let paths = LogbookPaths { directory: p.clone() };
         (LogbookWriter::spawn(paths), p)
     }
 
@@ -460,8 +481,19 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn writer_directory_reflects_paths() {
-        let (writer, dir) = fresh_writer("dir");
-        assert_eq!(writer.directory(), dir.as_path());
+        // The other fresh_writer-based tests rely on `LogbookPaths::resolve(&p)`
+        // appending a `logbook` subdir. This test specifically asserts the
+        // writer reflects the exact path it was constructed with, so build
+        // `LogbookPaths` directly (no `resolve`) to avoid the subdir helper.
+        let mut p = std::env::temp_dir();
+        p.push(format!(
+            "riptide-logbook-test-dir-{}",
+            Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&p);
+        let paths = LogbookPaths { directory: p.clone() };
+        let writer = LogbookWriter::spawn(paths);
+        assert_eq!(writer.directory(), p.as_path());
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -505,7 +537,11 @@ mod b3_4_tests {
     use std::time::{Duration, Instant};
 
     /// Build a writer rooted at a unique temp dir. Returns the writer and
-    /// the temp path so tests can read back what was written.
+    /// the temp path (the writer's directory) so tests can read back what
+    /// was written. We use `LogbookPaths { directory: p }` directly rather
+    /// than `LogbookPaths::resolve(&p)` (which would append a `/logbook`
+    /// subdir) so the temp path the helper returns is exactly the on-disk
+    /// location the writer flushes to.
     fn fresh_writer(tag: &str) -> (LogbookWriter, std::path::PathBuf) {
         let mut p = std::env::temp_dir();
         p.push(format!(
@@ -514,7 +550,7 @@ mod b3_4_tests {
             Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         let _ = std::fs::remove_dir_all(&p);
-        let paths = LogbookPaths::resolve(&p);
+        let paths = LogbookPaths { directory: p.clone() };
         (LogbookWriter::spawn(paths), p)
     }
 

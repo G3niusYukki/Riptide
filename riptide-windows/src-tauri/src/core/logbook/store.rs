@@ -357,11 +357,17 @@ mod tests {
 
     /// Write a hand-rolled JSONL file under `dir/<day>.jsonl` directly
     /// so we can test the store without involving the writer's async
-    /// batch flush.
+    /// batch flush. We open with `create + append` so that back-to-back
+    /// calls for the same day accumulate entries (the production writer
+    /// appends, and tests should match that semantics).
     fn write_file(dir: &std::path::Path, day: &str, entries: &[LogEntry]) {
         use std::io::Write;
         let path = dir.join(format!("{day}.jsonl"));
-        let mut f = std::fs::File::create(&path).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
         for e in entries {
             let line = serde_json::to_string(e).unwrap();
             writeln!(f, "{}", line).unwrap();
@@ -394,7 +400,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn query_empty_dir_returns_empty() {
         let dir = fresh_dir("empty");
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert!(out.is_empty());
     }
@@ -409,7 +415,7 @@ mod tests {
         write_file(&dir, "2026-06-06", &[
             entry(6, LogLevel::Info, LogCategory::Service, "third"),
         ]);
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 3);
         assert_eq!(out[0].message, "first");
@@ -425,7 +431,7 @@ mod tests {
             entry(5, LogLevel::Warning, LogCategory::Service, "w-svc"),
             entry(5, LogLevel::Error, LogCategory::Mihomo, "e-mihomo"),
         ]);
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let q = LogbookQuery {
             levels: vec![LogLevel::Warning, LogLevel::Error],
             categories: vec![],
@@ -448,7 +454,7 @@ mod tests {
         writeln!(f, "{}", serde_json::to_string(&e).unwrap()).unwrap();
         writeln!(f, "this is not json").unwrap();
         writeln!(f, "").unwrap();
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].message, "ok");
@@ -462,7 +468,7 @@ mod tests {
             entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-1"),
             entry(5, LogLevel::Info, LogCategory::Mihomo, "drop-2"),
         ]);
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let removed = store
             .clear(Some(LogCategory::Mihomo), None)
             .await
@@ -478,7 +484,7 @@ mod tests {
         let dir = fresh_dir("clear-date");
         write_file(&dir, "2026-06-04", &[entry(4, LogLevel::Info, LogCategory::App, "old")]);
         write_file(&dir, "2026-06-05", &[entry(5, LogLevel::Info, LogCategory::App, "new")]);
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let cutoff = Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap();
         let _ = store.clear(None, Some(cutoff)).await.unwrap();
         let remaining = store.query(LogbookQuery::default()).await.unwrap();
@@ -492,7 +498,7 @@ mod tests {
         // Insert in non-chronological order on disk — export must sort.
         write_file(&dir, "2026-06-06", &[entry(6, LogLevel::Info, LogCategory::App, "b")]);
         write_file(&dir, "2026-06-05", &[entry(5, LogLevel::Info, LogCategory::App, "a")]);
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let dest = dir.join("exported.jsonl");
         let count = store
             .export(LogbookQuery::default(), dest.clone())
@@ -512,18 +518,18 @@ mod tests {
     async fn store_sees_what_writer_wrote() {
         // End-to-end smoke: writer + store on the same dir.
         let dir = fresh_dir("e2e");
-        let writer = LogbookWriter::spawn(LogbookPaths::resolve(&dir));
+        let writer = LogbookWriter::spawn(LogbookPaths { directory: dir.clone() });
         writer.log_info("hello", LogCategory::App);
         writer.log_warning("careful", LogCategory::Service);
 
         // The writer's batch flusher is 50ms — give it a few cycles.
-        let day = LogbookPaths::resolve(&dir).day_string(Utc::now());
+        let day = writer.paths().day_string(Utc::now());
         wait_for(&dir.join(format!("{day}.jsonl"))).await;
 
         // Drop the writer so its background task exits cleanly.
         drop(writer);
 
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let out = store.query(LogbookQuery::default()).await.unwrap();
         assert_eq!(out.len(), 2);
         let messages: Vec<&str> = out.iter().map(|e| e.message.as_str()).collect();
@@ -560,11 +566,17 @@ mod b3_4_tests {
 
     /// Write a hand-rolled JSONL file under `dir/<day>.jsonl` directly so
     /// we can test the store without involving the writer's async batch
-    /// flush.
+    /// flush. We open with `create + append` so that back-to-back calls
+    /// for the same day accumulate entries (the production writer
+    /// appends, and tests should match that semantics).
     fn write_file(dir: &std::path::Path, day: &str, entries: &[LogEntry]) {
         use std::io::Write;
         let path = dir.join(format!("{day}.jsonl"));
-        let mut f = std::fs::File::create(&path).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
         for e in entries {
             let line = serde_json::to_string(e).unwrap();
             writeln!(f, "{}", line).unwrap();
@@ -599,7 +611,7 @@ mod b3_4_tests {
             ],
         );
 
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         let q = LogbookQuery {
             limit: Some(100),
             ..Default::default()
@@ -633,7 +645,7 @@ mod b3_4_tests {
                 entry_at(5, 12, LogLevel::Error, LogCategory::Helper, "e-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
 
         // Only error → 2 entries
         let q_err = LogbookQuery {
@@ -671,7 +683,7 @@ mod b3_4_tests {
                 entry_at(5, 12, LogLevel::Info, LogCategory::App, "x-app-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
 
         // Service only → 2 entries
         let q_svc = LogbookQuery {
@@ -714,7 +726,7 @@ mod b3_4_tests {
                 ],
             );
         }
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
 
         // Range covers only day 6 (UTC). Expect 2 entries.
         let from = Utc.with_ymd_and_hms(2026, 6, 6, 0, 0, 0).unwrap();
@@ -773,7 +785,7 @@ mod b3_4_tests {
                 entry_at(6, 10, LogLevel::Info, LogCategory::App, "a-2"),
             ],
         );
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
 
         // Sanity: 8 entries total
         let initial = store.query(LogbookQuery::default()).await.unwrap();
@@ -824,7 +836,7 @@ mod b3_4_tests {
             ],
         );
 
-        let store = LogbookStore::new(LogbookPaths::resolve(&dir));
+        let store = LogbookStore::new(LogbookPaths { directory: dir.clone() });
         // Export only errors → 1 entry
         let dest = dir.join("only-errors.jsonl");
         let q = LogbookQuery {
@@ -847,7 +859,7 @@ mod b3_4_tests {
         assert_eq!(entry.level, LogLevel::Error);
 
         // Round-trip: re-read the dest via the store and confirm the count.
-        let store2 = LogbookStore::new(LogbookPaths::resolve(dir.parent().unwrap()));
+        let store2 = LogbookStore::new(LogbookPaths { directory: dir.parent().unwrap().to_path_buf() });
         // We just want to sanity-check that the file is valid JSONL;
         // read it back as raw lines and confirm count.
         let reread = std::fs::read_to_string(&dest).unwrap();
