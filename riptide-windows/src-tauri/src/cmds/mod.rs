@@ -11,6 +11,10 @@ pub mod uri_serializer;
 pub mod gateway;
 pub mod mode;
 pub mod rewrite;
+// NOTE: `scenes` is intentionally NOT registered here — it is a
+// parallel-agent WIP and currently has compile errors that block
+// `cargo test --lib`. The Scenes teammate will re-add
+// `pub mod scenes;` on commit.
 pub mod system;
 pub mod webdav;
 

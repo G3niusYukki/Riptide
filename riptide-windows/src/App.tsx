@@ -16,6 +16,8 @@ import { LogbookView } from './components/Logbook';
 import { Overrides } from './components/Overrides';
 import { useRiptideStore } from './stores/riptide';
 import { useTheme } from './hooks/useTheme';
+import { useNotification } from './hooks/useNotification';
+import { useToastStore } from './stores/toast';
 import { modeCurrent, importProfileFromUrl, importShareUri, type AppMode } from './services/tauri';
 import { parseDeepLink, dispatchDeepLink, type DeepLinkDispatchDeps } from './lib/deepLinks';
 
@@ -43,6 +45,11 @@ function AppBody() {
   // [data-theme="light"] / :root, so the previous class-toggle path
   // (which silently had no effect) is replaced here.
   useTheme();
+  // C11: wire the Rust NotificationDispatcher's 5 `notify:*` events to
+  // the in-app toast store. The hook auto-subscribes on mount and
+  // auto-cleans on unmount; we just hand it the toast callback.
+  const addToast = useToastStore((s) => s.addToast);
+  useNotification(addToast);
   const navigate = useNavigate();
 
   // Stable dependency bundle for the deep-link dispatcher. `navigate` is

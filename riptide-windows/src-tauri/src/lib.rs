@@ -12,6 +12,7 @@ pub mod cli {
 pub mod cmds;
 pub mod config;
 pub mod core;
+pub mod notify;
 pub mod platform;
 pub mod utils;
 
@@ -35,6 +36,8 @@ use crate::core::mode_coordinator::ModeCoordinator;
 use crate::core::sysproxy::SystemProxyController;
 #[cfg(not(test))]
 use crate::cmds::config::AppState;
+#[cfg(not(test))]
+use crate::notify::NotificationDispatcher;
 #[cfg(all(not(test), target_os = "windows"))]
 use crate::utils::hotkeys::init_hotkeys;
 
@@ -113,6 +116,11 @@ pub fn run() {
             // Initialize state
             let app_handle = app.handle().clone();
             app.manage(MihomoManager::new(app_handle.clone()));
+            // Notification dispatcher: 5 emit paths + best-effort native
+            // toasts. Registered early so the rest of the setup phase can
+            // reach it via `app_handle.state::<NotificationDispatcher>()`.
+            let notifier = NotificationDispatcher::new(app_handle.clone());
+            app.manage(notifier);
             let sysproxy = SystemProxyController::new();
             // Arm the guard's event emitter before any enable() can spawn it.
             {
@@ -217,6 +225,12 @@ pub fn run() {
                     log::warn!("Failed to initialize global hotkeys: {}", e);
                 }
             }
+
+            // Notify the front-end that boot finished. C11 (Notification
+            // subsystem) wires this through the Tauri event bus; the
+            // in-app toast surfaces as "Riptide is ready — v2.4.1 loaded".
+            let version = app.config().version.clone().unwrap_or_else(|| "unknown".into());
+            app.state::<NotificationDispatcher>().startup_complete(version);
 
             Ok(())
         })
