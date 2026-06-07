@@ -768,15 +768,53 @@ missing entrypoint is never probed. `delayimp.lib` provides the
 the production release binary (muda constructs `TaskDialogIndirect`
 lazily; the loader finds the SxS v6 `comctl32.dll` at call time).
 
-### Why this lives at `src-tauri/.cargo/config.toml` and not at the repo root
+### Dual-config layout (workspace root + package local)
+
+Since v2.4.1+ the rustflags live at **two** paths:
+
+- `riptide-windows/.cargo/config.toml` — workspace-root copy
+- `riptide-windows/src-tauri/.cargo/config.toml` — package-local copy
+
+Both files contain the same `[target.*-pc-windows-msvc]` rustflags.
+We need both because Cargo's `.cargo/config.toml` lookup walks the
+directory tree **upward from the workdir**; it does not walk down.
+Concretely:
+
+| Workdir + invocation                                       | Config that wins        |
+| ---------------------------------------------------------- | ----------------------- |
+| `cd src-tauri && cargo test`                               | `src-tauri/.cargo/`     |
+| `cd riptide-windows && cargo build --manifest-path src-tauri/Cargo.toml --tests` | `riptide-windows/.cargo/` |
+| `cd riptide-windows && cargo test` (no manifest flag)      | **none** — error        |
+
+That third row is why we can't just leave the package-local file:
+`cargo test` invoked from `riptide-windows/` with no manifest flag
+fails with "could not find `Cargo.toml`". Most IDEs and CI scripts
+that target the package from the workspace root rely on the
+upward-walked file, which is why we ship the workspace-root copy as
+the primary path. The package-local copy stays as a defence-in-depth
+fallback — if a future contributor runs cargo from
+`riptide-windows/src-tauri/` (or any nested directory), the fix
+still applies.
+
+Verified empirically: `cd riptide-windows && cargo build
+--manifest-path src-tauri/Cargo.toml --tests -v | grep DELAYLOAD`
+emits 3 hits (one per rustc invocation: `riptide_windows_lib`,
+`tun_service`, `riptide_windows`).
+
+The 4th stanza in each `config.toml` covers the `i686-pc-windows-msvc`
+target (the original `4e3800a` had only x86_64 + aarch64). The i686
+build is part of the `tauri build` matrix on some hosts and would
+have hit the same loader abort.
+
+### Why not hoist the rustflags to the monorepo root
 
 - The `riptide-windows/src-tauri/` subdir is the only Rust crate in
   the monorepo that has this problem (it is the only one that links
   `tauri` with the `tray-icon` feature). macOS, the `riptide-cli`
   binary, and any future sub-crates do not need DELAYLOAD.
-- Cargo's package-local `.cargo/config.toml` is the canonical place
-  for per-crate link flags. Putting the flag at the repo root would
-  leak DELAYLOAD into crates that should not have it.
+- We do not want DELAYLOAD to leak into every Rust crate on the
+  contributor's machine via `~/.cargo/config.toml`; it must stay
+  scoped to the riptide-windows subtree.
 - A future contributor who clones only the `riptide-windows/`
   subtree still gets the fix automatically; no extra setup step is
   needed.
@@ -808,10 +846,12 @@ cargo build --manifest-path src-tauri/Cargo.toml --release
 
 If `cargo test --lib --no-run` fails with the same
 `STATUS_ENTRYPOINT_NOT_FOUND` (0xC0000139), the most likely cause is
-that `src-tauri/.cargo/config.toml` was deleted (e.g. by `git clean`)
-or that the rustflags entry is syntactically invalid. Restore the
-file from git (`git checkout -- src-tauri/.cargo/config.toml`) and
-re-run the verification commands above.
+that **both** `riptide-windows/.cargo/config.toml` and
+`riptide-windows/src-tauri/.cargo/config.toml` were deleted (e.g.
+by `git clean`), or that the rustflags entry is syntactically
+invalid in one of them. Restore both files from git
+(`git checkout -- riptide-windows/.cargo riptide-windows/src-tauri/.cargo`)
+and re-run the verification commands above.
 
 ### CI integration
 
