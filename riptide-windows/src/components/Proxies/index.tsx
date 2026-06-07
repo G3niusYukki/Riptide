@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useProxyData, useTestDelay, useSwitchProxy } from '../../hooks/useProxies';
 import { useRiptideStore } from '../../stores/riptide';
 import { Globe, Zap, Check, Loader2 } from 'lucide-react';
@@ -9,6 +10,65 @@ export function Proxies() {
   const { mutateAsync: testDelayAsync, isPending: isTesting } = useTestDelay();
   const { mutateAsync: switchProxyAsync, isPending: isSwitching } = useSwitchProxy();
   const [testingProxy, setTestingProxy] = useState<string | null>(null);
+
+  // riptide://switch-group?group=X and riptide://select-node?group=X&node=Y
+  // land here as search params (set by lib/deepLinks.ts). We use the
+  // `?group=` value to visually highlight the matching group card, and
+  // when `?node=` is also present we auto-select that node in the
+  // matching group. The auto-select fires once per (group, node) tuple
+  // to avoid an infinite re-render loop on every render.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedGroup = searchParams.get('group');
+  const requestedNode = searchParams.get('node');
+  const autoSelectKey = requestedGroup && requestedNode ? `${requestedGroup}::${requestedNode}` : null;
+  const lastAutoSelectRef = useRef<string | null>(null);
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!autoSelectKey || !isRunning) return;
+    if (lastAutoSelectRef.current === autoSelectKey) return;
+    if (isLoading || isError) return;
+    // Local non-null aliases — TS can't follow the autoSelectKey
+    // truthiness through to the `requestedGroup` / `requestedNode`
+    // narrowing on its own, so re-bind here.
+    const groupName = requestedGroup as string;
+    const nodeName = requestedNode as string;
+    // Wait until the requested group is actually present in the
+    // backend's group list; otherwise the switch would be rejected.
+    const groupExists = groups.some((g) => g.name === groupName);
+    if (!groupExists) return;
+    lastAutoSelectRef.current = autoSelectKey;
+    switchProxyAsync({ group: groupName, proxyName: nodeName }).catch((err) => {
+      console.warn('Deep link auto-select failed:', err);
+    });
+  }, [
+    autoSelectKey,
+    isRunning,
+    isLoading,
+    isError,
+    groups,
+    requestedGroup,
+    requestedNode,
+    switchProxyAsync,
+  ]);
+
+  const clearDeepLinkParams = () => {
+    if (requestedGroup || requestedNode) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('group');
+      next.delete('node');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // Scroll the deep-link-targeted group into view once groups are loaded.
+  useEffect(() => {
+    if (!requestedGroup || isLoading || isError) return;
+    const node = groupRefs.current[requestedGroup];
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [requestedGroup, isLoading, isError, groups.length]);
 
   const handleTestDelay = async (proxyName: string) => {
     setTestingProxy(proxyName);
@@ -77,13 +137,36 @@ export function Proxies() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-100">代理节点</h2>
-        <button 
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-          onClick={handleTestAllDelay}
-          disabled={isTesting || isSwitching}
-        >
-          {isTesting ? '测试中...' : '测试全部延迟'}
-        </button>
+        <div className="flex items-center gap-3">
+          {requestedGroup && (
+            <span
+              className="text-xs px-2 py-1 bg-blue-600/20 text-blue-300 border border-blue-700/40 rounded"
+              data-testid="proxies-deeplink-banner"
+            >
+              Deep link → group: <span className="font-semibold">{requestedGroup}</span>
+              {requestedNode && (
+                <>
+                  {' · node: '}
+                  <span className="font-semibold">{requestedNode}</span>
+                </>
+              )}
+              <button
+                onClick={clearDeepLinkParams}
+                className="ml-2 text-blue-300/70 hover:text-blue-200"
+                title="清除 deep link 参数"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          <button
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            onClick={handleTestAllDelay}
+            disabled={isTesting || isSwitching}
+          >
+            {isTesting ? '测试中...' : '测试全部延迟'}
+          </button>
+        </div>
       </div>
 
       {/* Proxy Groups */}
@@ -94,7 +177,18 @@ export function Proxies() {
           </div>
         ) : (
           groups.map((group) => (
-            <div key={group.name} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+            <div
+              key={group.name}
+              data-group-name={group.name}
+              ref={(el) => {
+                groupRefs.current[group.name] = el;
+              }}
+              className={`bg-slate-900/50 border rounded-xl overflow-hidden ${
+                requestedGroup === group.name
+                  ? 'border-blue-500/60 ring-1 ring-blue-500/30'
+                  : 'border-slate-800'
+              }`}
+            >
               <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/70">
                 <div className="flex items-center gap-2.5">
                   <Globe size={18} className="text-blue-400" />

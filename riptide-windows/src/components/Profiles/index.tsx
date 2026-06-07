@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRiptideStore } from '../../stores/riptide';
 import { Plus, Trash2, Edit3, Download, FileText, ClipboardPaste, Boxes, Cloud } from 'lucide-react';
 import type { Profile } from '../../types';
@@ -19,6 +20,21 @@ export function Profiles() {
   const [saving, setSaving] = useState(false);
   const [nodeEditorTarget, setNodeEditorTarget] = useState<Profile | null>(null);
   const [registeringWarp, setRegisteringWarp] = useState(false);
+
+  // riptide://open-config dispatches `navigate('/profiles?import=1')`.
+  // When the page lands with that flag, auto-open the "从 URL 导入" modal
+  // so the user can paste a subscription URL straight into the box.
+  // We consume the flag once via setSearchParams(..., { replace: true })
+  // so a subsequent refresh of /profiles does not re-trigger the modal.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkImport = searchParams.get('import') === '1';
+  useEffect(() => {
+    if (!deepLinkImport) return;
+    setShowImportModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('import');
+    setSearchParams(next, { replace: true });
+  }, [deepLinkImport, searchParams, setSearchParams]);
 
   // Load profiles from disk on mount — the in-memory store doesn't survive reloads.
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { listen } from '@tauri-apps/api/event';
 import { onOpenUrl, getCurrent as getCurrentDeepLink } from '@tauri-apps/plugin-deep-link';
 import { Layout } from './components/Layout';
@@ -11,8 +11,10 @@ import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
 import { LogViewer } from './components/LogViewer';
 import { LogbookView } from './components/Logbook';
+import { Overrides } from './components/Overrides';
 import { useRiptideStore } from './stores/riptide';
 import { modeCurrent, importProfileFromUrl, importShareUri, type AppMode } from './services/tauri';
+import { parseDeepLink, dispatchDeepLink, type DeepLinkDispatchDeps } from './lib/deepLinks';
 
 interface ModeStateEvent {
   mode: AppMode;
@@ -28,44 +30,13 @@ interface SystemProxyDriftEvent {
 }
 
 /**
- * Parse and dispatch a riptide:// URL. Supported shapes:
- *   riptide://import?url=<subscription_url>
- *   riptide://import?uri=<share_uri>
+ * Inner App body — must live inside `<BrowserRouter>` so `useNavigate`
+ * resolves to the router's navigate function. The outer `App` component
+ * is the one exposed to `main.tsx` and only sets up routing.
  */
-async function handleDeepLink(rawUrl: string) {
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    console.warn('Ignoring malformed deep link:', rawUrl);
-    return;
-  }
-  if (url.protocol !== 'riptide:') return;
-
-  const action = url.host || url.pathname.replace(/^\/*/, '');
-  if (action === 'import') {
-    const subUrl = url.searchParams.get('url');
-    const shareUri = url.searchParams.get('uri');
-    try {
-      if (subUrl) {
-        const profile = await importProfileFromUrl(subUrl);
-        alert(`已通过 deep link 导入订阅：${profile.name}`);
-      } else if (shareUri) {
-        const profile = await importShareUri(shareUri);
-        alert(`已通过 deep link 导入节点：${profile.name}`);
-      } else {
-        console.warn('riptide://import missing url= or uri= parameter');
-      }
-    } catch (e) {
-      alert(`Deep link 导入失败：${e}`);
-    }
-  } else {
-    console.warn('Unknown deep link action:', action);
-  }
-}
-
-function App() {
+function AppBody() {
   const theme = useRiptideStore((s) => s.theme);
+  const navigate = useNavigate();
 
   // Apply theme as a class on <html>. Tailwind picks it up via the `dark:`
   // variant when configured. Light-theme styling is a future pass; for now
@@ -85,6 +56,28 @@ function App() {
     }
     apply(theme);
   }, [theme]);
+
+  // Stable dependency bundle for the deep-link dispatcher. `navigate` is
+  // referentially stable across renders, but rebuilding the object would
+  // still cause the deep-link useEffect to re-run — useMemo is cheap
+  // insurance.
+  const dispatchDeps = useMemo<DeepLinkDispatchDeps>(
+    () => ({
+      navigate,
+      importProfileFromUrl: (url: string) => importProfileFromUrl(url),
+      importShareUri: (uri: string) => importShareUri(uri),
+      modeSwitchOff: () =>
+        import('./services/tauri').then((t) => t.modeSwitchOff()),
+      modeSwitchToSystemProxy: (httpPort?: number, socksPort?: number) =>
+        import('./services/tauri').then((t) =>
+          t.modeSwitchToSystemProxy(httpPort ?? 7890, socksPort ?? 7891),
+        ),
+      modeSwitchToTun: () =>
+        import('./services/tauri').then((t) => t.modeSwitchToTun()),
+      alert: (message: string) => window.alert(message),
+    }),
+    [navigate],
+  );
 
   useEffect(() => {
     // Reflect the initial backend mode before any user interaction.
@@ -116,10 +109,11 @@ function App() {
       const store = useRiptideStore.getState();
       const target = store.mode === 'off' ? 'system_proxy' : 'off';
       try {
+        const t = await import('./services/tauri');
         if (target === 'off') {
-          await (await import('./services/tauri')).modeSwitchOff();
+          await t.modeSwitchOff();
         } else {
-          await (await import('./services/tauri')).modeSwitchToSystemProxy(7890, 7891);
+          await t.modeSwitchToSystemProxy(7890, 7891);
         }
       } catch (e) {
         console.warn('Hotkey toggle-proxy failed:', e);
@@ -140,7 +134,19 @@ function App() {
       }
     });
 
-    // Deep link: handle the URL that launched the app (if any) + future ones.
+    // Deep link: handle the URL that launched the app (if any) + future
+    // ones. The parser + dispatcher live in `lib/deepLinks.ts` — single
+    // source of truth for the riptide:// scheme, exercised by 8 unit
+    // tests in `lib/__tests__/deepLinks.test.ts`.
+    const handleDeepLink = async (rawUrl: string) => {
+      const cmd = parseDeepLink(rawUrl);
+      if (cmd.type === 'noop') {
+        console.warn('Ignoring deep link:', cmd.reason);
+        return;
+      }
+      await dispatchDeepLink(cmd, dispatchDeps);
+    };
+
     getCurrentDeepLink()
       .then((urls) => {
         if (urls && urls.length > 0) handleDeepLink(urls[0]);
@@ -157,22 +163,29 @@ function App() {
       unlistenToggleProxy.then((fn) => fn()).catch(() => {});
       unlistenToggleMode.then((fn) => fn()).catch(() => {});
     };
-  }, []);
+  }, [dispatchDeps]);
 
   return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="proxies" element={<Proxies />} />
+        <Route path="profiles" element={<Profiles />} />
+        <Route path="rules" element={<Rules />} />
+        <Route path="connections" element={<Connections />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="logs" element={<LogViewer />} />
+        <Route path="logbook" element={<LogbookView />} />
+        <Route path="overrides" element={<Overrides />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function App() {
+  return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="proxies" element={<Proxies />} />
-          <Route path="profiles" element={<Profiles />} />
-          <Route path="rules" element={<Rules />} />
-          <Route path="connections" element={<Connections />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="logs" element={<LogViewer />} />
-          <Route path="logbook" element={<LogbookView />} />
-        </Route>
-      </Routes>
+      <AppBody />
     </BrowserRouter>
   );
 }
