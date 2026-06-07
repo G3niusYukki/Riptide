@@ -6,6 +6,8 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { Proxies } from './components/Proxies';
 import { Profiles } from './components/Profiles';
+import { Config } from './components/Config';
+import { Traffic } from './components/Traffic';
 import { Rules } from './components/Rules';
 import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
@@ -13,6 +15,7 @@ import { LogViewer } from './components/LogViewer';
 import { LogbookView } from './components/Logbook';
 import { Overrides } from './components/Overrides';
 import { useRiptideStore } from './stores/riptide';
+import { useTheme } from './hooks/useTheme';
 import { modeCurrent, importProfileFromUrl, importShareUri, type AppMode } from './services/tauri';
 import { parseDeepLink, dispatchDeepLink, type DeepLinkDispatchDeps } from './lib/deepLinks';
 
@@ -35,27 +38,12 @@ interface SystemProxyDriftEvent {
  * is the one exposed to `main.tsx` and only sets up routing.
  */
 function AppBody() {
-  const theme = useRiptideStore((s) => s.theme);
+  // C10.1: theme management now lives in `useTheme`, which writes the
+  // resolved value to <html data-theme="...">. tokens.css keys off
+  // [data-theme="light"] / :root, so the previous class-toggle path
+  // (which silently had no effect) is replaced here.
+  useTheme();
   const navigate = useNavigate();
-
-  // Apply theme as a class on <html>. Tailwind picks it up via the `dark:`
-  // variant when configured. Light-theme styling is a future pass; for now
-  // `dark` is the only fully-styled variant and the default.
-  useEffect(() => {
-    const root = document.documentElement;
-    const apply = (mode: 'light' | 'dark') => {
-      root.classList.toggle('dark', mode === 'dark');
-      root.classList.toggle('light', mode === 'light');
-    };
-    if (theme === 'system') {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      apply(mq.matches ? 'dark' : 'light');
-      const handler = (e: MediaQueryListEvent) => apply(e.matches ? 'dark' : 'light');
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-    apply(theme);
-  }, [theme]);
 
   // Stable dependency bundle for the deep-link dispatcher. `navigate` is
   // referentially stable across renders, but rebuilding the object would
@@ -171,6 +159,8 @@ function AppBody() {
         <Route index element={<Dashboard />} />
         <Route path="proxies" element={<Proxies />} />
         <Route path="profiles" element={<Profiles />} />
+        <Route path="config" element={<Config />} />
+        <Route path="traffic" element={<Traffic />} />
         <Route path="rules" element={<Rules />} />
         <Route path="connections" element={<Connections />} />
         <Route path="settings" element={<SettingsPage />} />

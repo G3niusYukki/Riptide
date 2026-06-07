@@ -7,7 +7,7 @@ import { SyncTab } from './SyncTab';
 import { AssetsTab } from './AssetsTab';
 import { RecoveryTab } from './RecoveryTab';
 import { RewriteTab } from './RewriteTab';
-import { AppearanceSettings } from '../AppearanceSettings';
+import { AppearanceTab } from './AppearanceTab';
 import { GatewayTab } from './GatewayTab';
 import { MITMTab } from './MITMTab';
 import { useRiptideStore } from '../../stores/riptide';
@@ -97,7 +97,7 @@ export function SettingsPage() {
       {active === 'assets' && <AssetsTab />}
       {active === 'recovery' && <RecoveryTab />}
       {active === 'mitm' && <MITMTab />}
-      {active === 'appearance' && <AppearanceSettings />}
+      {active === 'appearance' && <AppearanceTab />}
       {active === 'about' && (
         <div className="space-y-3">
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
