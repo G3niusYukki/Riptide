@@ -1,0 +1,44 @@
+# Cargo configuration for riptide-windows.
+#
+# Workaround for STATUS_ENTRYPOINT_NOT_FOUND (0xC0000139) when
+# `cargo test` is run on Windows hosts that ship `comctl32.dll` v5
+# in `%SystemRoot%\System32\comctl32.dll` instead of the modern
+# v6.0+ Common Controls.
+#
+# Why this is needed:
+#
+# The `tauri` crate's `tray-icon` feature pulls in `muda`, which
+# (transitively, via `windows-sys` 0.60) declares FFI bindings to
+# `comctl32!TaskDialogIndirect`. That function only exists in
+# `comctl32.dll` v6.0+. The Rust linker emits a regular (non-delay)
+# import for `TaskDialogIndirect` into every binary that links the
+# `riptide_windows_lib` rlib — including the lib test binary, even
+# though no test code calls into muda's menu surface.
+#
+# On hosts where the v5 `comctl32.dll` takes precedence over the
+# side-by-side v6 (e.g. when only the v5 is in `System32`), the
+# loader fails to resolve `TaskDialogIndirect` at process startup
+# and aborts the test binary before any test code runs.
+#
+# The fix: delay-load `comctl32.dll` for Windows MSVC targets so
+# the loader only resolves `TaskDialogIndirect` on first use. The
+# test harness never invokes muda's menu code, so the missing
+# entrypoint is never probed. The `delayimp.lib` import library
+# provides the `__delayLoadHelper2` symbol the linker requires.
+#
+# This flag is also safe for the production release binary:
+# muda's tray menu code calls `TaskDialogIndirect` lazily, and the
+# delayload resolver looks up the real v6 `comctl32.dll` via the
+# standard search order (System32 / KnownDLLs / manifest-redirected
+# SxS) at call time.
+#
+# Scope: applies to all rustc invocations for the Windows MSVC
+# target in this crate. This crate is Windows-only on the binary
+# level (`main.rs` is `#[cfg(windows)]`), so non-Windows targets
+# are unaffected.
+
+[target.x86_64-pc-windows-msvc]
+rustflags = "-C link-arg=/DELAYLOAD:comctl32.dll -C link-arg=/DEFAULTLIB:delayimp.lib"
+
+[target.aarch64-pc-windows-msvc]
+rustflags = "-C link-arg=/DELAYLOAD:comctl32.dll -C link-arg=/DEFAULTLIB:delayimp.lib"

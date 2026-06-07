@@ -662,3 +662,179 @@ what order**, see:
 If this file and the catchup plan ever disagree, **the catchup plan
 wins** for scope/scheduling questions; this file wins for tooling,
 paths, and coding-convention questions.
+
+---
+
+## 13. Engine Router (ADR-0005 implementation)
+
+The Windows port of the `ProxyEngine` protocol + `EngineRouter`
+decision lives entirely in `src-tauri/src/`:
+
+| File | Responsibility |
+|---|---|
+| `core/engines/mod.rs` | Module entry; re-exports the public types below. |
+| `core/engines/proxy_engine.rs` | `ProxyEngineKind` (Mihomo/Singbox/Swift), `ProxyKind` (11 variants: SS/Vmess/Vless/Trojan/Hy2/Snell/Tuic/Socks5/Http/Reality/AnyTls), `ProxyNode` (engine-agnostic input), `Config { format, body }`, `EngineError`, and the `ProxyEngine` trait (4 methods: `name`, `kind`, `supported_proxy_kinds`, `generate_config`). |
+| `core/engines/mihomo_engine.rs` | `MihomoEngine` impl — **zero-sized struct**, does not call into `MihomoManager`. The trait is for the future "import via engine" path; today's mihomo-launching code path is unchanged. |
+| `core/engines/router.rs` | `EngineRouter { policy: Mutex<Policy> }`, `Policy { DefaultMihomo, ExplicitSingbox }`. 5 unit tests in `#[cfg(test)] mod tests` cover the ADR-0005 routing table. |
+| `cmds/engines.rs` | 6 Tauri commands (see below). |
+
+### 6 Tauri commands (cross-platform, no `#[cfg]`)
+
+| Command | Returns | Purpose |
+|---|---|---|
+| `engine_current` | `ProxyEngineKind` | Where the router sends a non-forced kind right now. |
+| `engine_set_policy` | `Result<(), String>` | Accepts `"default_mihomo"` or `"explicit_singbox"`. |
+| `engine_supported_kinds` | `Vec<ProxyKind>` | The currently routed engine's supported kinds. |
+| `engine_status` | `EngineStatus { name, kind, version, last_error }` | One-shot health snapshot. |
+| `engine_list_kinds` | `Vec<ProxyEngineKind>` | All engines routable on Windows: `[Mihomo, Singbox]`. Swift is excluded (ADR-0007). |
+| `engine_get_policy` | `String` | Wire string of the active policy. |
+
+### State wiring
+
+A single `Arc<EngineRouter>` is registered in `lib.rs::run()` via
+`tauri::Builder::default().manage(Arc::new(EngineRouter::default_mihomo()))`.
+The state is **not** persisted to disk in this revision — a follow-up
+phase will surface an `engine_policy.json` (parallel to
+`active.json`).
+
+### Adding a new engine
+
+1. Add a variant to `ProxyEngineKind` (e.g. `Xray`).
+2. Add a zero-sized `XrayEngine` impl in `core/engines/xray_engine.rs`.
+3. Add a routing rule in `EngineRouter::engine_for` (or add a new
+   forced-kind branch in the `match kind { ... }` head).
+4. Update `engine_list_kinds` and `engine_supported_kinds`'s
+   `match` to dispatch to the new impl.
+5. Add unit tests in `core/engines/router.rs`.
+
+## 14. Test Binary Loader (`comctl32` DELAYLOAD) — v2.4.1+
+
+> Despite the original report describing the failure as a
+> "WebView2Loader.dll" issue, the actual root cause is
+> `comctl32!TaskDialogIndirect` (transitive via `tauri` tray-icon →
+> `muda` → `windows-sys` 0.60). This section is the running docs
+> entry; see
+> [`../docs/decisions/0008-windows-webview2-test-loader.md`](../docs/decisions/0008-windows-webview2-test-loader.md)
+> for the full candidate matrix and rationale.
+
+### Symptom
+
+On Windows hosts that ship `comctl32.dll` v5 in `%SystemRoot%\System32`
+(rather than the v6.0+ Common Controls), `cargo test --lib` aborts at
+process startup with `STATUS_ENTRYPOINT_NOT_FOUND` (0xC0000139). The
+binary never reaches `libtest`; the test runner reports
+"could not start process" and a Windows error dialog flashes. This
+blocks every `cargo test --lib` invocation on such a host, including
+the 18-test B1.1 URI parser and 11-test B1.2 Logbook suites that this
+plan needs to land in Phase B.
+
+### Root cause
+
+`tauri = "=2.10"` with the `tray-icon` feature pulls in `muda`
+v0.17.2, which pulls in `windows-sys` 0.60. `windows-sys` 0.60
+declares an FFI binding to `comctl32!TaskDialogIndirect`. The Rust
+linker emits a **regular** (non-delay) import for that symbol into
+every binary that links the `riptide_windows_lib` rlib, including the
+test binary, even though no test code ever calls into muda's menu
+surface.
+
+`comctl32.dll` is a Windows Known DLL: the loader binds
+`System32\comctl32.dll` first. On a v5 host (v5.82), the v5 build
+does not export `TaskDialogIndirect` (added in v6.0). The v6 build
+*is* present in this host's `WinSxS`, but Known-DLL resolution wins
+over WinSxS, so the v6 copy is never consulted.
+
+`#[cfg(not(test))]` isolation in `lib.rs` (commit `fcf388e`) is
+necessary but not sufficient — muda's compiled object files emit
+imports regardless of whether any of its symbols are called from
+riptide code.
+
+### Fix
+
+Add `src-tauri/.cargo/config.toml` with the package-local rustflags:
+
+```toml
+[target.x86_64-pc-windows-msvc]
+rustflags = "-C link-arg=/DELAYLOAD:comctl32.dll -C link-arg=/DEFAULTLIB:delayimp.lib"
+
+[target.aarch64-pc-windows-msvc]
+rustflags = "-C link-arg=/DELAYLOAD:comctl32.dll -C link-arg=/DEFAULTLIB:delayimp.lib"
+```
+
+DELAYLOAD defers the `comctl32!TaskDialogIndirect` resolution to
+first use; the test harness never invokes muda's menu code, so the
+missing entrypoint is never probed. `delayimp.lib` provides the
+`__delayLoadHelper2` symbol MSVC requires. The flags are safe for
+the production release binary (muda constructs `TaskDialogIndirect`
+lazily; the loader finds the SxS v6 `comctl32.dll` at call time).
+
+### Why this lives at `src-tauri/.cargo/config.toml` and not at the repo root
+
+- The `riptide-windows/src-tauri/` subdir is the only Rust crate in
+  the monorepo that has this problem (it is the only one that links
+  `tauri` with the `tray-icon` feature). macOS, the `riptide-cli`
+  binary, and any future sub-crates do not need DELAYLOAD.
+- Cargo's package-local `.cargo/config.toml` is the canonical place
+  for per-crate link flags. Putting the flag at the repo root would
+  leak DELAYLOAD into crates that should not have it.
+- A future contributor who clones only the `riptide-windows/`
+  subtree still gets the fix automatically; no extra setup step is
+  needed.
+
+### Verification commands
+
+Run these on a Windows 11 dev box to confirm the fix is in place and
+the test binary can boot:
+
+```powershell
+# 1. Confirm the test binary builds and the runner can load it
+cd riptide-windows
+cargo test --manifest-path src-tauri/Cargo.toml --lib --no-run
+# Expected: exit 0, prints "Executable unittests src\lib.rs ..."
+
+# 2. Run the smallest non-trivial test module (no Tauri surface)
+cargo test --manifest-path src-tauri/Cargo.toml --lib core::logbook::paths
+# Expected: 7 passed; 0 failed; 0 ignored
+
+# 3. Run the existing engine-router + lib.rs tests to confirm no regression
+cargo test --manifest-path src-tauri/Cargo.toml --lib autostart_passes_minimized_flag
+cargo test --manifest-path src-tauri/Cargo.toml --lib core::engines::router
+# Expected: 1 + 5 = 6 passed; 0 failed
+
+# 4. Confirm the release build is unaffected
+cargo build --manifest-path src-tauri/Cargo.toml --release
+# Expected: exit 0
+```
+
+If `cargo test --lib --no-run` fails with the same
+`STATUS_ENTRYPOINT_NOT_FOUND` (0xC0000139), the most likely cause is
+that `src-tauri/.cargo/config.toml` was deleted (e.g. by `git clean`)
+or that the rustflags entry is syntactically invalid. Restore the
+file from git (`git checkout -- src-tauri/.cargo/config.toml`) and
+re-run the verification commands above.
+
+### CI integration
+
+`ci.yml` already runs `cargo test --manifest-path src-tauri/Cargo.toml
+--all` (see § 11.1 step 8). With the DELAYLOAD flags in place, the
+CI runner (which ships v6 `comctl32.dll` in `System32`) will pass
+even on hosts where the link step would otherwise surface a strict
+import. No CI workflow change is required; the fix is invisible to
+CI.
+
+### Watch out
+
+- **Do not run `git clean -fdx` inside `riptide-windows/src-tauri/`
+  without first backing up `.cargo/config.toml`**. The file is
+  committed (since the B1.1/B1.2 fix commit), so `git checkout --`
+  will restore it — but on a fresh `git clone` of a stale branch
+  the file may be missing until you pull the latest `master`.
+- **Do not loosen the rustflags to global scope** (e.g. by moving
+  the file to `~/.cargo/config.toml`). That would DELAYLOAD
+  `comctl32.dll` for every Rust crate you ever build on this host,
+  including unrelated projects, and would mask future regressions
+  inside `riptide-windows`.
+- **Do not switch off the `tray-icon` feature in Cargo.toml** to
+  "fix" the loader — the tray menu is a Phase A deliverable. If
+  the tray feature is ever dropped, the DELAYLOAD flag becomes
+  dead code and should be removed in the same commit.
