@@ -3,6 +3,7 @@
 pub mod proxy;
 pub mod proxy_editor;
 pub mod config;
+pub mod engines;
 pub mod logbook;
 pub mod dns;
 pub mod uri_serializer;

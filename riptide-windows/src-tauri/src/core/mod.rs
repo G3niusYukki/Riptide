@@ -1,6 +1,7 @@
 //! Core business logic modules
 
 pub mod diagnostics;
+pub mod engines;
 #[cfg(target_os = "windows")]
 pub mod gateway;
 pub mod geo_assets;
@@ -12,6 +13,7 @@ pub mod mihomo_bootstrap;
 pub mod mode_coordinator;
 pub mod recovery_watchdog;
 pub mod region_presets;
+pub mod singbox;
 pub mod secrets;
 pub mod subscription_scheduler;
 pub mod sysproxy;

@@ -108,6 +108,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .manage(AppState::new())
+        .manage(std::sync::Arc::new(crate::core::engines::EngineRouter::default_mihomo()))
         .setup(|app| {
             // Initialize state
             let app_handle = app.handle().clone();
@@ -369,6 +370,15 @@ pub fn run() {
             cmds::logbook::logbook_query,
             cmds::logbook::logbook_clear,
             cmds::logbook::logbook_export,
+            // Engine router (ADR-0005): the policy that decides
+            // mihomo-vs-singbox for each ProxyKind. State is the
+            // shared `Arc<EngineRouter>` registered below.
+            cmds::engines::engine_current,
+            cmds::engines::engine_set_policy,
+            cmds::engines::engine_supported_kinds,
+            cmds::engines::engine_status,
+            cmds::engines::engine_list_kinds,
+            cmds::engines::engine_get_policy,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
