@@ -14,7 +14,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.5", features = [] }
 
 [dependencies]
-tauri = { version = "=2.10", features = ["tray-icon"] }
+tauri = { version = "=2.10", features = ["tray-icon", "test"] }
+# `test` feature unlocks `tauri::test::mock_builder()` /
+# `mock_context()` / `noop_assets()` for the C8.5 IPC integration
+# test. The feature is gated to `#[cfg(test)]`-only code
+# internally so release builds aren't bloated — the feature flag
+# just lets the same `tauri::test` symbols resolve from
+# integration tests' own compile scope.
 tauri-plugin-shell = "=2.3.5"
 tauri-plugin-process = "=2.3.1"
 tauri-plugin-notification = "=2.3.3"
