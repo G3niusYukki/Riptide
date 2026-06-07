@@ -9,6 +9,7 @@ import { Profiles } from './components/Profiles';
 import { Config } from './components/Config';
 import { Traffic } from './components/Traffic';
 import { Rules } from './components/Rules';
+import { SceneEditorView } from './components/Rules/SceneEditorView';
 import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
 import { LogViewer } from './components/LogViewer';
@@ -169,6 +170,7 @@ function AppBody() {
         <Route path="config" element={<Config />} />
         <Route path="traffic" element={<Traffic />} />
         <Route path="rules" element={<Rules />} />
+        <Route path="scenes" element={<SceneEditorView />} />
         <Route path="connections" element={<Connections />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="logs" element={<LogViewer />} />

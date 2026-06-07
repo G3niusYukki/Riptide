@@ -1,6 +1,7 @@
 import { useRules } from '../../hooks/useRules';
 import { useRiptideStore } from '../../stores/riptide';
-import { Shield, Globe, FileText, Loader2, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Shield, Globe, FileText, Loader2, AlertTriangle, Network } from 'lucide-react';
 
 const ruleIcons: Record<string, typeof Globe> = {
   DOMAIN: Globe,
@@ -66,6 +67,21 @@ export function Rules() {
         <h2 className="text-2xl font-bold text-slate-100">规则列表</h2>
         <span className="text-sm text-slate-400">{rules.length} 条规则</span>
       </div>
+
+      <Link
+        to="/scenes"
+        data-testid="rules-to-scenes-link"
+        className="flex items-center gap-3 bg-slate-900/50 border border-slate-800 hover:border-blue-700/60 rounded-xl px-4 py-3 transition-colors"
+      >
+        <Network size={20} className="text-blue-400 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-100">场景编辑器</p>
+          <p className="text-xs text-slate-500 truncate">
+            通过进程 / 域名 / IP 集规则自动覆盖代理模式。
+          </p>
+        </div>
+        <span className="text-xs text-slate-500">→</span>
+      </Link>
 
       {rules.length === 0 ? (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-12 text-center">

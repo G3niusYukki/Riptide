@@ -13,16 +13,11 @@ pub mod mihomo_bootstrap;
 pub mod mode_coordinator;
 pub mod recovery_watchdog;
 pub mod region_presets;
+pub mod scenes;
 pub mod singbox;
 pub mod secrets;
 pub mod subscription_scheduler;
 pub mod sysproxy;
-// NOTE: `scenes` is intentionally NOT registered here — it is a
-// parallel-agent WIP and currently has compile errors that block
-// `cargo test --lib`. The Scenes teammate will re-add
-// `pub mod scenes;` on commit. Leaving it out keeps the notification
-// subsystem's tests runnable; the file structure is otherwise
-// untouched.
 #[cfg(target_os = "windows")]
 pub mod service;
 #[cfg(not(target_os = "windows"))]

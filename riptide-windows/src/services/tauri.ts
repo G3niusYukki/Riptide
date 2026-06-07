@@ -11,6 +11,7 @@ import type {
   ProfileMetadata,
   RewriteRule,
 } from '../types';
+import type { Scene, SceneApplyResult, SceneSummary } from '../types/scene';
 
 // Proxy commands
 export const startProxy = () => invoke<void>('start_proxy');
@@ -536,3 +537,38 @@ export const logbookExport = (
   to: string | null | undefined,
   destPath: string,
 ) => invoke<number>('logbook_export', { from, to, destPath });
+
+// Scene editor (C8.2) — scenes bind process / domain / IP-set matchers
+// to mode overrides. Persisted to %APPDATA%\Riptide\scenes.json.
+// Mirror of `core::scenes::SceneStore` on the Rust side. The MVP
+// shape is intentionally narrow: list / create / update / delete /
+// apply (probe). UI shell predates any router integration.
+
+/**
+ * Read all scenes. The list view passes `full = false` (or omits
+ * the arg) and gets back the trimmed `SceneSummary` list. Pass
+ * `full = true` to get the full scenes (used by the editor when
+ * hydrating the form fields).
+ */
+export const sceneList = (full: boolean = false) =>
+  invoke<(SceneSummary | Scene)[]>('scene_list', { full });
+
+/** Create a scene. The backend mints a UUID v4 id and ISO 8601
+ *  timestamps; the returned scene is the stored value. */
+export const sceneCreate = (scene: Omit<Scene, 'id' | 'created_at' | 'updated_at'> & { id?: string }) =>
+  invoke<Scene>('scene_create', { scene });
+
+/** Replace an existing scene (matched by `scene.id`). */
+export const sceneUpdate = (scene: Scene) => invoke<Scene>('scene_update', { scene });
+
+/** Delete a scene by id. */
+export const sceneDelete = (id: string) => invoke<void>('scene_delete', { id });
+
+/**
+ * Probe a connection tuple `(process, domain, ip)` against every
+ * enabled scene; the first match's mode override is returned. All
+ * three fields are optional — `null` / `undefined` mean "no
+ * constraint on this axis".
+ */
+export const sceneApply = (process?: string | null, domain?: string | null, ip?: string | null) =>
+  invoke<SceneApplyResult>('scene_apply', { process, domain, ip });
