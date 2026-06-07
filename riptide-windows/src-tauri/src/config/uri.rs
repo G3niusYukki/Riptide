@@ -89,32 +89,56 @@ fn base64_decode_bytes(input: &str) -> Option<Vec<u8>> {
     Some(result)
 }
 
-/// Parse Shadowsocks URI: ss://BASE64(method:password)@server:port or
-/// ss://BASE64(method:password@server:port)#name
+/// Parse Shadowsocks URI. Two shapes are accepted:
+///
+/// - SIP002 (modern): `ss://BASE64(method:password)@server:port[#name]`.
+///   The base64 part contains no `@` (the base64 alphabet is
+///   `[A-Za-z0-9+/=]`-style), so we can detect this format by spotting
+///   a literal `@` in the undecoded remainder.
+/// - Legacy: `ss://BASE64(method:password@server:port)[#name]`. The
+///   base64 part is the *whole* `method:password@server:port` blob and
+///   we split it on the *last* `@` after decoding.
 fn parse_shadowsocks(rest: &str) -> Result<ClashRawProxy, UriParseError> {
     let (encoded, name) = split_fragment(rest);
 
-    // If there's an '@' after base64 decode, it's the user-info format
+    // SIP002 detection: a literal `@` in the undecoded remainder means
+    // the base64 part is everything before it. We deliberately check
+    // `find('@')` (not `rfind`) because the SIP002 grammar has exactly
+    // one `@` and any extra `@` in a base64 blob would be a malformed
+    // URL anyway.
+    if let Some(at) = encoded.find('@') {
+        let userinfo_b64 = &encoded[..at];
+        let server_port = &encoded[at + 1..];
+        let userinfo = decode_base64(userinfo_b64)?;
+        return parse_ss_userinfo_and_server(&userinfo, server_port, name);
+    }
+
+    // Legacy: base64-encode the whole `method:password@server:port` blob.
     let decoded = decode_base64(encoded)?;
+    let (userinfo, server_port) = decoded
+        .rfind('@')
+        .map(|at| (decoded[..at].to_string(), decoded[at + 1..].to_string()))
+        .ok_or_else(|| UriParseError::UrlParseError("Invalid SS URI format".into()))?;
+    parse_ss_userinfo_and_server(&userinfo, &server_port, name)
+}
 
-    let (userinfo, server_port) = if let Some(at) = decoded.rfind('@') {
-        (&decoded[..at], &decoded[at + 1..])
-    } else {
-        // Legacy format: entire string is method:password@server:port
-        return Err(UriParseError::UrlParseError("Invalid SS URI format".into()));
-    };
-
+/// Build a `ClashRawProxy` from an already-decoded SS userinfo and the
+/// undecoded `server:port` tail. Shared between the SIP002 and legacy
+/// branches of `parse_shadowsocks`.
+fn parse_ss_userinfo_and_server(
+    userinfo: &str,
+    server_port: &str,
+    name: Option<String>,
+) -> Result<ClashRawProxy, UriParseError> {
     let (method, password) = userinfo
         .split_once(':')
         .ok_or_else(|| UriParseError::MissingField("cipher:password".into()))?;
-
     let (server, port_str) = server_port
         .split_once(':')
         .ok_or_else(|| UriParseError::MissingField("server:port".into()))?;
     let port: u16 = port_str
         .parse()
         .map_err(|_| UriParseError::InvalidPort(port_str.into()))?;
-
     Ok(ClashRawProxy {
         name: name.unwrap_or_else(|| format!("SS-{}-{}", server, port)),
         server: Some(server.to_string()),
@@ -132,9 +156,16 @@ fn parse_trojan(rest: &str) -> Result<ClashRawProxy, UriParseError> {
     let (body, name) = split_fragment(rest);
 
     let without_scheme = body;
-    let (password, rest) = without_scheme
+    let (password_raw, rest) = without_scheme
         .split_once('@')
         .ok_or_else(|| UriParseError::MissingField("password@server:port".into()))?;
+
+    // The serializer percent-encodes the password before emitting the
+    // URI, so we must decode it back to get the original plaintext
+    // (e.g. `p%40ss` → `p@ss`, `pwd%21` → `pwd!`).
+    let password = urlencoding::decode(password_raw)
+        .map(|s| s.into_owned())
+        .unwrap_or_else(|_| password_raw.to_string());
 
     let (host_port, query) = rest.split_once('?').unwrap_or((rest, ""));
 
@@ -157,7 +188,7 @@ fn parse_trojan(rest: &str) -> Result<ClashRawProxy, UriParseError> {
         server: Some(server.to_string()),
         port: Some(port),
         proxy_type: Some("trojan".into()),
-        password: Some(password.to_string()),
+        password: Some(password),
         sni: sni.or_else(|| Some(server.to_string())),
         skip_cert_verify,
         udp: Some(true),
@@ -289,9 +320,16 @@ fn parse_vmess(rest: &str) -> Result<ClashRawProxy, UriParseError> {
 fn parse_hysteria2(rest: &str) -> Result<ClashRawProxy, UriParseError> {
     let (body, name) = split_fragment(rest);
 
-    let (password, host_rest) = body
+    let (password_raw, host_rest) = body
         .split_once('@')
         .ok_or_else(|| UriParseError::MissingField("password@server:port".into()))?;
+
+    // Percent-decode the password for symmetry with `parse_trojan` and
+    // `parse_tuic`. The serializer encodes it before emit, and a
+    // password like `p@ss` would otherwise round-trip as `p%40ss`.
+    let password = urlencoding::decode(password_raw)
+        .map(|s| s.into_owned())
+        .unwrap_or_else(|_| password_raw.to_string());
 
     let (host_port, query) = host_rest.split_once('?').unwrap_or((host_rest, ""));
 
@@ -311,7 +349,7 @@ fn parse_hysteria2(rest: &str) -> Result<ClashRawProxy, UriParseError> {
         server: Some(server.to_string()),
         port: Some(port),
         proxy_type: Some("hysteria2".into()),
-        password: Some(password.to_string()),
+        password: Some(password),
         sni,
         skip_cert_verify,
         udp: Some(true),
@@ -324,8 +362,15 @@ fn parse_tuic(rest: &str) -> Result<ClashRawProxy, UriParseError> {
     let (body, name) = split_fragment(rest);
     let (userinfo, host_rest) = body.split_once('@')
         .ok_or_else(|| UriParseError::MissingField("uuid:password@server:port".into()))?;
-    let (uuid, password) = userinfo.split_once(':')
+    let (uuid, password_raw) = userinfo.split_once(':')
         .ok_or_else(|| UriParseError::MissingField("uuid:password".into()))?;
+    // The serializer percent-encodes the password before emitting the
+    // URI, so decode it back. We try the full URL decode first; if that
+    // fails (e.g. legacy share links that pre-date the encoding), fall
+    // back to the raw value.
+    let password = urlencoding::decode(password_raw)
+        .map(|s| s.into_owned())
+        .unwrap_or_else(|_| password_raw.to_string());
     let (host_port, query) = host_rest.split_once('?').unwrap_or((host_rest, ""));
     let (server, port_str) = host_port.split_once(':')
         .ok_or_else(|| UriParseError::MissingField("server:port".into()))?;
@@ -339,7 +384,7 @@ fn parse_tuic(rest: &str) -> Result<ClashRawProxy, UriParseError> {
         port: Some(port),
         proxy_type: Some("tuic".into()),
         uuid: Some(uuid.to_string()),
-        password: Some(password.to_string()),
+        password: Some(password),
         sni,
         skip_cert_verify,
         udp: Some(true),
