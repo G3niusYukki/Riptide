@@ -294,6 +294,17 @@ pub fn run() {
             cmds::rewrite::add_rewrite_rule,
             cmds::rewrite::delete_rewrite_rule,
             cmds::rewrite::toggle_rewrite_rule,
+            // Scene editor (C8) — 5 commands backing the Rules → Scenes
+            // tab. Each is a thin wrapper over `SceneStore` (a tokio
+            // actor over %APPDATA%\Riptide\scenes.json). C8 shipped the
+            // command bodies but the registration in invoke_handler!
+            // was missed — the C8.5 verifier caught it; this block
+            // wires the JS-side `invoke('scene_*')` calls.
+            cmds::scenes::scene_list,
+            cmds::scenes::scene_create,
+            cmds::scenes::scene_update,
+            cmds::scenes::scene_delete,
+            cmds::scenes::scene_apply,
             // Gateway / ICS
             #[cfg(target_os = "windows")]
             cmds::gateway::enable_gateway,
@@ -393,6 +404,20 @@ pub fn run() {
             cmds::engines::engine_status,
             cmds::engines::engine_list_kinds,
             cmds::engines::engine_get_policy,
+            // Scene editor (C8): five thin wrappers over
+            // `core::scenes::SceneStore`. The front-end
+            // `/scenes` route and the editor modal both rely on
+            // these — omitting them from `generate_handler!`
+            // means every `invoke('scene_*')` call surfaces
+            // as `command not found` in the Tauri IPC. Cross-
+            // platform (no `#[cfg(target_os = "windows")]`) so
+            // the Linux `cargo check` and the macOS test
+            // surface agree.
+            cmds::scenes::scene_list,
+            cmds::scenes::scene_create,
+            cmds::scenes::scene_update,
+            cmds::scenes::scene_delete,
+            cmds::scenes::scene_apply,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
