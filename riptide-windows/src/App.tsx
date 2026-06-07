@@ -10,6 +10,7 @@ import { Rules } from './components/Rules';
 import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
 import { LogViewer } from './components/LogViewer';
+import { LogbookView } from './components/Logbook';
 import { useRiptideStore } from './stores/riptide';
 import { modeCurrent, importProfileFromUrl, importShareUri, type AppMode } from './services/tauri';
 
@@ -169,6 +170,7 @@ function App() {
           <Route path="connections" element={<Connections />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="logs" element={<LogViewer />} />
+          <Route path="logbook" element={<LogbookView />} />
         </Route>
       </Routes>
     </BrowserRouter>

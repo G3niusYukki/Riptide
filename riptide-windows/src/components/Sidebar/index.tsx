@@ -7,6 +7,7 @@ import {
   Shield,
   Terminal,
   Zap,
+  BookText,
 } from 'lucide-react';
 import { useRiptideStore } from '../../stores/riptide';
 
@@ -17,6 +18,7 @@ const navItems = [
   { path: '/rules', icon: Shield, label: '规则' },
   { path: '/connections', icon: Zap, label: '连接' },
   { path: '/logs', icon: Terminal, label: '日志' },
+  { path: '/logbook', icon: BookText, label: 'Logbook' },
   { path: '/settings', icon: Settings, label: '设置' },
 ];
 
