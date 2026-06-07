@@ -8,17 +8,22 @@ import {
   Terminal,
   Zap,
   BookText,
-  Layers,
+  BarChart3,
 } from 'lucide-react';
 import { useRiptideStore } from '../../stores/riptide';
 
+// C13 — 9 top-level tabs (macOS-aligned): Dashboard, Config, Proxy,
+// Traffic, Rules, Connections, Logs, Diagnostics, Settings.
+// `Overrides` keeps its /overrides route but is no longer surfaced in
+// the side nav (Phase C12 deliverable; the Overrides link inside
+// Settings is still there).
 const navItems = [
   { path: '/', icon: Activity, label: '概览' },
+  { path: '/config', icon: FileText, label: '配置' },
   { path: '/proxies', icon: Globe, label: '代理' },
-  { path: '/profiles', icon: FileText, label: '配置' },
+  { path: '/traffic', icon: BarChart3, label: '流量' },
   { path: '/rules', icon: Shield, label: '规则' },
   { path: '/connections', icon: Zap, label: '连接' },
-  { path: '/overrides', icon: Layers, label: '覆盖' },
   { path: '/logs', icon: Terminal, label: '日志' },
   { path: '/logbook', icon: BookText, label: 'Logbook' },
   { path: '/settings', icon: Settings, label: '设置' },

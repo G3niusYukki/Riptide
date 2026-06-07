@@ -1,12 +1,11 @@
 import { useTraffic } from '../hooks/useTraffic';
 import { useRiptideStore } from '../stores/riptide';
-import { Activity, ArrowDown, ArrowUp, Clock, Cloud, Wifi } from 'lucide-react';
-import { TrafficChart } from './Dashboard/TrafficChart';
+import { ArrowDown, ArrowUp, Clock, Cloud, Wifi } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function Dashboard() {
   const { isRunning, traffic, activeProfile, profiles, connections } = useRiptideStore();
-  const { isError } = useTraffic();
+  useTraffic();
 
   // Collect subscription info from profiles with metadata
   const subscriptions = useMemo(() =>
@@ -146,30 +145,9 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Traffic Chart */}
-      <div className="bg-slate-900/40 border border-slate-800/70 rounded-2xl p-6 shadow-sm shadow-black/10">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-slate-100">实时流量</h3>
-          {isRunning && (
-            <span className="text-[10px] text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE
-            </span>
-          )}
-        </div>
-        {!isRunning ? (
-          <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-3">
-            <Activity size={36} className="opacity-25" />
-            <span className="text-sm">启动代理后即可查看流量曲线</span>
-          </div>
-        ) : isError ? (
-          <div className="h-64 flex items-center justify-center">
-            <span className="text-red-400 text-sm">加载流量数据失败</span>
-          </div>
-        ) : (
-          <TrafficChart />
-        )}
-      </div>
+      <p className="text-xs text-slate-600 text-center pt-2">
+        详细流量曲线见「流量」标签
+      </p>
     </div>
   );
 }
