@@ -28,7 +28,14 @@ export function SettingsPage() {
   const theme = useRiptideStore((s) => s.theme);
   const setTheme = useRiptideStore((s) => s.setTheme);
   const [lang, setLang] = useState(i18n.language);
-
+  const [updateStatus, setUpdateStatus] = useState<
+    | { state: 'idle' }
+    | { state: 'checking' }
+    | { state: 'up-to-date' }
+    | { state: 'available'; version: string; url: string }
+    | { state: 'error'; message: string; notConfigured?: boolean }
+  >({ state: 'idle' });
+  const [installing, setInstalling] = useState(false);
   const handleLangChange = (code: string) => {
     setLang(code);
     localStorage.setItem('riptide-lang', code);
@@ -138,31 +145,75 @@ export function SettingsPage() {
               <p className="font-medium text-slate-300">Riptide v{appVersion}</p>
               <p>{t('settings.aboutText')}</p>
               <p className="text-slate-600">© 2026 Riptide Team</p>
+            </div>
+            {/* Update section */}
+            <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
               <button
                 onClick={async () => {
+                  setUpdateStatus({ state: 'checking' });
                   try {
                     const info = await tauri.checkUpdate();
                     if (info.update_available) {
-                      const ok = confirm(
-                        `发现新版本 ${info.latest_version}（当前 ${info.current_version}）\n打开下载页？`,
-                      );
-                      if (ok) {
-                        // Use tauri-plugin-opener to open in default browser.
-                        const { openUrl } = await import('@tauri-apps/plugin-opener');
-                        await openUrl(info.release_url);
-                      }
+                      setUpdateStatus({
+                        state: 'available',
+                        version: info.latest_version,
+                        url: info.release_url,
+                      });
                     } else {
-                      alert(`已是最新版本 (${info.current_version})`);
+                      setUpdateStatus({ state: 'up-to-date' });
                     }
                   } catch (e) {
-                    console.error('Update check failed:', e);
-                    alert(`检查失败：${e}`);
+                    const msg = e instanceof Error ? e.message : String(e);
+                    const notConfigured =
+                      msg.includes('pubkey') ||
+                      msg.includes('signature') ||
+                      msg.includes('REPLACE_WITH_YOUR_PUBLIC_KEY');
+                    setUpdateStatus({
+                      state: 'error',
+                      message: msg,
+                      notConfigured,
+                    });
                   }
                 }}
-                className="mt-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200 transition-colors text-xs"
+                disabled={updateStatus.state === 'checking'}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded text-slate-300 hover:text-slate-100 transition-colors text-xs"
               >
-                检查更新
+                {updateStatus.state === 'checking' ? '检查中…' : '检查更新'}
               </button>
+              {updateStatus.state === 'up-to-date' && (
+                <p className="text-xs text-green-400">已是最新版本 (v{appVersion})</p>
+              )}
+              {updateStatus.state === 'available' && (
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-blue-400">
+                    新版本可用：v{updateStatus.version}
+                  </p>
+                  <button
+                    onClick={async () => {
+                      setInstalling(true);
+                      try {
+                        const { openUrl } = await import('@tauri-apps/plugin-opener');
+                        await openUrl(updateStatus.url);
+                      } catch (e) {
+                        console.error('Failed to open download URL:', e);
+                      } finally {
+                        setInstalling(false);
+                      }
+                    }}
+                    disabled={installing}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded text-white text-xs transition-colors"
+                  >
+                    {installing ? '打开中…' : '下载并安装'}
+                  </button>
+                </div>
+              )}
+              {updateStatus.state === 'error' && (
+                <p className="text-xs text-amber-400">
+                  {updateStatus.notConfigured
+                    ? '自动更新尚未配置'
+                    : `检查失败：${updateStatus.message}`}
+                </p>
+              )}
             </div>
           </div>
         </div>

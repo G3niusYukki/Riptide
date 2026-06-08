@@ -10,6 +10,8 @@ import { Config } from './components/Config';
 import { Traffic } from './components/Traffic';
 import { Rules } from './components/Rules';
 import { SceneEditorView } from './components/Rules/SceneEditorView';
+import { ScriptEditorView } from './components/Rules/ScriptEditorView';
+import { RuleMarketView } from './components/Rules/RuleMarketView';
 import { Connections } from './components/Connections';
 import { SettingsPage } from './components/Settings';
 import { LogViewer } from './components/LogViewer';
@@ -171,6 +173,8 @@ function AppBody() {
         <Route path="traffic" element={<Traffic />} />
         <Route path="rules" element={<Rules />} />
         <Route path="scenes" element={<SceneEditorView />} />
+        <Route path="script-editor" element={<ScriptEditorView />} />
+        <Route path="rule-market" element={<RuleMarketView />} />
         <Route path="connections" element={<Connections />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="logs" element={<LogViewer />} />

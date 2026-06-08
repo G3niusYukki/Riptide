@@ -1,4 +1,32 @@
+// ⚠️ SKELETON — DO NOT ENABLE ⚠️
+//
+// SingBoxRuntimeManager is a v2.4.1 Phase 1 skeleton. The actor
+// compiles and is constructable, but `start(...)` throws
+// `.notImplemented` — there is no Process spawn, no binary
+// download, no health probe. `SingBoxDownloader.resolveLatestStable()`
+// returns a `PLACEHOLDER_SHA256` with no integrity check.
+//
+// The EngineRouter (.reality / .anytls → .singbox) is wired
+// defensively: the default policy is `.defaultMihomo`, so the
+// router only picks sing-box when a `.reality` or `.anytls` node
+// is present. The KernelSwitcherView is status-only — there is no
+// user-facing toggle to enable the sing-box engine in v2.4.1.
+//
+// Phase 2 lands:
+//   • real Process spawn gated on `paths.binaryPath` existence
+//   • SHA-256 verification of the downloaded binary
+//   • stdout/stderr pipes + health probe
+//   • throwing init (no synthetic-fallback path)
+//
+// If `start(...)` is called in v2.4.1, it throws `.notImplemented`
+// and `state` stays in `.starting` / `.stopped` — the engine never
+// pretends to be running.
+
 import Foundation
+
+public enum SingBoxRuntimeManagerError: Error, Equatable, Sendable {
+    case notImplemented
+}
 
 public actor SingBoxRuntimeManager {
     public enum State: Sendable, Equatable {
@@ -35,16 +63,13 @@ public actor SingBoxRuntimeManager {
 
     public func start(config _: Data) async throws {
         state = .starting
-        // Ensure on-disk directories exist before we hand the config to
-        // the (future) process spawn.
         try paths.ensureDirectories()
-        // Phase 1: process spawn is mocked (skeleton). Phase 2 lands the
-        // real Process invocation gated behind `.running` of the real
-        // binary at `paths.binaryPath`.
-        // Phase 1 sentinel: 99999 is intentionally not a real PID. Phase 2 will
-        // populate this with the actual Process pid. Do NOT match on `99999` in
-        // production code — use `case .running(pid:)` without binding to a value.
-        state = .running(pid: 99999)
+        // Phase 1: process spawn is mocked. The Phase 2 implementation
+        // gates the real Process invocation on `paths.binaryPath`
+        // existing and SHA-256-verified. Throwing here means a stray
+        // call (e.g. from a future UI toggle) fails loudly instead of
+        // pretending the engine is running with pid 99999.
+        throw SingBoxRuntimeManagerError.notImplemented
     }
 
     public func stop() async {

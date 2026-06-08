@@ -1,7 +1,7 @@
 import { useRules } from '../../hooks/useRules';
 import { useRiptideStore } from '../../stores/riptide';
 import { Link } from 'react-router-dom';
-import { Shield, Globe, FileText, Loader2, AlertTriangle, Network } from 'lucide-react';
+import { Shield, Globe, FileText, Loader2, AlertTriangle, Network, Sparkles } from 'lucide-react';
 
 const ruleIcons: Record<string, typeof Globe> = {
   DOMAIN: Globe,
@@ -78,6 +78,21 @@ export function Rules() {
           <p className="text-sm font-medium text-slate-100">场景编辑器</p>
           <p className="text-xs text-slate-500 truncate">
             通过进程 / 域名 / IP 集规则自动覆盖代理模式。
+          </p>
+        </div>
+        <span className="text-xs text-slate-500">→</span>
+      </Link>
+
+      <Link
+        to="/rule-market"
+        data-testid="rules-to-market-link"
+        className="flex items-center gap-3 bg-slate-900/50 border border-slate-800 hover:border-amber-700/60 rounded-xl px-4 py-3 transition-colors"
+      >
+        <Sparkles size={20} className="text-amber-400 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-100">规则市场</p>
+          <p className="text-xs text-slate-500 truncate">
+            浏览并安装内置规则集。
           </p>
         </div>
         <span className="text-xs text-slate-500">→</span>

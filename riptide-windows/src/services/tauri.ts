@@ -572,3 +572,18 @@ export const sceneDelete = (id: string) => invoke<void>('scene_delete', { id });
  */
 export const sceneApply = (process?: string | null, domain?: string | null, ip?: string | null) =>
   invoke<SceneApplyResult>('scene_apply', { process, domain, ip });
+
+// Script engine (C9) — SurgeScript-compatible JavaScript evaluation.
+// Backend: `core::scripting::ScriptEngine` using boa_engine (pure Rust JS).
+// The engine supports load / eval / unload lifecycle plus SurgeScriptBridge
+// for `$request` / `$done` / `$persistentStore` injection.
+
+/** Evaluate JavaScript code in the script engine. Returns the result as a JSON string. */
+export const scriptEval = (code: string, context?: string) =>
+  invoke<string>('script_eval', { code, context });
+
+/** List names of currently loaded scripts. */
+export const scriptListLoaded = () => invoke<string[]>('script_list_loaded');
+
+/** Unload a previously loaded script by name. */
+export const scriptUnload = (name: string) => invoke<void>('script_unload', { name });

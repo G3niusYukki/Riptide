@@ -68,7 +68,35 @@
     "startToView": "Start the proxy to view rules",
     "loadFailed": "Failed to load rules, ensure mihomo is running",
     "noRules": "No rules",
-    "ruleCount": "rules"
+    "ruleCount": "rules",
+    "market": {
+      "title": "Rule Market",
+      "description": "Bundled rule-sets ready to install. Backend installation support coming in v2.5.0.",
+      "available": "available",
+      "rules": "rules",
+      "install": "Install",
+      "installed": "Installed",
+      "installPending": "Rule-set installation will be available in v2.5.0",
+      "empty": "No rule-sets available"
+    }
+  },
+  "ruleset": {
+    "reject-ads": {
+      "name": "Ad Block",
+      "description": "Block ads and tracking domains."
+    },
+    "cn-domain": {
+      "name": "CN Direct Domains",
+      "description": "Route Chinese websites directly."
+    },
+    "geoip-cn": {
+      "name": "CN GeoIP",
+      "description": "Route Chinese IPs directly via MaxMind/GeoLite2."
+    },
+    "apple-services": {
+      "name": "Apple Services",
+      "description": "Route Apple services for best performance in mainland China."
+    }
   },
   "logs": {
     "title": "Logs",

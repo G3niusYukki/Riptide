@@ -14,7 +14,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "docs:dev": "vitepress dev site",
+    "docs:build": "vitepress build site",
+    "docs:preview": "vitepress preview site"
   },
   "dependencies": {
     "@codemirror/lang-yaml": "^6.1.2",
@@ -63,6 +66,7 @@
     "tailwindcss": "^4",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "vitepress": "^1.6.3"
   }
 }

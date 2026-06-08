@@ -10,7 +10,7 @@ pub mod logbook;
 pub mod mode;
 pub mod proxy;
 pub mod proxy_editor;
-pub mod rewrite;
+pub mod scripting;
 pub mod scenes;
 pub mod system;
 pub mod uri_serializer;

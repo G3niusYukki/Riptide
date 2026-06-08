@@ -1,0 +1,56 @@
+# Riptide Community Rules
+# Category: China mainland direct domains
+# Behavior: domain
+# Updated: auto
+
+payload:
+  - DOMAIN-SUFFIX,cn
+  - DOMAIN-SUFFIX,baidu.com
+  - DOMAIN-SUFFIX,qq.com
+  - DOMAIN-SUFFIX,taobao.com
+  - DOMAIN-SUFFIX,tmall.com
+  - DOMAIN-SUFFIX,alipay.com
+  - DOMAIN-SUFFIX,weixin.qq.com
+  - DOMAIN-SUFFIX,weibo.com
+  - DOMAIN-SUFFIX,zhihu.com
+  - DOMAIN-SUFFIX,bilibili.com
+  - DOMAIN-SUFFIX,jd.com
+  - DOMAIN-SUFFIX,163.com
+  - DOMAIN-SUFFIX,126.com
+  - DOMAIN-SUFFIX,sina.com.cn
+  - DOMAIN-SUFFIX,sohu.com
+  - DOMAIN-SUFFIX,sogou.com
+  - DOMAIN-SUFFIX,douyin.com
+  - DOMAIN-SUFFIX,toutiao.com
+  - DOMAIN-SUFFIX,kuaishou.com
+  - DOMAIN-SUFFIX,meituan.com
+  - DOMAIN-SUFFIX,dianping.com
+  - DOMAIN-SUFFIX,ele.me
+  - DOMAIN-SUFFIX,ctrip.com
+  - DOMAIN-SUFFIX,xiaohongshu.com
+  - DOMAIN-SUFFIX,pinduoduo.com
+  - DOMAIN-SUFFIX,mi.com
+  - DOMAIN-SUFFIX,huawei.com
+  - DOMAIN-SUFFIX,vivo.com.cn
+  - DOMAIN-SUFFIX,oppo.com
+  - DOMAIN-SUFFIX,bytedance.com
+  - DOMAIN-SUFFIX,feishu.cn
+  - DOMAIN-SUFFIX,larkoffice.com
+  - DOMAIN-SUFFIX,dingtalk.com
+  - DOMAIN-SUFFIX,aliyun.com
+  - DOMAIN-SUFFIX,tencent.com
+  - DOMAIN-SUFFIX,qcloud.com
+  - DOMAIN-SUFFIX,cloud.tencent.com
+  - DOMAIN-SUFFIX,csdn.net
+  - DOMAIN-SUFFIX,cnblogs.com
+  - DOMAIN-SUFFIX,juejin.cn
+  - DOMAIN-SUFFIX,oschina.net
+  - DOMAIN-SUFFIX,gitee.com
+  - DOMAIN-SUFFIX,infoq.cn
+  - DOMAIN-SUFFIX,geekbang.org
+  - DOMAIN-SUFFIX,runoob.com
+  - DOMAIN-SUFFIX,w3school.com.cn
+  - DOMAIN-SUFFIX,xueqiu.com
+  - DOMAIN-SUFFIX,eastmoney.com
+  - DOMAIN-SUFFIX,12306.cn
+  - DOMAIN-SUFFIX,gaode.com

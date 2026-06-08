@@ -8,6 +8,7 @@ import jaJP from './locales/ja-JP.json';
 import koKR from './locales/ko-KR.json';
 import ptBR from './locales/pt-BR.json';
 import viVN from './locales/vi-VN.json';
+import esES from './locales/es-ES.json';
 
 const savedLang = localStorage.getItem('riptide-lang') || 'zh-CN';
 
@@ -20,6 +21,7 @@ export const SUPPORTED_LANGUAGES: { code: string; label: string }[] = [
   { code: 'fa-IR', label: 'فارسی' },
   { code: 'pt-BR', label: 'Português' },
   { code: 'vi-VN', label: 'Tiếng Việt' },
+  { code: 'es-ES', label: 'Español' },
 ];
 
 i18next.use(initReactI18next).init({
@@ -31,6 +33,7 @@ i18next.use(initReactI18next).init({
     'ru-RU': { translation: ruRU },
     'fa-IR': { translation: faIR },
     'pt-BR': { translation: ptBR },
+    'es-ES': { translation: esES },
     'vi-VN': { translation: viVN },
   },
   lng: savedLang,

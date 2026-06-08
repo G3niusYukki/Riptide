@@ -43,6 +43,7 @@ use crate::core::mode_coordinator::ModeCoordinator;
 #[cfg(not(test))]
 use crate::core::sysproxy::SystemProxyController;
 #[cfg(not(test))]
+use crate::core::scripting::engine::ScriptEngine;
 use crate::notify::NotificationDispatcher;
 #[cfg(all(not(test), target_os = "windows"))]
 use crate::utils::hotkeys::init_hotkeys;
@@ -120,6 +121,7 @@ pub fn run() {
         .manage(std::sync::Arc::new(
             crate::core::engines::EngineRouter::default_mihomo(),
         ))
+        .manage(ScriptEngine::new())
         .setup(|app| {
             // Initialize state
             let app_handle = app.handle().clone();
@@ -426,6 +428,10 @@ pub fn run() {
             // synchronous internally; the Tauri command wraps it
             // in `spawn_blocking` for runtime-friendliness.
             cmds::bench::bench_run,
+            // Scripting (C9) — Surge-compatible JS engine
+            cmds::scripting::script_eval,
+            cmds::scripting::script_list_loaded,
+            cmds::scripting::script_unload,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

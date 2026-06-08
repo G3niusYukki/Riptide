@@ -1,0 +1,121 @@
+{
+  "app": {
+    "title": "Riptide",
+    "overview": "Resumen",
+    "proxies": "Proxies",
+    "profiles": "Perfiles",
+    "rules": "Reglas",
+    "connections": "Conexiones",
+    "logs": "Registros",
+    "settings": "Configuración"
+  },
+  "dashboard": {
+    "running": "En ejecución",
+    "stopped": "Detenido",
+    "status": "Estado",
+    "currentConfig": "Configuración actual",
+    "downloadSpeed": "Descarga",
+    "uploadSpeed": "Subida",
+    "total": "Total",
+    "realtimeTraffic": "Tráfico en tiempo real",
+    "startToView": "Inicie el proxy para ver el tráfico",
+    "loading": "Cargando...",
+    "loadFailed": "Error al cargar los datos de tráfico",
+    "waitingData": "Esperando datos de tráfico..."
+  },
+  "proxies": {
+    "title": "Proxies",
+    "startToView": "Inicie el proxy para ver los nodos",
+    "loadFailed": "Error al cargar los datos del proxy, asegúrese de que mihomo esté en ejecución",
+    "testAll": "Probar todos",
+    "testing": "Probando...",
+    "testDelay": "Probar",
+    "current": "Actual",
+    "noGroups": "Sin grupos de proxy",
+    "noProxies": "Sin nodos de proxy",
+    "allProxies": "Todos los proxies"
+  },
+  "profiles": {
+    "title": "Perfiles",
+    "importUrl": "Importar desde URL",
+    "importShare": "Enlace para compartir",
+    "newProfile": "Nuevo perfil",
+    "create": "Crear",
+    "import": "Importar",
+    "cancel": "Cancelar",
+    "activate": "Activar",
+    "delete": "Eliminar",
+    "updated": "Actualizado",
+    "editTitle": "Editar perfil",
+    "save": "Guardar",
+    "saving": "Guardando..."
+  },
+  "connections": {
+    "title": "Conexiones",
+    "startToView": "Inicie el proxy para ver las conexiones",
+    "loadFailed": "Error al cargar los datos de conexión",
+    "activeConnections": "conexiones activas",
+    "closeAll": "Cerrar todas",
+    "noConnections": "Sin conexiones activas",
+    "target": "Destino",
+    "chain": "Cadena",
+    "upload": "Subida",
+    "download": "Descarga",
+    "duration": "Duración"
+  },
+  "rules": {
+    "title": "Reglas",
+    "startToView": "Inicie el proxy para ver las reglas",
+    "loadFailed": "Error al cargar las reglas, asegúrese de que mihomo esté en ejecución",
+    "noRules": "Sin reglas",
+    "ruleCount": "reglas"
+  },
+  "logs": {
+    "title": "Registros",
+    "startToView": "Inicie el proxy para ver los registros",
+    "loading": "Cargando registros...",
+    "noLogs": "Sin registros"
+  },
+  "settings": {
+    "title": "Configuración",
+    "general": "General",
+    "autoStart": "Iniciar al arrancar",
+    "autoStartDesc": "Ejecutar Riptide automáticamente al iniciar el sistema",
+    "silentStart": "Inicio silencioso",
+    "silentStartDesc": "Iniciar minimizado en la bandeja del sistema",
+    "systemProxy": "Proxy del sistema",
+    "enableProxy": "Habilitar proxy del sistema",
+    "enableProxyDesc": "Configurar automáticamente el proxy del sistema de Windows",
+    "httpPort": "Puerto HTTP",
+    "socksPort": "Puerto SOCKS",
+    "tunMode": "Modo TUN",
+    "installService": "Instalar servicio TUN",
+    "installServiceDesc": "Requiere privilegios de administrador",
+    "installBtn": "Instalar servicio",
+    "installing": "Instalando...",
+    "enableTun": "Habilitar modo TUN",
+    "enableTunDesc": "Intercepción de tráfico a nivel de sistema (requiere la instalación del servicio)",
+    "installSuccess": "Servicio TUN instalado correctamente",
+    "installFailed": "Error al instalar el servicio TUN",
+    "about": "Acerca de",
+    "aboutText": "Un cliente proxy nativo para Windows basado en mihomo",
+    "tabs": {
+      "network": "Red",
+      "dns": "DNS",
+      "sync": "Sincronización",
+      "assets": "Recursos",
+      "recovery": "Recuperación",
+      "about": "Acerca de"
+    },
+    "mode": {
+      "off": "Desactivado",
+      "systemProxy": "Proxy del sistema",
+      "tun": "TUN",
+      "transitioning": "Cambiando…"
+    }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "notSelected": "No seleccionado"
+  }
+}

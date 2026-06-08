@@ -26,6 +26,7 @@ pub mod service {
 }
 #[cfg(not(target_os = "windows"))]
 mod service_linux;
+pub mod scripting;
 pub mod tls_tricks;
 pub mod tray;
 pub mod warp;
