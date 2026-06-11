@@ -72,12 +72,27 @@ struct ProxyGroupCard: View {
     @State private var isExpanded = true
 
     private var visibleNodes: [ProxyNodeDisplay] {
-        ProxyTabFilter.applySortAndFilter(
+        var nodes = ProxyTabFilter.applySortAndFilter(
             group.nodes,
             sort: sortOrder,
             filter: filter,
             searchText: searchText
         )
+
+        // Apply persisted node order if the group is .select and the user
+        // has reordered its nodes. Nodes missing from the order (e.g. new
+        // nodes added by a subscription refresh) are appended at the end.
+        if group.kind == .select,
+           let order = vm.nodeOrder[group.id], !order.isEmpty {
+            let orderMap = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, $0) })
+            nodes.sort { lhs, rhs in
+                let lIdx = orderMap[lhs.name] ?? Int.max
+                let rIdx = orderMap[rhs.name] ?? Int.max
+                return lIdx < rIdx
+            }
+        }
+
+        return nodes
     }
 
     var body: some View {
@@ -118,6 +133,15 @@ struct ProxyGroupCard: View {
                             }
                         }
                     )
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let dropped = items.first, group.kind == .select else { return false }
+                        var current = visibleNodes.map(\.name)
+                        guard let from = current.firstIndex(of: dropped),
+                              let to = current.firstIndex(of: node.name) else { return false }
+                        current.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+                        vm.setNodeOrder(current, for: group.id)
+                        return true
+                    }
                     .accessibilityIdentifier(A11yID.Proxy.nodeRow + ".\(node.name)")
                 }
             }
@@ -179,6 +203,11 @@ struct ProxyNodeRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .draggable(node.name) {
+            Text(node.name)
+                .padding(4)
+                .background(.regularMaterial)
+        }
         .contextMenu {
             Button {
                 Task { await vm.testDelay(groupID: group.id) }

@@ -215,6 +215,12 @@ public final class AppViewModel: @unchecked Sendable {
     public private(set) var allProxies: [ProxyNodeDisplay] = []
     private var proxyDelays: [String: Int] = [:]  // proxy name -> delay ms
 
+    /// Per-group user-customized node order. Persisted to UserDefaults so
+    /// drag/drop rearrangements survive app relaunches. Maps groupID to an
+    /// ordered list of node names. Nodes not present in the list (or new
+    /// nodes from a refreshed profile) are appended at the end.
+    public private(set) var nodeOrder: [String: [String]] = [:]
+
     // Traffic
     public private(set) var currentSpeedUp: Int64 = 0
     public private(set) var currentSpeedDown: Int64 = 0
@@ -304,6 +310,8 @@ public final class AppViewModel: @unchecked Sendable {
         // Inject the Logbook writer into each business module so its
         // fire-and-forget logInfo/logError calls reach the persistent store.
         checkHelperInstallation()
+        // Restore any persisted drag/drop node order from a prior session.
+        loadNodeOrder()
         let writer = self.logbook.writer
         Task {
             await self.modeCoordinator.setLogbookWriter(writer)
@@ -1282,6 +1290,37 @@ public final class AppViewModel: @unchecked Sendable {
             }
 
         rules = profile.config.rules
+    }
+
+    // MARK: - Node Order (drag/drop persistence)
+
+    /// Returns the persisted node-name order for a group, or an empty array
+    /// if the user has not yet reordered the group.
+    public func nodeOrder(for groupID: String) -> [String] {
+        nodeOrder[groupID] ?? []
+    }
+
+    /// Persists a new node-name order for a group and updates the in-memory
+    /// state. Saving is best-effort; a JSON encode failure is silently
+    /// ignored (the in-memory change still applies for the current session).
+    public func setNodeOrder(_ order: [String], for groupID: String) {
+        nodeOrder[groupID] = order
+        saveNodeOrder()
+    }
+
+    /// Reads the persisted node-order map from UserDefaults. Missing or
+    /// undecodable data is treated as "no persisted order".
+    public func loadNodeOrder() {
+        guard let data = UserDefaults.standard.data(forKey: "riptide.proxyGroup.nodeOrder"),
+              let decoded = try? JSONDecoder().decode([String: [String]].self, from: data) else {
+            return
+        }
+        nodeOrder = decoded
+    }
+
+    private func saveNodeOrder() {
+        guard let data = try? JSONEncoder().encode(nodeOrder) else { return }
+        UserDefaults.standard.set(data, forKey: "riptide.proxyGroup.nodeOrder")
     }
 
     // MARK: - Mihomo Core Management
