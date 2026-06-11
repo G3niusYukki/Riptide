@@ -33,6 +33,12 @@ public enum A11yID {
         public static let importButton = "config.import-button"
         public static let addSubscription = "config.add-subscription"
         public static let mergeButton = "config.merge-button"
+        public static let editYAMLButton = "config.edit-yaml-button"
+        public static let yamlEditorText = "config.yaml-editor-text"
+        public static let yamlEditorValidate = "config.yaml-editor-validate"
+        public static let yamlEditorSave = "config.yaml-editor-save"
+        public static let yamlEditorClose = "config.yaml-editor-close"
+        public static let yamlEditorError = "config.yaml-editor-error"
     }
 
     public enum Proxy {

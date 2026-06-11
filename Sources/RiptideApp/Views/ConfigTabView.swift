@@ -16,6 +16,8 @@ struct ConfigTabView: View {
     @State private var isDragOver = false
     @State private var importErrorMessage: String?
     @State private var showImportError = false
+    @State private var showYAMLEditor = false
+    @State private var yamlEditorProfileID: UUID?
 
     var body: some View {
         ScrollView {
@@ -26,7 +28,8 @@ struct ConfigTabView: View {
                 // Active profile card
                 if let profile = vm.activeProfile {
                     ProfileCard(profile: profile, isActive: true) {
-                        // Edit action
+                        yamlEditorProfileID = profile.id
+                        showYAMLEditor = true
                     } onDelete: {
                         vm.removeProfile(profile)
                     }
@@ -145,6 +148,11 @@ struct ConfigTabView: View {
                 },
                 onCancel: { showImportPreview = false }
             )
+        }
+        .sheet(isPresented: $showYAMLEditor) {
+            if let id = yamlEditorProfileID {
+                YAMLEditorView(vm: vm, profileID: id)
+            }
         }
         .onChange(of: vm.showHelperSetup) { _, newValue in
             showHelperSetup = newValue
@@ -570,8 +578,13 @@ struct ProfileCard: View {
                         .clipShape(Capsule())
                 }
                 Spacer()
-                Button("编辑", action: onEdit)
-                    .buttonStyle(.bordered)
+                Button {
+                    onEdit()
+                } label: {
+                    Label("编辑 YAML", systemImage: "pencil")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier(A11yID.Config.editYAMLButton)
                 Button("删除", action: onDelete)
                     .buttonStyle(.bordered)
                     .tint(Theme.danger)

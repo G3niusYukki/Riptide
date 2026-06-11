@@ -1097,6 +1097,40 @@ public final class AppViewModel: @unchecked Sendable {
         }
     }
 
+    /// Returns the raw YAML of the profile with the given id, or an empty
+    /// string if the profile is not present in `ProfileStore`.
+    public func profileYAML(id: UUID) async -> String {
+        await profileStore.profile(id: id)?.rawYAML ?? ""
+    }
+
+    /// Updates the active profile's raw YAML (and the in-memory `RiptideConfig`
+    /// derived from it) and persists the change via `ProfileStore`. The
+    /// profile's `id` and `source` are preserved; subscription-backed
+    /// profiles keep their existing `subscriptionURL`.
+    ///
+    /// - Throws: `ClashConfigError` if the YAML cannot be parsed.
+    @MainActor
+    public func updateProfileYAML(_ profileID: UUID, yaml: String) async throws {
+        let (newConfig, _) = try ClashConfigParser.parse(yaml: yaml)
+        guard let idx = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        let existing = profiles[idx]
+        let updated = Profile(
+            id: existing.id,
+            name: existing.name,
+            config: newConfig,
+            source: existing.source
+        )
+        profiles[idx] = updated
+        if activeProfile?.id == profileID {
+            activeProfile = updated
+            rebuildProxyGroupDisplays()
+        }
+        // Persist via the actor-backed store. `importProfile` creates a new
+        // internal id for the stored record, so we re-read it back and
+        // re-link the in-memory profile to the stored id when possible.
+        _ = try? await profileStore.importProfile(name: updated.name, yaml: yaml)
+    }
+
     public func activateProfile(_ profile: Profile) {
         // Backup current config before switching
         if let currentID = activeProfile?.id, let currentName = activeProfile?.name {
