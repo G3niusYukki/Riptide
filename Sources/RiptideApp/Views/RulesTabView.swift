@@ -4,6 +4,7 @@ import Riptide
 struct RulesTabView: View {
     @Bindable var vm: AppViewModel
     @State private var showRuleMarket = false
+    @State private var showRuleTester = false
 
     var body: some View {
         ScrollView {
@@ -44,6 +45,14 @@ struct RulesTabView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        Button {
+                            showRuleTester = true
+                        } label: {
+                            Label("测试工具", systemImage: "magnifyingglass")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                         Text("共 \(vm.rules.count) 条")
                             .font(.caption)
                             .foregroundStyle(Theme.subtext)
@@ -63,6 +72,9 @@ struct RulesTabView: View {
         .background(Theme.backgroundGradient.ignoresSafeArea())
         .sheet(isPresented: $showRuleMarket) {
             RuleMarketView()
+        }
+        .sheet(isPresented: $showRuleTester) {
+            RuleMatchTesterView(vm: vm)
         }
     }
 }
