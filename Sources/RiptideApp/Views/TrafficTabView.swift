@@ -78,6 +78,9 @@ struct TrafficTabView: View {
 
                 // Active connections — real-time list
                 ConnectionListView(vm: vm)
+
+                // Historical traffic bar chart (day / week / month)
+                TrafficHistoryView(vm: vm)
             }
             .padding()
         }
