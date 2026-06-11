@@ -7,14 +7,16 @@ public final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private weak var vm: AppViewModel?
+    private let speedView: MenuBarSpeedView
+    private var speedObservationTask: Task<Void, Never>?
 
     public override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        speedView = MenuBarSpeedView(frame: .zero)
 
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 360, height: 400)
-        // Placeholder host; replaced as soon as `setup(vm:)` is called.
         popover.contentViewController = NSHostingController(
             rootView: MenuBarPlaceholderView()
         )
@@ -28,23 +30,54 @@ public final class StatusBarController: NSObject {
         popover.contentViewController = NSHostingController(
             rootView: MenuBarPopoverView(viewModel: vm)
         )
+        startObservingSpeed()
     }
 
-    func updateButton(isRunning: Bool) {
+    private func startObservingSpeed() {
+        speedObservationTask?.cancel()
+        guard let vm else { return }
+        speedObservationTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let up = vm.currentSpeedUp
+                let down = vm.currentSpeedDown
+                let isRunning = vm.tunnelState == .running
+                self.updateDisplay(uploadBytesPerSec: up, downloadBytesPerSec: down, isRunning: isRunning)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    deinit {
+        speedObservationTask?.cancel()
+    }
+
+    private func updateDisplay(uploadBytesPerSec: Int64, downloadBytesPerSec: Int64, isRunning: Bool) {
         guard let button = statusItem.button else { return }
-        let symbolName = isRunning ? "network.badge.shield.half.filled" : "network"
-        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Riptide")?
-            .withSymbolConfiguration(config)
-        button.image?.isTemplate = true
-        button.contentTintColor = isRunning ? .systemGreen : .secondaryLabelColor
+        if isRunning {
+            speedView.update(uploadBytesPerSec: uploadBytesPerSec, downloadBytesPerSec: downloadBytesPerSec)
+            // Remove any existing image before adding subview
+            button.image = nil
+            button.subviews = [speedView]
+            speedView.frame = button.bounds
+            speedView.autoresizingMask = [.width, .height]
+        } else {
+            // Show shield icon when stopped
+            let symbolName = "network"
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Riptide")?
+                .withSymbolConfiguration(config)
+            button.image?.isTemplate = true
+            button.contentTintColor = .secondaryLabelColor
+            button.subviews = []
+        }
     }
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
         button.target = self
         button.action = #selector(handleButtonClick)
-        updateButton(isRunning: false)
+        updateDisplay(uploadBytesPerSec: 0, downloadBytesPerSec: 0, isRunning: false)
     }
 
     @objc private func handleButtonClick() {
