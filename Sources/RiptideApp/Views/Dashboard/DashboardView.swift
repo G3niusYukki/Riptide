@@ -31,6 +31,18 @@ struct DashboardView: View {
                 // MARK: - Speed Card
                 speedCard
 
+                // MARK: - Mini Traffic Chart
+                miniTrafficChart
+
+                // MARK: - Traffic History (Today / Week / Month)
+                TrafficHistoryCard(vm: vm)
+
+                // MARK: - Node Health
+                NodeHealthCard(vm: vm)
+
+                // MARK: - Quick Actions
+                QuickActionsRow(vm: vm)
+
                 // MARK: - Subscription Info
                 subscriptionSection
 
@@ -97,6 +109,15 @@ struct DashboardView: View {
             )
         }
         .accessibilityIdentifier(A11yID.Dashboard.speedCard)
+    }
+
+    // MARK: - Mini Traffic Chart
+
+    private var miniTrafficChart: some View {
+        MiniTrafficChart(vm: vm)
+            .padding()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
     }
 
     // MARK: - Subscription Section

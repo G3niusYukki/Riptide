@@ -23,6 +23,10 @@ public enum A11yID {
         public static let nodeCard = "dashboard.node-card"
         public static let speedCard = "dashboard.speed-card"
         public static let diagnosticsButton = "dashboard.diagnostics-button"
+        public static let miniChart = "dashboard.mini-chart"
+        public static let trafficHistory = "dashboard.traffic-history"
+        public static let nodeHealth = "dashboard.node-health"
+        public static let quickActions = "dashboard.quick-actions"
     }
 
     public enum Config {

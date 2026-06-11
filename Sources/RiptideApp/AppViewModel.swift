@@ -823,6 +823,15 @@ public final class AppViewModel: @unchecked Sendable {
         await loadSubscriptionsFromBackend()
     }
 
+    /// Refresh every subscription sequentially. Used by the dashboard quick-action
+    /// button. Failures are recorded on each subscription's `lastError` and don't
+    /// short-circuit the rest.
+    public func refreshAllSubscriptions() async {
+        for sub in await subscriptionManager.allSubscriptions() {
+            await updateSubscription(id: sub.id)
+        }
+    }
+
     /// Updates (refreshes) a subscription by fetching fresh nodes.
     public func updateSubscription(id: UUID) async {
         let result = await subscriptionManager.updateSubscription(id: id)
