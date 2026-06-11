@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.5.0] — 2026-06-XX
+
+> **macOS UI Enhancement** — major UX pass closing the feature gap with ClashX Pro / Surge / Stash. Adds 14 new view files, modifies 15 existing files; ~1,900 net lines.
+
+### Added (P0 — Foundation)
+
+- **Menu bar persistent speed display** — live `↑ 1.2M ↓ 3.4M` text replaces the static shield icon when the proxy is running; format helper compactifies `<1K / 1.0K / 1.0M / 1.0G`.
+- **Country flags on proxy nodes** — `RegionMapping` table covers 50+ Chinese/English keywords → ISO codes; `CountryFlagView` renders Unicode regional-indicator flag emojis (fallback: 🌐).
+- **Protocol badges on proxy rows** — colored capsule (SS cyan, VMess purple, VLESS blue, Trojan orange, Hy2 green, etc.) covers all 14 `ProxyKind` cases.
+- **Sort/filter/search in proxy tab** — `NavigationStack` wrapper enables `.searchable`; sort (default/delay↑/delay↓/name), filter (all/available), and free-text search compose cleanly.
+
+### Added (P1 — Core UX)
+
+- **Traffic chart auto-collect with time range** — `TrafficTimeRange` enum (1min/5min/1h/24h) replaces hardcoded 60-point cap; auto-start in `.task`, manual toggle removed, x-axis now uses real timestamps.
+- **Global hotkey deep integration** — 3 new actions (toggle system proxy, switch next node, test all delay); `HotkeySettingsView` with live key recording and conflict detection; known-conflict documentation.
+- **Rule match testing tool** — `RuleMatchTesterView` sheet parses domain/IP input, runs `RuleEngine.resolve`, displays matched rule/policy/latency, persists 10-entry history.
+- **Drag-and-drop + clipboard import** — `ConfigTabView` accepts `.yaml`/`.yml`/`.txt` drops, routes URLs/URIs/YAML to appropriate handlers, plus a "从剪贴板导入" button.
+- **Network scene auto-switching enhancement** — `NetworkEnvironmentSettingsView` shows current SSID + active scene, full edit sheet (proxy mode, connection mode, profile binding, enable toggle), 5s auto-refresh.
+
+### Added (P2 — Polish)
+
+- **Dashboard enrichment** — `MiniTrafficChart` (60pt pulse), `TrafficHistoryCard` (today/week/month via `LogbookStore.trafficByDate`), `NodeHealthCard` (per-group healthy ratio bars), `QuickActionsRow` (4 shortcut buttons).
+- **`LogbookStore.trafficByDate` aggregation** — new actor method scans UTC-day `.jsonl` files, aggregates `uploadBytes`/`downloadBytes` per day; 3 Swift-Testing tests.
+- **Context menus on rows** — proxy nodes (test delay, copy info), connections (close, copy host), rules (copy text).
+- **Traffic history view** — `TrafficHistoryView` with day/week/month segmented picker and stacked bar chart.
+- **Notification system expansion** — 3 new types (`notifyTrafficThreshold`, `notifyConfigUpdateSuccess`, `notifyConfigUpdateFailed`); `NotificationSettingsView` with 5 toggles + threshold slider; `SubscriptionUpdateScheduler.onUpdateResult` callback for wiring.
+
+### Added (P3 — Advanced)
+
+- **Visual rule editor** — `VisualRuleEditorView` with 9 rule type pickers, dynamic value inputs, policy selector, "Add" and "Add & Continue" actions; persists via `AppViewModel.appendRule(_:)`.
+- **Basic YAML editor** — `YAMLEditorView` sheet with monospaced `TextEditor`, `ClashConfigParser`-backed validation, re-parse on save via `updateProfileYAML`.
+- **Visual polish** — `Theme` gains `cardBackground`/`elevatedCard`/`cardBorder` NSColor-adapted tokens; spring animations on proxy card expand/collapse, ease-in-out on node selection.
+- **Drag-and-drop node sorting** — `.draggable` + `.dropDestination` for `.select` groups; order persisted to `UserDefaults` via `vm.nodeOrder` dict.
+
+### Changed
+
+- `TrafficViewModel.maxHistoryPoints` removed; replaced by per-instance `timeRange: TrafficTimeRange` and `setTimeRange(_:)`.
+- `TrafficChartView` controls simplified: "Start/Stop" button removed, replaced by segmented `Picker`.
+- `ProxyNodeRow` API extended: takes `group` and `vm` for context menu and drag/drop.
+
+### Test surface
+
+- New test files: `RegionMappingTests`, `CountryFlagViewTests`, `ProtocolBadgeTests`, `MenuBarSpeedViewTests`, `ProxyTabFilterTests`, `RuleMatchTesterTests`, `HotkeyManagerTests`, extended `LogbookStoreTests` (3 new), extended `UserNotificationManagerTests`.
+- 622 tests in 96 suites. 2 pre-existing `AppGroupStateStoreTests` failures are environmental (no App Group container in dev env), unrelated to this work.
+
 ## [2.4.1] — 2026-06-04
 
 > **Status:** Unreleased. Phase 1 closeout — closes a helper-LPE-class
