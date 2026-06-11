@@ -154,6 +154,25 @@ public final class UserNotificationManager: NSObject {
         await deliver(content)
     }
 
+    public func notifyTrafficThreshold(usedBytes: Int64, limitBytes: Int64) async {
+        let content = Self.makeTrafficThresholdContent(
+            usedBytes: usedBytes, limitBytes: limitBytes
+        )
+        await deliver(content)
+    }
+
+    public func notifyConfigUpdateSuccess(profileName: String) async {
+        let content = Self.makeConfigUpdateSuccessContent(profileName: profileName)
+        await deliver(content)
+    }
+
+    public func notifyConfigUpdateFailed(profileName: String, error: String) async {
+        let content = Self.makeConfigUpdateFailedContent(
+            profileName: profileName, error: error
+        )
+        await deliver(content)
+    }
+
     // MARK: - Content Builders (Testable Static API)
 
     public nonisolated static func makeNodeFailureContent(
@@ -213,6 +232,65 @@ public final class UserNotificationManager: NSObject {
             "type": "mihomoExit"
         ]
         return content
+    }
+
+    public nonisolated static func makeTrafficThresholdContent(
+        usedBytes: Int64,
+        limitBytes: Int64
+    ) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = "流量使用提醒"
+        content.body = "已使用 \(formatBytes(usedBytes)) / \(formatBytes(limitBytes))"
+        content.sound = .default
+        content.categoryIdentifier = categorySystemAlert
+        content.userInfo = [
+            "type": "trafficThreshold",
+            "usedBytes": usedBytes,
+            "limitBytes": limitBytes
+        ]
+        return content
+    }
+
+    public nonisolated static func makeConfigUpdateSuccessContent(
+        profileName: String
+    ) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = "订阅更新成功"
+        content.body = "\(profileName) 已更新"
+        content.sound = .default
+        content.categoryIdentifier = categorySystemAlert
+        content.userInfo = [
+            "type": "configUpdateSuccess",
+            "profileName": profileName
+        ]
+        return content
+    }
+
+    public nonisolated static func makeConfigUpdateFailedContent(
+        profileName: String,
+        error: String
+    ) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = "订阅更新失败"
+        content.body = "\(profileName): \(error)"
+        content.sound = .default
+        content.categoryIdentifier = categorySystemAlert
+        content.userInfo = [
+            "type": "configUpdateFailed",
+            "profileName": profileName,
+            "error": error
+        ]
+        return content
+    }
+
+    /// Formats a byte count using the same unit scheme as the rest of the
+    /// app's traffic displays (K/M/G with one decimal place).
+    public nonisolated static func formatBytes(_ bytes: Int64) -> String {
+        let abs = Double(bytes.magnitude)
+        if abs < 1_000 { return "<1K" }
+        if abs < 1_000_000 { return String(format: "%.1fK", abs / 1_000) }
+        if abs < 1_000_000_000 { return String(format: "%.1fM", abs / 1_000_000) }
+        return String(format: "%.1fG", abs / 1_000_000_000)
     }
 
     // MARK: - Delivery

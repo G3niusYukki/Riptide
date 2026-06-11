@@ -1,5 +1,7 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
+import Riptide
 
 struct ConfigTabView: View {
     // swiftlint:disable:next identifier_name
@@ -11,6 +13,11 @@ struct ConfigTabView: View {
     @State private var importPreviewURL: URL?
     @State private var importPreviewYAML = ""
     @State private var importPreviewFileName = ""
+    @State private var isDragOver = false
+    @State private var importErrorMessage: String?
+    @State private var showImportError = false
+    @State private var showYAMLEditor = false
+    @State private var yamlEditorProfileID: UUID?
 
     var body: some View {
         ScrollView {
@@ -21,22 +28,55 @@ struct ConfigTabView: View {
                 // Active profile card
                 if let profile = vm.activeProfile {
                     ProfileCard(profile: profile, isActive: true) {
-                        // Edit action
+                        yamlEditorProfileID = profile.id
+                        showYAMLEditor = true
                     } onDelete: {
                         vm.removeProfile(profile)
                     }
                 }
 
-                // Import button
-                Button {
-                    importConfig()
-                } label: {
-                    Label("导入配置文件", systemImage: "plus.circle")
-                        .frame(maxWidth: .infinity)
+                // Import controls (button + clipboard + drag-drop target)
+                VStack(spacing: 12) {
+                    Button {
+                        importConfig()
+                    } label: {
+                        Label("导入配置文件", systemImage: "plus.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .accessibilityIdentifier(A11yID.Config.importButton)
+
+                    Button {
+                        importFromClipboard()
+                    } label: {
+                        Label("从剪贴板导入", systemImage: "doc.on.clipboard")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("riptide.config.clipboardImportButton")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .accessibilityIdentifier(A11yID.Config.importButton)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.cardRadius)
+                        .strokeBorder(
+                            isDragOver ? Theme.accent : Color.clear,
+                            style: StrokeStyle(lineWidth: 2, dash: [6])
+                        )
+                )
+                .onDrop(of: [.fileURL, .plainText], isTargeted: $isDragOver) { providers in
+                    handleDrop(providers: providers)
+                }
+                .overlay {
+                    if isDragOver {
+                        Text("释放以导入")
+                            .font(.headline)
+                            .foregroundStyle(Theme.accent)
+                            .padding()
+                            .background(.regularMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+                    }
+                }
 
                 // Profiles list (inactive)
                 if !vm.profiles.isEmpty {
@@ -109,6 +149,11 @@ struct ConfigTabView: View {
                 onCancel: { showImportPreview = false }
             )
         }
+        .sheet(isPresented: $showYAMLEditor) {
+            if let id = yamlEditorProfileID {
+                YAMLEditorView(vm: vm, profileID: id)
+            }
+        }
         .onChange(of: vm.showHelperSetup) { _, newValue in
             showHelperSetup = newValue
         }
@@ -118,6 +163,11 @@ struct ConfigTabView: View {
                 // Recheck helper status when sheet closes
                 vm.checkHelperInstallation()
             }
+        }
+        .alert("导入失败", isPresented: $showImportError, presenting: importErrorMessage) { _ in
+            Button("确定") { importErrorMessage = nil }
+        } message: { msg in
+            Text(msg)
         }
     }
 
@@ -379,6 +429,96 @@ struct ConfigTabView: View {
             }
         }
     }
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        if provider.canLoadObject(ofClass: URL.self) {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                DispatchQueue.main.async {
+                    if routeImportURL(url) == nil {
+                        // Fall back to reading the file contents as text
+                        if let text = try? String(contentsOf: url, encoding: .utf8) {
+                            routeImportText(text)
+                        } else {
+                            importErrorMessage = "无法读取文件内容"
+                            showImportError = true
+                        }
+                    }
+                }
+            }
+            return true
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
+                let text: String?
+                if let data = item as? Data {
+                    text = String(data: data, encoding: .utf8)
+                } else if let str = item as? String {
+                    text = str
+                } else {
+                    text = nil
+                }
+                guard let text else {
+                    DispatchQueue.main.async {
+                        importErrorMessage = "无法读取拖入的文本"
+                        showImportError = true
+                    }
+                    return
+                }
+                DispatchQueue.main.async {
+                    routeImportText(text)
+                }
+            }
+            return true
+        }
+        return false
+    }
+
+    private func importFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string) else {
+            importErrorMessage = "剪贴板为空"
+            showImportError = true
+            return
+        }
+        routeImportText(text)
+    }
+
+    @discardableResult
+    private func routeImportURL(_ url: URL) -> Bool? {
+        let ext = url.pathExtension.lowercased()
+        if ext == "yaml" || ext == "yml" {
+            Task { await vm.importConfig(from: url) }
+            return true
+        }
+        return nil
+    }
+
+    private func routeImportText(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            // Subscription URL — full URL flow is a follow-up
+            importErrorMessage = "检测到订阅 URL，请使用「添加订阅」功能导入"
+            showImportError = true
+            return
+        }
+        let uriPrefixes = ["ss://", "vmess://", "vless://", "trojan://", "hysteria2://", "hy2://", "tuic://"]
+        for prefix in uriPrefixes where trimmed.hasPrefix(prefix) {
+            importErrorMessage = "Share URI 解析暂未实现，请使用 YAML 格式"
+            showImportError = true
+            return
+        }
+        // Try as YAML
+        do {
+            _ = try ClashConfigParser.parse(yaml: trimmed)
+            // Create a temp file and import
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).yaml")
+            try trimmed.write(to: tmp, atomically: true, encoding: .utf8)
+            Task { await vm.importConfig(from: tmp) }
+        } catch {
+            importErrorMessage = "无法解析内容: \(error.localizedDescription)"
+            showImportError = true
+        }
+    }
 }
 
 struct ProfileRow: View {
@@ -438,8 +578,13 @@ struct ProfileCard: View {
                         .clipShape(Capsule())
                 }
                 Spacer()
-                Button("编辑", action: onEdit)
-                    .buttonStyle(.bordered)
+                Button {
+                    onEdit()
+                } label: {
+                    Label("编辑 YAML", systemImage: "pencil")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier(A11yID.Config.editYAMLButton)
                 Button("删除", action: onDelete)
                     .buttonStyle(.bordered)
                     .tint(Theme.danger)

@@ -14,6 +14,7 @@ public struct TrafficChartView: View {
     @State private var peakDownload: Double = 0
     @State private var currentUpSpeed: Double = 0
     @State private var currentDownSpeed: Double = 0
+    @State private var timeRange: TrafficTimeRange = .oneMin
 
     public init(viewModel: TrafficViewModel) {
         self._viewModel = State(initialValue: viewModel)
@@ -57,34 +58,44 @@ public struct TrafficChartView: View {
 
             // Chart
             Chart {
-                ForEach(Array(history.enumerated()), id: \.offset) { index, point in
+                ForEach(Array(history.enumerated()), id: \.offset) { _, point in
                     LineMark(
-                        x: .value("Time", index),
+                        x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.upSpeed)
                     )
                     .foregroundStyle(.blue)
                     .interpolationMethod(.catmullRom)
+                    .accessibilityLabel("Upload")
+                    .accessibilityValue("\(Int(point.upSpeed)) bytes per second")
 
                     AreaMark(
-                        x: .value("Time", index),
+                        x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.upSpeed)
                     )
                     .foregroundStyle(.blue.opacity(0.1))
                     .interpolationMethod(.catmullRom)
 
                     LineMark(
-                        x: .value("Time", index),
+                        x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.downSpeed)
                     )
                     .foregroundStyle(.green)
                     .interpolationMethod(.catmullRom)
+                    .accessibilityLabel("Download")
+                    .accessibilityValue("\(Int(point.downSpeed)) bytes per second")
 
                     AreaMark(
-                        x: .value("Time", index),
+                        x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.downSpeed)
                     )
                     .foregroundStyle(.green.opacity(0.1))
                     .interpolationMethod(.catmullRom)
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.hour().minute().second())
                 }
             }
             .chartYAxis {
@@ -139,22 +150,24 @@ public struct TrafficChartView: View {
 
             Spacer()
 
-            // Control Buttons
+            // Controls
             HStack {
-                Button("Reset") {
-                    Task {
-                        await viewModel.reset()
-                        await refreshData()
+                Picker("时间范围", selection: $timeRange) {
+                    ForEach(TrafficTimeRange.allCases) { range in
+                        Text(range.rawValue).tag(range)
                     }
                 }
-                .buttonStyle(.bordered)
-
-                Spacer()
-
-                Button(timer == nil ? "Start Monitoring" : "Stop Monitoring") {
-                    toggleMonitoring()
+                .pickerStyle(.segmented)
+                .onChange(of: timeRange) { _, newRange in
+                    Task { await viewModel.setTimeRange(newRange) }
                 }
-                .buttonStyle(.borderedProminent)
+
+                Button {
+                    Task { await viewModel.reset() }
+                } label: {
+                    Label("重置", systemImage: "arrow.counterclockwise")
+                }
+                .buttonStyle(.bordered)
             }
             .padding(.horizontal)
         }
@@ -200,20 +213,6 @@ public struct TrafficChartView: View {
             return String(format: "\(sign)%.1f MB/s", absSpeed / (1024.0 * 1024.0))
         default:
             return String(format: "\(sign)%.1f GB/s", absSpeed / (1024.0 * 1024.0 * 1024.0))
-        }
-    }
-
-    private func toggleMonitoring() {
-        if timer != nil {
-            timer?.invalidate()
-            timer = nil
-        } else {
-            timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                Task {
-                    await viewModel.fetchTrafficFromAPI()
-                    await refreshData()
-                }
-            }
         }
     }
 }

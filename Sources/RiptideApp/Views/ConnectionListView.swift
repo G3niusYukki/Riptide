@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Filter mode for connection list.
 enum ConnectionFilter: String, CaseIterable {
@@ -244,6 +245,16 @@ struct ConnectionRow: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
             }
+        }
+        .contextMenu {
+            Button {
+                onClose()
+            } label: { Label("关闭连接", systemImage: "xmark.circle") }
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(conn.host, forType: .string)
+            } label: { Label("复制域名", systemImage: "doc.on.doc") }
         }
     }
 }

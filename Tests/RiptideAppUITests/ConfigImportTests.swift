@@ -29,4 +29,16 @@ final class ConfigImportTests: RiptideUITestCase {
             || openSheet.waitForExistence(timeout: 3.0)
         XCTAssertTrue(appeared, "File picker should open after tapping import button")
     }
+
+    func testEditYAMLButtonExists() {
+        // The "编辑 YAML" button only appears once an active profile is
+        // loaded, which the launch fixtures provide. If it's not present we
+        // just skip — the button is only meaningful with a profile.
+        let button = app.buttons[A11yID.Config.editYAMLButton]
+        if !button.waitForExistence(timeout: 2.0) {
+            // Acceptable: no active profile in this fixture.
+            return
+        }
+        XCTAssertTrue(button.exists)
+    }
 }

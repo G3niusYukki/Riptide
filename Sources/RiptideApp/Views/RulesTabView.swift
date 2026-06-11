@@ -1,9 +1,12 @@
 import SwiftUI
+import AppKit
 import Riptide
 
 struct RulesTabView: View {
     @Bindable var vm: AppViewModel
     @State private var showRuleMarket = false
+    @State private var showRuleTester = false
+    @State private var showVisualRuleEditor = false
 
     var body: some View {
         ScrollView {
@@ -44,6 +47,22 @@ struct RulesTabView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        Button {
+                            showRuleTester = true
+                        } label: {
+                            Label("测试工具", systemImage: "magnifyingglass")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        Button {
+                            showVisualRuleEditor = true
+                        } label: {
+                            Label("添加规则", systemImage: "plus.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                         Text("共 \(vm.rules.count) 条")
                             .font(.caption)
                             .foregroundStyle(Theme.subtext)
@@ -63,6 +82,12 @@ struct RulesTabView: View {
         .background(Theme.backgroundGradient.ignoresSafeArea())
         .sheet(isPresented: $showRuleMarket) {
             RuleMarketView()
+        }
+        .sheet(isPresented: $showRuleTester) {
+            RuleMatchTesterView(vm: vm)
+        }
+        .sheet(isPresented: $showVisualRuleEditor) {
+            VisualRuleEditorView(vm: vm)
         }
     }
 }
@@ -105,5 +130,11 @@ struct RuleRow: View {
         Text(ruleText)
             .font(.system(.caption, design: .monospaced))
             .foregroundStyle(Theme.text)
+            .contextMenu {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(ruleText, forType: .string)
+                } label: { Label("复制规则文本", systemImage: "doc.on.doc") }
+            }
     }
 }

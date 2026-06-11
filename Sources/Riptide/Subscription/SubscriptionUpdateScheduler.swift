@@ -9,9 +9,21 @@ public actor SubscriptionUpdateScheduler {
     /// Update check interval (default: 5 minutes)
     private let checkInterval: TimeInterval
 
-    public init(manager: SubscriptionManager, checkInterval: TimeInterval = 300) {
+    /// Optional callback invoked after every subscription update attempt.
+    /// Parameters are `(profileName, success, errorMessage)`. The closure is
+    /// called from the scheduler's actor; consumers are responsible for
+    /// hopping to the appropriate isolation domain (e.g. `@MainActor`) before
+    /// touching UI or `UNUserNotificationCenter`.
+    private let onUpdateResult: (@Sendable (String, Bool, String?) async -> Void)?
+
+    public init(
+        manager: SubscriptionManager,
+        checkInterval: TimeInterval = 300,
+        onUpdateResult: (@Sendable (String, Bool, String?) async -> Void)? = nil
+    ) {
         self.manager = manager
         self.checkInterval = checkInterval
+        self.onUpdateResult = onUpdateResult
     }
 
     /// Starts the scheduler
@@ -56,8 +68,20 @@ public actor SubscriptionUpdateScheduler {
         var updatedCount = 0
         for subscription in needingUpdate where subscription.autoUpdate {
             let result = await manager.updateSubscription(id: subscription.id)
-            if case .success = result {
+            switch result {
+            case .success:
                 updatedCount += 1
+                if let cb = onUpdateResult {
+                    await cb(subscription.name, true, nil)
+                }
+            case .noChange:
+                // No notification — repeated refreshes that produce identical
+                // payloads would otherwise spam the user.
+                break
+            case .failure(let error):
+                if let cb = onUpdateResult {
+                    await cb(subscription.name, false, error)
+                }
             }
         }
 

@@ -18,6 +18,12 @@ enum Theme {
     static let subtext = Color.secondary
     static let card = Color.clear  // use .ultraThinMaterial in views
 
+    // MARK: - NSColor-adapted semantic colors (auto light/dark)
+    // These are derived from NSColor and adapt to the system appearance.
+    static let cardBackground = Color(nsColor: NSColor.controlBackgroundColor)
+    static let elevatedCard = Color(nsColor: NSColor.windowBackgroundColor)
+    static let cardBorder = Color(nsColor: NSColor.separatorColor)
+
     /// Background gradient that adapts to the current color scheme.
     static func backgroundGradient(for colorScheme: ColorScheme) -> LinearGradient {
         switch colorScheme {

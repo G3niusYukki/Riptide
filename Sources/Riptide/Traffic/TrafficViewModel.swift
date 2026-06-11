@@ -1,5 +1,34 @@
 import Foundation
 
+// MARK: - Traffic Time Range
+
+public enum TrafficTimeRange: String, CaseIterable, Identifiable, Sendable {
+    case oneMin = "1分钟"
+    case fiveMin = "5分钟"
+    case oneHour = "1小时"
+    case oneDay = "24小时"
+
+    public var id: String { rawValue }
+
+    public var sampleIntervalSeconds: Double {
+        switch self {
+        case .oneMin: return 1
+        case .fiveMin: return 5
+        case .oneHour: return 30
+        case .oneDay: return 60
+        }
+    }
+
+    public var maxPoints: Int {
+        switch self {
+        case .oneMin: return 60
+        case .fiveMin: return 60
+        case .oneHour: return 120
+        case .oneDay: return 144
+        }
+    }
+}
+
 // MARK: - Traffic Data Types
 
 /// A single data point for traffic measurement
@@ -64,9 +93,9 @@ public actor TrafficViewModel {
     public private(set) var peakUploadSpeed: Double = 0
     public private(set) var peakDownloadSpeed: Double = 0
     public private(set) var lastError: Error?
+    public private(set) var timeRange: TrafficTimeRange = .oneMin
 
     // MARK: - Configuration
-    public let maxHistoryPoints = 60
     private var lastTraffic: (up: Int, down: Int)?
     private var lastTimestamp: Date?
 
@@ -110,8 +139,8 @@ public actor TrafficViewModel {
 
         // Update state
         history.append(dataPoint)
-        if history.count > maxHistoryPoints {
-            history.removeFirst(history.count - maxHistoryPoints)
+        if history.count >= timeRange.maxPoints {
+            history.removeFirst(history.count - timeRange.maxPoints + 1)
         }
 
         // Update peaks
@@ -130,6 +159,12 @@ public actor TrafficViewModel {
         lastTimestamp = now
 
         return dataPoint
+    }
+
+    // MARK: - Configuration
+    public func setTimeRange(_ range: TrafficTimeRange) {
+        self.timeRange = range
+        self.history.removeAll(keepingCapacity: true)
     }
 
     // MARK: - API Integration

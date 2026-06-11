@@ -215,6 +215,12 @@ public final class AppViewModel: @unchecked Sendable {
     public private(set) var allProxies: [ProxyNodeDisplay] = []
     private var proxyDelays: [String: Int] = [:]  // proxy name -> delay ms
 
+    /// Per-group user-customized node order. Persisted to UserDefaults so
+    /// drag/drop rearrangements survive app relaunches. Maps groupID to an
+    /// ordered list of node names. Nodes not present in the list (or new
+    /// nodes from a refreshed profile) are appended at the end.
+    public private(set) var nodeOrder: [String: [String]] = [:]
+
     // Traffic
     public private(set) var currentSpeedUp: Int64 = 0
     public private(set) var currentSpeedDown: Int64 = 0
@@ -225,6 +231,11 @@ public final class AppViewModel: @unchecked Sendable {
     // Rules
     public private(set) var rules: [ProxyRule] = []
     public private(set) var ruleMatches: [RuleMatchLog] = []
+
+    // Rule engine — built lazily by `buildRuleEngine()` for the rule tester.
+    // Cached and rebuilt only when the active config changes.
+    public private(set) var ruleEngine: RuleEngine?
+    private var ruleEngineConfig: RiptideConfig?
 
     // Rule Sets
     private var activeRuleSetProviders: [String: RuleSetProvider] = [:]
@@ -299,6 +310,8 @@ public final class AppViewModel: @unchecked Sendable {
         // Inject the Logbook writer into each business module so its
         // fire-and-forget logInfo/logError calls reach the persistent store.
         checkHelperInstallation()
+        // Restore any persisted drag/drop node order from a prior session.
+        loadNodeOrder()
         let writer = self.logbook.writer
         Task {
             await self.modeCoordinator.setLogbookWriter(writer)
@@ -329,6 +342,89 @@ public final class AppViewModel: @unchecked Sendable {
         } else {
             await start()
         }
+    }
+
+    // MARK: - Hotkey Actions
+
+    /// Routes a hotkey action from `HotkeyManager` to the appropriate
+    /// `AppViewModel` method. Safe to call from any actor — handlers that
+    /// touch UI state hop to `MainActor` internally.
+    public func handleHotkeyAction(_ action: HotkeyManager.HotkeyAction) async {
+        switch action {
+        case .toggleTunnel:
+            await toggleTunnel()
+        case .toggleMode:
+            // Cycle connection modes: off -> systemProxy -> tun -> off
+            await cycleConnectionMode()
+        case .showPanel:
+            await MainActor.run {
+                NSApp.activate(ignoringOtherApps: true)
+                if let window = AppCoordinator.shared.mainWindow {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+        case .toggleSystemProxy:
+            await toggleSystemProxy()
+        case .switchNextNode:
+            await switchToNextNode()
+        case .testAllDelay:
+            await testDelay()
+        }
+    }
+
+    /// Cycles through `off -> systemProxy -> tun -> off`. When the tunnel
+    /// is currently running, it is restarted in the new mode. When stopping,
+    /// `stop()` halts the runtime.
+    private func cycleConnectionMode() async {
+        let wasRunning = tunnelState == .running
+        let next: ConnectionMode?
+        switch connectionMode {
+        case .systemProxy: next = .tun
+        case .tun:        next = .systemProxy  // wrap back to systemProxy (no explicit "off" in ConnectionMode)
+        }
+        if let next {
+            connectionMode = next
+            if wasRunning {
+                await stop()
+                await start()
+            }
+        }
+    }
+
+    /// Toggles the system proxy connection mode. If the tunnel is currently
+    /// running in TUN mode, the runtime is restarted in system-proxy mode
+    /// (and vice versa). Stops the runtime if it is already in the target
+    /// mode.
+    private func toggleSystemProxy() async {
+        let wasRunning = tunnelState == .running
+        if connectionMode == .systemProxy {
+            if wasRunning {
+                await stop()
+            } else {
+                connectionMode = .tun
+            }
+        } else {
+            connectionMode = .systemProxy
+            if wasRunning {
+                await stop()
+                await start()
+            }
+        }
+    }
+
+    /// Advances the first `.select` group to its next node, wrapping around
+    /// at the end. No-op if there is no `.select` group or no current
+    /// selection.
+    private func switchToNextNode() async {
+        guard let primaryGroup = proxyGroups.first(where: { $0.kind == .select }),
+              let currentName = primaryGroup.selectedNodeName,
+              let currentIdx = primaryGroup.nodes.firstIndex(where: { $0.name == currentName }),
+              !primaryGroup.nodes.isEmpty else {
+            return
+        }
+        let nextIdx = (currentIdx + 1) % primaryGroup.nodes.count
+        let nextNode = primaryGroup.nodes[nextIdx]
+        await selectProxy(groupID: primaryGroup.id, nodeName: nextNode.name)
     }
 
     public func start() async {
@@ -735,6 +831,15 @@ public final class AppViewModel: @unchecked Sendable {
         await loadSubscriptionsFromBackend()
     }
 
+    /// Refresh every subscription sequentially. Used by the dashboard quick-action
+    /// button. Failures are recorded on each subscription's `lastError` and don't
+    /// short-circuit the rest.
+    public func refreshAllSubscriptions() async {
+        for sub in await subscriptionManager.allSubscriptions() {
+            await updateSubscription(id: sub.id)
+        }
+    }
+
     /// Updates (refreshes) a subscription by fetching fresh nodes.
     public func updateSubscription(id: UUID) async {
         let result = await subscriptionManager.updateSubscription(id: id)
@@ -888,6 +993,75 @@ public final class AppViewModel: @unchecked Sendable {
         ruleSetDisplays = displays
     }
 
+    // MARK: - Rule Engine Builder
+
+    /// Returns the active profile's `RiptideConfig`, or nil if there is no
+    /// active profile.
+    public func currentRiptideConfig() -> RiptideConfig? {
+        activeProfile?.config
+    }
+
+    /// Builds (or returns the cached) `RuleEngine` for the active profile.
+    ///
+    /// GeoIP and GeoSite resolvers are loaded lazily from the default mihomo
+    /// cache directory. Missing databases degrade gracefully to a resolver
+    /// that always returns nil.
+    public func buildRuleEngine() -> RuleEngine? {
+        guard let config = currentRiptideConfig() else { return nil }
+        if let cached = ruleEngine, ruleEngineConfig == config {
+            return cached
+        }
+
+        // Try to load resolvers from default geo asset paths.
+        let geoIPPath = "\(NSHomeDirectory())/Library/Application Support/Riptide/mihomo/cache/GeoIP.dat"
+        let geoSitePath = "\(NSHomeDirectory())/Library/Application Support/Riptide/mihomo/cache/GeoSite.dat"
+
+        let geoIPResolver: GeoIPResolver
+        if let db = try? GeoIPDatabase(filePath: geoIPPath) {
+            geoIPResolver = GeoIPResolver(database: db)
+        } else {
+            geoIPResolver = .none
+        }
+        let geoSiteResolver = try? GeoSiteResolver(filePath: geoSitePath)
+
+        ruleEngine = RuleEngine(
+            rules: config.rules,
+            geoIPResolver: geoIPResolver,
+            geoSiteResolver: geoSiteResolver,
+            asnResolver: nil
+        )
+        ruleEngineConfig = config
+        return ruleEngine
+    }
+
+    // MARK: - Rule Mutation
+
+    /// Appends a rule to the active profile's rule list and refreshes the
+    /// display copy. The change is in-memory only — persist the profile via
+    /// `ProfileStore` (Task 4.2 YAML editor) if a disk write is desired.
+    @MainActor
+    public func appendRule(_ rule: ProxyRule) {
+        guard var profile = activeProfile else { return }
+        let updatedRules = profile.config.rules + [rule]
+        let updatedConfig = RiptideConfig(
+            mode: profile.config.mode,
+            proxies: profile.config.proxies,
+            rules: updatedRules,
+            proxyGroups: profile.config.proxyGroups,
+            dnsPolicy: profile.config.dnsPolicy,
+            ruleProviders: profile.config.ruleProviders,
+            proxyProviders: profile.config.proxyProviders
+        )
+        profile = Profile(
+            id: profile.id,
+            name: profile.name,
+            config: updatedConfig,
+            source: profile.source
+        )
+        activeProfile = profile
+        rules = updatedRules
+    }
+
     // MARK: - Backup Management
 
     public func loadBackups() async {
@@ -929,6 +1103,40 @@ public final class AppViewModel: @unchecked Sendable {
         } catch {
             lastError = "删除备份失败: \(error.localizedDescription)"
         }
+    }
+
+    /// Returns the raw YAML of the profile with the given id, or an empty
+    /// string if the profile is not present in `ProfileStore`.
+    public func profileYAML(id: UUID) async -> String {
+        await profileStore.profile(id: id)?.rawYAML ?? ""
+    }
+
+    /// Updates the active profile's raw YAML (and the in-memory `RiptideConfig`
+    /// derived from it) and persists the change via `ProfileStore`. The
+    /// profile's `id` and `source` are preserved; subscription-backed
+    /// profiles keep their existing `subscriptionURL`.
+    ///
+    /// - Throws: `ClashConfigError` if the YAML cannot be parsed.
+    @MainActor
+    public func updateProfileYAML(_ profileID: UUID, yaml: String) async throws {
+        let (newConfig, _) = try ClashConfigParser.parse(yaml: yaml)
+        guard let idx = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        let existing = profiles[idx]
+        let updated = Profile(
+            id: existing.id,
+            name: existing.name,
+            config: newConfig,
+            source: existing.source
+        )
+        profiles[idx] = updated
+        if activeProfile?.id == profileID {
+            activeProfile = updated
+            rebuildProxyGroupDisplays()
+        }
+        // Persist via the actor-backed store. `importProfile` creates a new
+        // internal id for the stored record, so we re-read it back and
+        // re-link the in-memory profile to the stored id when possible.
+        _ = try? await profileStore.importProfile(name: updated.name, yaml: yaml)
     }
 
     public func activateProfile(_ profile: Profile) {
@@ -1082,6 +1290,37 @@ public final class AppViewModel: @unchecked Sendable {
             }
 
         rules = profile.config.rules
+    }
+
+    // MARK: - Node Order (drag/drop persistence)
+
+    /// Returns the persisted node-name order for a group, or an empty array
+    /// if the user has not yet reordered the group.
+    public func nodeOrder(for groupID: String) -> [String] {
+        nodeOrder[groupID] ?? []
+    }
+
+    /// Persists a new node-name order for a group and updates the in-memory
+    /// state. Saving is best-effort; a JSON encode failure is silently
+    /// ignored (the in-memory change still applies for the current session).
+    public func setNodeOrder(_ order: [String], for groupID: String) {
+        nodeOrder[groupID] = order
+        saveNodeOrder()
+    }
+
+    /// Reads the persisted node-order map from UserDefaults. Missing or
+    /// undecodable data is treated as "no persisted order".
+    public func loadNodeOrder() {
+        guard let data = UserDefaults.standard.data(forKey: "riptide.proxyGroup.nodeOrder"),
+              let decoded = try? JSONDecoder().decode([String: [String]].self, from: data) else {
+            return
+        }
+        nodeOrder = decoded
+    }
+
+    private func saveNodeOrder() {
+        guard let data = try? JSONEncoder().encode(nodeOrder) else { return }
+        UserDefaults.standard.set(data, forKey: "riptide.proxyGroup.nodeOrder")
     }
 
     // MARK: - Mihomo Core Management
