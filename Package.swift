@@ -119,6 +119,7 @@ let package = Package(
             dependencies: [
                 "Riptide",
                 "RiptideCLI",
+                "RiptideApp",
                 "RiptideWidget",
                 "RiptideQuickLook",
             ]
