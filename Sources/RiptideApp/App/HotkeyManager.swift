@@ -31,12 +31,18 @@ public final class HotkeyManager: ObservableObject {
         case toggleTunnel = "toggleTunnel"
         case toggleMode = "toggleMode"
         case showPanel = "showPanel"
+        case toggleSystemProxy = "toggleSystemProxy"
+        case switchNextNode = "switchNextNode"
+        case testAllDelay = "testAllDelay"
 
         public var displayName: String {
             switch self {
             case .toggleTunnel: return "开关代理"
             case .toggleMode: return "切换模式"
             case .showPanel: return "显示面板"
+            case .toggleSystemProxy: return "切换系统代理"
+            case .switchNextNode: return "下一节点"
+            case .testAllDelay: return "测试延迟"
             }
         }
     }
