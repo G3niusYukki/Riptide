@@ -103,6 +103,11 @@ struct SettingsTabView: View {
                         HotkeySettingsView(hotkeyManager: hotkeyManager)
                     }
 
+                    // MARK: - Notifications
+                    SettingsSection(title: "通知", icon: "bell.badge") {
+                        NotificationSettingsView()
+                    }
+
                     // MARK: - Startup
                     SettingsSection(title: "启动", icon: "power") {
                         Toggle(isOn: $launchAtLogin) {
