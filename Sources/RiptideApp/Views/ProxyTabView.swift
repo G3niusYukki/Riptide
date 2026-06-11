@@ -124,6 +124,7 @@ struct ProxyGroupCard: View {
         }
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isExpanded)
     }
 }
 
@@ -177,6 +178,7 @@ struct ProxyNodeRow: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
         .contextMenu {
             Button {
                 Task { await vm.testDelay(groupID: group.id) }
