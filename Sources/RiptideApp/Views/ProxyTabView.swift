@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Riptide
 
 struct ProxyTabView: View {
@@ -106,11 +107,17 @@ struct ProxyGroupCard: View {
 
             if isExpanded {
                 ForEach(visibleNodes) { node in
-                    ProxyNodeRow(node: node, isSelected: node.name == group.selectedNodeName) {
-                        Task {
-                            await vm.selectProxy(groupID: group.id, nodeName: node.name)
+                    ProxyNodeRow(
+                        node: node,
+                        isSelected: node.name == group.selectedNodeName,
+                        group: group,
+                        vm: vm,
+                        onSelect: {
+                            Task {
+                                await vm.selectProxy(groupID: group.id, nodeName: node.name)
+                            }
                         }
-                    }
+                    )
                     .accessibilityIdentifier(A11yID.Proxy.nodeRow + ".\(node.name)")
                 }
             }
@@ -123,6 +130,8 @@ struct ProxyGroupCard: View {
 struct ProxyNodeRow: View {
     let node: ProxyNodeDisplay
     let isSelected: Bool
+    let group: ProxyGroupDisplay
+    @Bindable var vm: AppViewModel
     let onSelect: () -> Void
 
     private var statusColor: Color {
@@ -168,5 +177,16 @@ struct ProxyNodeRow: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
+        .contextMenu {
+            Button {
+                Task { await vm.testDelay(groupID: group.id) }
+            } label: { Label("测试延迟", systemImage: "speedometer") }
+
+            Button {
+                let info = "\(node.name) (\(node.kind))"
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(info, forType: .string)
+            } label: { Label("复制节点信息", systemImage: "doc.on.doc") }
+        }
     }
 }

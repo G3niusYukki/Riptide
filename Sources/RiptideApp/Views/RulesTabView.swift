@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Riptide
 
 struct RulesTabView: View {
@@ -117,5 +118,11 @@ struct RuleRow: View {
         Text(ruleText)
             .font(.system(.caption, design: .monospaced))
             .foregroundStyle(Theme.text)
+            .contextMenu {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(ruleText, forType: .string)
+                } label: { Label("复制规则文本", systemImage: "doc.on.doc") }
+            }
     }
 }
