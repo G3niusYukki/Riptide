@@ -226,6 +226,11 @@ public final class AppViewModel: @unchecked Sendable {
     public private(set) var rules: [ProxyRule] = []
     public private(set) var ruleMatches: [RuleMatchLog] = []
 
+    // Rule engine — built lazily by `buildRuleEngine()` for the rule tester.
+    // Cached and rebuilt only when the active config changes.
+    public private(set) var ruleEngine: RuleEngine?
+    private var ruleEngineConfig: RiptideConfig?
+
     // Rule Sets
     private var activeRuleSetProviders: [String: RuleSetProvider] = [:]
     private var ruleSetConfigs: [String: RuleSetProviderConfig] = [:]
@@ -969,6 +974,47 @@ public final class AppViewModel: @unchecked Sendable {
             ))
         }
         ruleSetDisplays = displays
+    }
+
+    // MARK: - Rule Engine Builder
+
+    /// Returns the active profile's `RiptideConfig`, or nil if there is no
+    /// active profile.
+    public func currentRiptideConfig() -> RiptideConfig? {
+        activeProfile?.config
+    }
+
+    /// Builds (or returns the cached) `RuleEngine` for the active profile.
+    ///
+    /// GeoIP and GeoSite resolvers are loaded lazily from the default mihomo
+    /// cache directory. Missing databases degrade gracefully to a resolver
+    /// that always returns nil.
+    public func buildRuleEngine() -> RuleEngine? {
+        guard let config = currentRiptideConfig() else { return nil }
+        if let cached = ruleEngine, ruleEngineConfig == config {
+            return cached
+        }
+
+        // Try to load resolvers from default geo asset paths.
+        let geoIPPath = "\(NSHomeDirectory())/Library/Application Support/Riptide/mihomo/cache/GeoIP.dat"
+        let geoSitePath = "\(NSHomeDirectory())/Library/Application Support/Riptide/mihomo/cache/GeoSite.dat"
+
+        let geoIPResolver: GeoIPResolver
+        if let db = try? GeoIPDatabase(filePath: geoIPPath) {
+            geoIPResolver = GeoIPResolver(database: db)
+        } else {
+            geoIPResolver = .none
+        }
+        let geoSiteResolver = try? GeoSiteResolver(filePath: geoSitePath)
+
+        ruleEngine = RuleEngine(
+            rules: config.rules,
+            geoIPResolver: geoIPResolver,
+            geoSiteResolver: geoSiteResolver,
+            asnResolver: nil
+        )
+        ruleEngineConfig = config
+        return ruleEngine
     }
 
     // MARK: - Backup Management
