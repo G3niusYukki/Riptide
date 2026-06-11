@@ -1,4 +1,5 @@
 import SwiftUI
+import Riptide
 
 struct ProxyTabView: View {
     @Bindable var vm: AppViewModel
@@ -100,13 +101,19 @@ struct ProxyNodeRow: View {
         return Theme.danger
     }
 
+    /// `ProxyNodeDisplay.kind` is already a `ProxyKind` enum, so this is a passthrough.
+    private var protocolKind: ProxyKind { node.kind }
+
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
+            CountryFlagView(nodeName: node.name, size: 14)
+            ProtocolBadge(kind: protocolKind)
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
             Text(node.name)
                 .foregroundStyle(Theme.text)
+                .lineLimit(1)
             Spacer()
             if let ms = node.delayMs {
                 Text("\(ms)ms")
