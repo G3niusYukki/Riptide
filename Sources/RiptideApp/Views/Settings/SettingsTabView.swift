@@ -7,6 +7,7 @@ import Riptide
 struct SettingsTabView: View {
     @Bindable var vm: AppViewModel
     @ObservedObject var themeManager: ThemeManager
+    @StateObject private var hotkeyManager = HotkeyManager()
 
     @State private var launchAtLogin: Bool = false
     @State private var launchAgentLoaded: Bool = false
@@ -95,6 +96,11 @@ struct SettingsTabView: View {
                     // MARK: - Updates
                     SettingsSection(title: "软件更新", icon: "arrow.down.circle") {
                         UpdateSettingsView()
+                    }
+
+                    // MARK: - Hotkeys
+                    SettingsSection(title: "快捷键", icon: "keyboard") {
+                        HotkeySettingsView(hotkeyManager: hotkeyManager)
                     }
 
                     // MARK: - Startup

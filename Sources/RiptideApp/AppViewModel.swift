@@ -331,6 +331,89 @@ public final class AppViewModel: @unchecked Sendable {
         }
     }
 
+    // MARK: - Hotkey Actions
+
+    /// Routes a hotkey action from `HotkeyManager` to the appropriate
+    /// `AppViewModel` method. Safe to call from any actor — handlers that
+    /// touch UI state hop to `MainActor` internally.
+    public func handleHotkeyAction(_ action: HotkeyManager.HotkeyAction) async {
+        switch action {
+        case .toggleTunnel:
+            await toggleTunnel()
+        case .toggleMode:
+            // Cycle connection modes: off -> systemProxy -> tun -> off
+            await cycleConnectionMode()
+        case .showPanel:
+            await MainActor.run {
+                NSApp.activate(ignoringOtherApps: true)
+                if let window = AppCoordinator.shared.mainWindow {
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+        case .toggleSystemProxy:
+            await toggleSystemProxy()
+        case .switchNextNode:
+            await switchToNextNode()
+        case .testAllDelay:
+            await testDelay()
+        }
+    }
+
+    /// Cycles through `off -> systemProxy -> tun -> off`. When the tunnel
+    /// is currently running, it is restarted in the new mode. When stopping,
+    /// `stop()` halts the runtime.
+    private func cycleConnectionMode() async {
+        let wasRunning = tunnelState == .running
+        let next: ConnectionMode?
+        switch connectionMode {
+        case .systemProxy: next = .tun
+        case .tun:        next = .systemProxy  // wrap back to systemProxy (no explicit "off" in ConnectionMode)
+        }
+        if let next {
+            connectionMode = next
+            if wasRunning {
+                await stop()
+                await start()
+            }
+        }
+    }
+
+    /// Toggles the system proxy connection mode. If the tunnel is currently
+    /// running in TUN mode, the runtime is restarted in system-proxy mode
+    /// (and vice versa). Stops the runtime if it is already in the target
+    /// mode.
+    private func toggleSystemProxy() async {
+        let wasRunning = tunnelState == .running
+        if connectionMode == .systemProxy {
+            if wasRunning {
+                await stop()
+            } else {
+                connectionMode = .tun
+            }
+        } else {
+            connectionMode = .systemProxy
+            if wasRunning {
+                await stop()
+                await start()
+            }
+        }
+    }
+
+    /// Advances the first `.select` group to its next node, wrapping around
+    /// at the end. No-op if there is no `.select` group or no current
+    /// selection.
+    private func switchToNextNode() async {
+        guard let primaryGroup = proxyGroups.first(where: { $0.kind == .select }),
+              let currentName = primaryGroup.selectedNodeName,
+              let currentIdx = primaryGroup.nodes.firstIndex(where: { $0.name == currentName }),
+              !primaryGroup.nodes.isEmpty else {
+            return
+        }
+        let nextIdx = (currentIdx + 1) % primaryGroup.nodes.count
+        let nextNode = primaryGroup.nodes[nextIdx]
+        await selectProxy(groupID: primaryGroup.id, nodeName: nextNode.name)
+    }
+
     public func start() async {
         // Check helper installation (non-blocking — sudo fallback available)
         await checkHelperInstallationAsync()

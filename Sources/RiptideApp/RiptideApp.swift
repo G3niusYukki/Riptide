@@ -34,6 +34,7 @@ struct RiptideApp: App {
     @State private var appVM = AppViewModel()
     @State private var statusBar: StatusBarController?
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var hotkeyManager = HotkeyManager()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     private var shouldShowMainUI: Bool {
@@ -101,6 +102,15 @@ struct RiptideApp: App {
                 // 2016-2021 MacBook Pros). No-op elsewhere.
                 TouchBarProvider.shared.appViewModel = appVM
                 AppCoordinator.shared.mainWindow?.touchBar = TouchBarProvider.shared.makeTouchBar()
+
+                // Register global keyboard shortcuts. The handler hops to
+                // MainActor so it can safely mutate AppViewModel state from
+                // the NSEvent monitor callback thread.
+                hotkeyManager.registerHotkeys { action in
+                    Task { @MainActor in
+                        await appVM.handleHotkeyAction(action)
+                    }
+                }
             }
         }
         .defaultSize(width: 900, height: 600)
