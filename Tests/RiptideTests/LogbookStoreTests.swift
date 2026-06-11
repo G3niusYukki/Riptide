@@ -102,6 +102,135 @@ struct LogbookStoreTests {
         #expect(size > 200)
     }
 
+    // MARK: - trafficByDate
+
+    @Test("trafficByDate aggregates upload + download bytes per UTC day")
+    func trafficByDateAggregatesUploadDownload() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        // Pin both records to the same UTC day so they aggregate into one bucket.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        var c = DateComponents()
+        c.year = 2026; c.month = 6; c.day = 7
+        c.hour = 10; c.minute = 0; c.second = 0
+        let day = utc.date(from: c)!
+
+        let record1 = ClosedConnectionRecord(
+            id: UUID().uuidString,
+            host: "example.com",
+            proxyName: "p1",
+            protocol: "tcp",
+            rule: "DOMAIN",
+            sourceIP: "127.0.0.1",
+            sourcePort: 12345,
+            destinationIP: "1.1.1.1",
+            destinationPort: 443,
+            startedAt: day,
+            closedAt: day,
+            uploadBytes: 1000,
+            downloadBytes: 2000,
+            closeReason: .userClosed
+        )
+        let record2 = ClosedConnectionRecord(
+            id: UUID().uuidString,
+            host: "example.org",
+            proxyName: "p1",
+            protocol: "tcp",
+            rule: "DOMAIN",
+            sourceIP: "127.0.0.1",
+            sourcePort: 12346,
+            destinationIP: "1.0.0.1",
+            destinationPort: 443,
+            startedAt: day,
+            closedAt: day,
+            uploadBytes: 500,
+            downloadBytes: 1500,
+            closeReason: .userClosed
+        )
+        // Include a non-connectionClosed entry to confirm events are ignored.
+        let eventEntry = makeEvent(message: "ignored", at: day)
+
+        try await store.append(.connectionClosed(record1))
+        try await store.append(.connectionClosed(record2))
+        try await store.append(eventEntry)
+        try await store.flush()
+
+        let from = utc.startOfDay(for: day)
+        guard let nextDay = utc.date(byAdding: .day, value: 1, to: from) else {
+            Issue.record("failed to compute end day")
+            return
+        }
+        let to = utc.date(
+            bySettingHour: 23, minute: 59, second: 59, of: from
+        ) ?? nextDay
+        let result = try await store.trafficByDate(from: from, to: to)
+
+        let dayKey = utc.startOfDay(for: day)
+        #expect(result[dayKey]?.up == 1500)
+        #expect(result[dayKey]?.down == 3500)
+        // Only one bucket — records all live on the same UTC day.
+        #expect(result.count == 1)
+    }
+
+    @Test("trafficByDate returns empty dict when no log files exist in range")
+    func trafficByDateEmptyRange() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        let now = Date()
+        let result = try await store.trafficByDate(
+            from: now.addingTimeInterval(-3600),
+            to: now
+        )
+        #expect(result.isEmpty)
+    }
+
+    @Test("trafficByDate splits records across multiple days")
+    func trafficByDateAcrossMultipleDays() async throws {
+        let (store, dir) = try await makeStore()
+        defer { cleanup(dir) }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        var c = DateComponents()
+        c.year = 2026; c.month = 6; c.day = 7
+        c.hour = 10
+        let day1 = utc.date(from: c)!
+        c.day = 8
+        let day2 = utc.date(from: c)!
+
+        let r1 = ClosedConnectionRecord(
+            id: UUID().uuidString, host: "a.com", proxyName: "p",
+            protocol: "tcp", rule: nil, sourceIP: "127.0.0.1", sourcePort: 1,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: day1, closedAt: day1,
+            uploadBytes: 100, downloadBytes: 200, closeReason: .userClosed
+        )
+        let r2 = ClosedConnectionRecord(
+            id: UUID().uuidString, host: "b.com", proxyName: "p",
+            protocol: "tcp", rule: nil, sourceIP: "127.0.0.1", sourcePort: 2,
+            destinationIP: nil, destinationPort: nil,
+            startedAt: day2, closedAt: day2,
+            uploadBytes: 300, downloadBytes: 400, closeReason: .userClosed
+        )
+        try await store.append(.connectionClosed(r1))
+        try await store.append(.connectionClosed(r2))
+        try await store.flush()
+
+        let from = utc.startOfDay(for: day1)
+        guard let day3 = utc.date(byAdding: .day, value: 2, to: from) else {
+            Issue.record("failed to compute end day")
+            return
+        }
+        let to = utc.date(bySettingHour: 23, minute: 59, second: 59, of: day3) ?? day3
+        let result = try await store.trafficByDate(from: from, to: to)
+
+        #expect(result[utc.startOfDay(for: day1)]?.up == 100)
+        #expect(result[utc.startOfDay(for: day1)]?.down == 200)
+        #expect(result[utc.startOfDay(for: day2)]?.up == 300)
+        #expect(result[utc.startOfDay(for: day2)]?.down == 400)
+        #expect(result.count == 2)
+    }
+
     // MARK: - query(_:)
 
     @Test("query returns appended entries within range")

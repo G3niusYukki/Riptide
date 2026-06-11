@@ -75,6 +75,35 @@ public actor LogbookStore {
         return results
     }
 
+    /// Aggregate upload + download bytes from `.connectionClosed` entries, bucketed
+    /// by UTC start-of-day, across `[startDate..endDate]` (inclusive).
+    ///
+    /// Days whose JSONL file is missing are skipped silently. Returns a dictionary
+    /// keyed by `Calendar.current.startOfDay(for: record.closedAt)` so callers can
+    /// index directly with the day they want to display. `.event` entries are
+    /// ignored — they have no byte counts.
+    public func trafficByDate(
+        from startDate: Date,
+        to endDate: Date
+    ) throws -> [Date: (up: Int, down: Int)] {
+        var result: [Date: (up: Int, down: Int)] = [:]
+        // Force any in-flight writes to disk so a fresh `Data(contentsOf:)` sees them.
+        try? currentHandle?.synchronize()
+        let urls = try enumerateDateURLs(from: startDate, to: endDate)
+        for url in urls {
+            let entries = try readEntries(from: url)
+            for entry in entries {
+                guard case .connectionClosed(let record) = entry else { continue }
+                let dayKey = Self.utcCalendar.startOfDay(for: record.closedAt)
+                var existing = result[dayKey] ?? (up: 0, down: 0)
+                existing.up &+= record.uploadBytes
+                existing.down &+= record.downloadBytes
+                result[dayKey] = existing
+            }
+        }
+        return result
+    }
+
     /// Delete log files whose UTC day is strictly before `cutoff`'s UTC start-of-day.
     /// Returns the count of files removed. Only files with a `.jsonl` extension that
     /// match the `yyyy-MM-dd` filename convention are considered; anything else is
