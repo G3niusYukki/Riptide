@@ -79,11 +79,13 @@ enum RegionMapping {
     }
 
     /// Returns the Unicode flag emoji for an ISO 3166-1 alpha-2 code.
+    /// Falls back to a globe for unknown, empty, or invalid codes.
     static func flagEmoji(for code: String) -> String {
-        guard code.count == 2 else { return "🌐" }
+        let upper = code.uppercased()
+        guard upper.count == 2, isoCodes.contains(upper) else { return "🌐" }
         let base: UInt32 = 127397
         var emoji = ""
-        for scalar in code.uppercased().unicodeScalars {
+        for scalar in upper.unicodeScalars {
             if let combined = UnicodeScalar(base + scalar.value) {
                 emoji.unicodeScalars.append(combined)
             }
