@@ -4,31 +4,59 @@ import Riptide
 struct ProxyTabView: View {
     @Bindable var vm: AppViewModel
     @State private var isTestingAll = false
+    @State private var sortOrder: ProxySortOrder = .default
+    @State private var filter: ProxyFilter = .all
+    @State private var searchText = ""
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(vm.proxyGroups) { group in
-                    ProxyGroupCard(group: group, vm: vm)
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(vm.proxyGroups) { group in
+                        ProxyGroupCard(
+                            group: group,
+                            vm: vm,
+                            sortOrder: sortOrder,
+                            filter: filter,
+                            searchText: searchText
+                        )
                         .accessibilityIdentifier(A11yID.Proxy.groupCard + ".\(group.name)")
-                }
-            }
-            .padding()
-        }
-        .background(Theme.backgroundGradient.ignoresSafeArea())
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    isTestingAll = true
-                    Task {
-                        await vm.testDelay()
-                        isTestingAll = false
                     }
-                } label: {
-                    Label("延迟测试", systemImage: "speedometer")
                 }
-                .disabled(isTestingAll)
-                .accessibilityIdentifier(A11yID.Proxy.testDelayButton)
+                .padding()
+            }
+            .background(Theme.backgroundGradient.ignoresSafeArea())
+            .searchable(text: $searchText, prompt: "搜索节点")
+            .toolbar {
+                ToolbarItem {
+                    Menu {
+                        Picker("排序", selection: $sortOrder) {
+                            ForEach(ProxySortOrder.allCases) { order in
+                                Text(order.rawValue).tag(order)
+                            }
+                        }
+                        Divider()
+                        Picker("过滤", selection: $filter) {
+                            Text("全部").tag(ProxyFilter.all)
+                            Text("可用").tag(ProxyFilter.available)
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+                ToolbarItem {
+                    Button {
+                        isTestingAll = true
+                        Task {
+                            await vm.testDelay()
+                            isTestingAll = false
+                        }
+                    } label: {
+                        Label("延迟测试", systemImage: "speedometer")
+                    }
+                    .disabled(isTestingAll)
+                    .accessibilityIdentifier(A11yID.Proxy.testDelayButton)
+                }
             }
         }
     }
@@ -37,11 +65,22 @@ struct ProxyTabView: View {
 struct ProxyGroupCard: View {
     let group: ProxyGroupDisplay
     @Bindable var vm: AppViewModel
+    let sortOrder: ProxySortOrder
+    let filter: ProxyFilter
+    let searchText: String
     @State private var isExpanded = true
+
+    private var visibleNodes: [ProxyNodeDisplay] {
+        ProxyTabFilter.applySortAndFilter(
+            group.nodes,
+            sort: sortOrder,
+            filter: filter,
+            searchText: searchText
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .foregroundStyle(Theme.accent)
@@ -66,7 +105,7 @@ struct ProxyGroupCard: View {
             Divider().background(Theme.subtext.opacity(0.3))
 
             if isExpanded {
-                ForEach(group.nodes) { node in
+                ForEach(visibleNodes) { node in
                     ProxyNodeRow(node: node, isSelected: node.name == group.selectedNodeName) {
                         Task {
                             await vm.selectProxy(groupID: group.id, nodeName: node.name)
