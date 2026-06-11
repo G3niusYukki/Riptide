@@ -1026,6 +1026,34 @@ public final class AppViewModel: @unchecked Sendable {
         return ruleEngine
     }
 
+    // MARK: - Rule Mutation
+
+    /// Appends a rule to the active profile's rule list and refreshes the
+    /// display copy. The change is in-memory only — persist the profile via
+    /// `ProfileStore` (Task 4.2 YAML editor) if a disk write is desired.
+    @MainActor
+    public func appendRule(_ rule: ProxyRule) {
+        guard var profile = activeProfile else { return }
+        let updatedRules = profile.config.rules + [rule]
+        let updatedConfig = RiptideConfig(
+            mode: profile.config.mode,
+            proxies: profile.config.proxies,
+            rules: updatedRules,
+            proxyGroups: profile.config.proxyGroups,
+            dnsPolicy: profile.config.dnsPolicy,
+            ruleProviders: profile.config.ruleProviders,
+            proxyProviders: profile.config.proxyProviders
+        )
+        profile = Profile(
+            id: profile.id,
+            name: profile.name,
+            config: updatedConfig,
+            source: profile.source
+        )
+        activeProfile = profile
+        rules = updatedRules
+    }
+
     // MARK: - Backup Management
 
     public func loadBackups() async {

@@ -6,6 +6,7 @@ struct RulesTabView: View {
     @Bindable var vm: AppViewModel
     @State private var showRuleMarket = false
     @State private var showRuleTester = false
+    @State private var showVisualRuleEditor = false
 
     var body: some View {
         ScrollView {
@@ -54,6 +55,14 @@ struct RulesTabView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        Button {
+                            showVisualRuleEditor = true
+                        } label: {
+                            Label("添加规则", systemImage: "plus.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                         Text("共 \(vm.rules.count) 条")
                             .font(.caption)
                             .foregroundStyle(Theme.subtext)
@@ -76,6 +85,9 @@ struct RulesTabView: View {
         }
         .sheet(isPresented: $showRuleTester) {
             RuleMatchTesterView(vm: vm)
+        }
+        .sheet(isPresented: $showVisualRuleEditor) {
+            VisualRuleEditorView(vm: vm)
         }
     }
 }
