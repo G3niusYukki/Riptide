@@ -106,13 +106,37 @@ impl ScriptEngine {
         // Extract result as HashMap
         match result {
             JsValue::Object(obj) => {
-                let keys = obj.own_property_keys(&mut ctx);
                 let mut output = HashMap::new();
-                for key in &keys {
-                    if let boa_engine::property::PropertyKey::String(js_str) = key {
-                        let key_str = js_str.to_std_string().unwrap_or_default();
+                // boa 0.17 removed JsObject::own_property_keys.
+                // Use Object.keys() via JS eval to get enumerable own property names.
+                let keys_fn = ctx
+                    .eval(Source::from_bytes(
+                        b"(function(o){return Object.keys(o);})",
+                    ))
+                    .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+                let keys_callable = keys_fn
+                    .as_object()
+                    .ok_or_else(|| {
+                        ScriptError::RuntimeError("Object.keys wrapper missing".into())
+                    })?
+                    .clone();
+                let keys_result = keys_callable
+                    .call(&JsValue::undefined(), &[JsValue::from(obj.clone())], &mut ctx)
+                    .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+                if let Some(keys_array) = keys_result.as_object() {
+                    let length = keys_array
+                        .get(js_string!("length"), &mut ctx)
+                        .ok()
+                        .and_then(|v| v.as_number())
+                        .unwrap_or(0.0) as usize;
+                    for i in 0..length {
+                        let key_val = keys_array
+                            .get(i, &mut ctx)
+                            .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+                        let Some(js_str) = key_val.as_string() else { continue };
+                        let Ok(key_str) = js_str.to_std_string() else { continue };
                         let val = obj
-                            .get(key.clone(), &mut ctx)
+                            .get(js_str, &mut ctx)
                             .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
                         if let Ok(val_jsstr) = val.to_string(&mut ctx) {
                             output.insert(key_str, val_jsstr.to_std_string().unwrap_or_default());

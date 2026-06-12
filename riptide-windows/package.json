@@ -68,5 +68,8 @@
     "vite": "^7.0.4",
     "vitest": "^4.1.8",
     "vitepress": "^1.6.3"
+  },
+  "overrides": {
+    "@docsearch/react": "3.9.0"
   }
 }
