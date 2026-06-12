@@ -136,7 +136,7 @@ impl ScriptEngine {
                         let Some(js_str) = key_val.as_string() else { continue };
                         let Ok(key_str) = js_str.to_std_string() else { continue };
                         let val = obj
-                            .get(js_str, &mut ctx)
+                            .get(js_str.clone(), &mut ctx)
                             .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
                         if let Ok(val_jsstr) = val.to_string(&mut ctx) {
                             output.insert(key_str, val_jsstr.to_std_string().unwrap_or_default());
