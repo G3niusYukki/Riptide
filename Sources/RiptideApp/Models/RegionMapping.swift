@@ -70,7 +70,7 @@ enum RegionMapping {
         for code in isoCodes {
             // Match ISO code delimited by non-letter characters (so JP-Tokyo and US_Los_Angeles both match)
             let pattern = "(?:^|[^a-z])\(code.lowercased())(?:$|[^a-z])"
-            if let _ = lowercased.range(of: pattern, options: .regularExpression) {
+            if lowercased.range(of: pattern, options: .regularExpression) != nil {
                 return code
             }
         }

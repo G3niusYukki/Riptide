@@ -114,8 +114,8 @@ private struct HotkeyRow: View {
 
     private var displayText: String {
         if isRecording { return "按下快捷键..." }
-        guard let s = shortcut else { return "未设置" }
-        return HotkeyRow.format(keyCode: s.keyCode, modifiers: s.modifiers)
+        guard let currentShortcut = shortcut else { return "未设置" }
+        return HotkeyRow.format(keyCode: currentShortcut.keyCode, modifiers: currentShortcut.modifiers)
     }
 
     static func format(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> String {
@@ -149,10 +149,8 @@ private struct HotkeyRow: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(isRecording ? Theme.warning.opacity(0.1) : Color.clear)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(isRecording ? Theme.warning : Theme.subtext.opacity(0.3), style: isRecording ? StrokeStyle(lineWidth: 1.5, dash: [4]) : StrokeStyle(lineWidth: 1))
-                )
+                .overlay(borderShape)
+
             Button(isRecording ? "取消" : (shortcut == nil ? "录制" : "重新录制")) {
                 onRecord()
             }
@@ -165,5 +163,12 @@ private struct HotkeyRow: View {
                     .tint(Theme.danger)
             }
         }
+    }
+
+    private var borderShape: some View {
+        RoundedRectangle(cornerRadius: 4).strokeBorder(
+            isRecording ? Theme.warning : Theme.subtext.opacity(0.3),
+            style: isRecording ? StrokeStyle(lineWidth: 1.5, dash: [4]) : StrokeStyle(lineWidth: 1)
+        )
     }
 }

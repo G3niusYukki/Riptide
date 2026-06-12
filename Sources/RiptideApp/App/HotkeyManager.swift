@@ -28,12 +28,12 @@ public final class HotkeyManager: ObservableObject {
     }
 
     public enum HotkeyAction: String, Codable, CaseIterable {
-        case toggleTunnel = "toggleTunnel"
-        case toggleMode = "toggleMode"
-        case showPanel = "showPanel"
-        case toggleSystemProxy = "toggleSystemProxy"
-        case switchNextNode = "switchNextNode"
-        case testAllDelay = "testAllDelay"
+        case toggleTunnel
+        case toggleMode
+        case showPanel
+        case toggleSystemProxy
+        case switchNextNode
+        case testAllDelay
 
         public var displayName: String {
             switch self {

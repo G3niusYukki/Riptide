@@ -26,8 +26,8 @@ struct TrafficHistoryView: View {
                 Text("历史流量").font(.headline)
                 Spacer()
                 Picker("", selection: $range) {
-                    ForEach(Range.allCases, id: \.self) { r in
-                        Text(r.rawValue).tag(r)
+                    ForEach(Range.allCases, id: \.self) { rangeCase in
+                        Text(rangeCase.rawValue).tag(rangeCase)
                     }
                 }
                 .pickerStyle(.segmented)

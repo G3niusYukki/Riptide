@@ -10,7 +10,7 @@ public final class StatusBarController: NSObject {
     private let speedView: MenuBarSpeedView
     private var speedObservationTask: Task<Void, Never>?
 
-    public override init() {
+    override public init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         speedView = MenuBarSpeedView(frame: .zero)
 

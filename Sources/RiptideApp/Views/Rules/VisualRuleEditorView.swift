@@ -171,74 +171,14 @@ struct VisualRuleEditorView: View {
     /// user can quickly add a series of related rules.
     @discardableResult
     private func addRule(continueAdding: Bool) -> Bool {
-        let policy: RoutingPolicy
-        switch policyKind {
-        case .direct: policy = .direct
-        case .reject: policy = .reject
-        case .proxyNode: policy = .proxyNode(name: proxyName)
-        }
-
-        if policyKind == .proxyNode && proxyName.trimmingCharacters(in: .whitespaces).isEmpty {
+        guard let policy = makePolicy() else {
             validationError = "代理节点名称不能为空"
             return false
         }
 
-        let newRule: ProxyRule
-        switch ruleType {
-        case .domain:
-            if value.isEmpty {
-                validationError = "请填写域名"
-                return false
-            }
-            newRule = .domain(domain: value, policy: policy)
-        case .domainSuffix:
-            if value.isEmpty {
-                validationError = "请填写域名后缀"
-                return false
-            }
-            newRule = .domainSuffix(suffix: value, policy: policy)
-        case .domainKeyword:
-            if value.isEmpty {
-                validationError = "请填写域名关键字"
-                return false
-            }
-            newRule = .domainKeyword(keyword: value, policy: policy)
-        case .ipCIDR:
-            if value.isEmpty {
-                validationError = "请填写 CIDR"
-                return false
-            }
-            newRule = .ipCIDR(cidr: value, policy: policy)
-        case .geoIP:
-            if value.isEmpty {
-                validationError = "请填写国家代码"
-                return false
-            }
-            newRule = .geoIP(countryCode: value, policy: policy)
-        case .geoSite:
-            if value.isEmpty || extra.isEmpty {
-                validationError = "请填写 GEOSITE 国家代码和类别"
-                return false
-            }
-            newRule = .geoSite(code: value, category: extra, policy: policy)
-        case .ruleSet:
-            if value.isEmpty {
-                validationError = "请填写规则集名称"
-                return false
-            }
-            newRule = .ruleSet(name: value, policy: policy)
-        case .processName:
-            if value.isEmpty {
-                validationError = "请填写进程名"
-                return false
-            }
-            newRule = .processName(name: value, policy: policy)
-        case .dstPort:
-            guard let portNum = Int(port), (1...65535).contains(portNum) else {
-                validationError = "端口必须是 1-65535 之间的整数"
-                return false
-            }
-            newRule = .dstPort(port: portNum, policy: policy)
+        guard let newRule = makeRule(policy: policy) else {
+            // validationError already set by makeRule
+            return false
         }
 
         validationError = nil
@@ -250,5 +190,56 @@ struct VisualRuleEditorView: View {
             port = ""
         }
         return true
+    }
+
+    private func makePolicy() -> RoutingPolicy? {
+        if policyKind == .proxyNode && proxyName.trimmingCharacters(in: .whitespaces).isEmpty {
+            return nil
+        }
+        switch policyKind {
+        case .direct: return .direct
+        case .reject: return .reject
+        case .proxyNode: return .proxyNode(name: proxyName)
+        }
+    }
+
+    /// Builds a ProxyRule from the form fields, validating input and setting
+    /// `validationError` on failure. Returns nil on validation failure.
+    private func makeRule(policy: RoutingPolicy) -> ProxyRule? {
+        switch ruleType {
+        case .domain:
+            guard !value.isEmpty else { validationError = "请填写域名"; return nil }
+            return .domain(domain: value, policy: policy)
+        case .domainSuffix:
+            guard !value.isEmpty else { validationError = "请填写域名后缀"; return nil }
+            return .domainSuffix(suffix: value, policy: policy)
+        case .domainKeyword:
+            guard !value.isEmpty else { validationError = "请填写域名关键字"; return nil }
+            return .domainKeyword(keyword: value, policy: policy)
+        case .ipCIDR:
+            guard !value.isEmpty else { validationError = "请填写 CIDR"; return nil }
+            return .ipCIDR(cidr: value, policy: policy)
+        case .geoIP:
+            guard !value.isEmpty else { validationError = "请填写国家代码"; return nil }
+            return .geoIP(countryCode: value, policy: policy)
+        case .geoSite:
+            guard !value.isEmpty, !extra.isEmpty else {
+                validationError = "请填写 GEOSITE 国家代码和类别"
+                return nil
+            }
+            return .geoSite(code: value, category: extra, policy: policy)
+        case .ruleSet:
+            guard !value.isEmpty else { validationError = "请填写规则集名称"; return nil }
+            return .ruleSet(name: value, policy: policy)
+        case .processName:
+            guard !value.isEmpty else { validationError = "请填写进程名"; return nil }
+            return .processName(name: value, policy: policy)
+        case .dstPort:
+            guard let portNum = Int(port), (1...65535).contains(portNum) else {
+                validationError = "端口必须是 1-65535 之间的整数"
+                return nil
+            }
+            return .dstPort(port: portNum, policy: policy)
+        }
     }
 }

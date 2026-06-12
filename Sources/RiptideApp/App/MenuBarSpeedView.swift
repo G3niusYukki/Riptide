@@ -5,7 +5,7 @@ import AppKit
 public final class MenuBarSpeedView: NSView {
     private let label: NSTextField
 
-    public override init(frame frameRect: NSRect) {
+    override public init(frame frameRect: NSRect) {
         self.label = NSTextField(labelWithString: "")
         super.init(frame: frameRect)
         setupLabel()
@@ -43,12 +43,12 @@ public final class MenuBarSpeedView: NSView {
         invalidateIntrinsicContentSize()
     }
 
-    public override var intrinsicContentSize: NSSize {
+    override public var intrinsicContentSize: NSSize {
         let labelSize = label.intrinsicContentSize
         return NSSize(width: labelSize.width + 16, height: 22)
     }
 
-    public nonisolated static func format(_ bytesPerSec: Int64) -> String {
+    nonisolated public static func format(_ bytesPerSec: Int64) -> String {
         let abs = Double(bytesPerSec.magnitude)
         if abs < 1_000 { return "<1K" }
         if abs < 1_000_000 { return String(format: "%.1fK", abs / 1_000) }

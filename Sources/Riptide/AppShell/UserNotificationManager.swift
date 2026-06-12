@@ -27,15 +27,15 @@ public final class UserNotificationManager: NSObject {
 
     // MARK: - Category Identifiers
 
-    public nonisolated static let categoryNodeFailure = "riptide.node.failure"
-    public nonisolated static let categorySubscriptionExpiring = "riptide.subscription.expiring"
-    public nonisolated static let categorySystemAlert = "riptide.system.alert"
+    nonisolated public static let categoryNodeFailure = "riptide.node.failure"
+    nonisolated public static let categorySubscriptionExpiring = "riptide.subscription.expiring"
+    nonisolated public static let categorySystemAlert = "riptide.system.alert"
 
     // MARK: - Action Identifiers
 
-    public nonisolated static let actionSwitch = "SWITCH"
-    public nonisolated static let actionDetails = "DETAILS"
-    public nonisolated static let actionDismiss = "DISMISS"
+    nonisolated public static let actionSwitch = "SWITCH"
+    nonisolated public static let actionDetails = "DETAILS"
+    nonisolated public static let actionDismiss = "DISMISS"
 
     // MARK: - State
 
@@ -48,13 +48,13 @@ public final class UserNotificationManager: NSObject {
     /// Whether the host environment can host a `UNUserNotificationCenter`.
     /// We treat a present `Bundle.main.bundleIdentifier` as the canonical
     /// signal that we're running inside a real macOS app.
-    public nonisolated static var canHostNotifications: Bool {
+    nonisolated public static var canHostNotifications: Bool {
         Bundle.main.bundleIdentifier != nil
     }
 
     // MARK: - Init
 
-    public override init() {
+    override public init() {
         super.init()
         // Intentionally do NOT touch `UNUserNotificationCenter.current()` here.
         // The center requires a real `.app` bundle and the singleton is
@@ -91,7 +91,7 @@ public final class UserNotificationManager: NSObject {
     /// Returns the categories this manager registers. Exposed as a static
     /// helper so unit tests can verify the configuration without touching the
     /// live `UNUserNotificationCenter` singleton.
-    public nonisolated static func registeredCategories() -> Set<UNNotificationCategory> {
+    nonisolated public static func registeredCategories() -> Set<UNNotificationCategory> {
         let switchAction = UNNotificationAction(
             identifier: actionSwitch,
             title: "立即切换",
@@ -175,7 +175,7 @@ public final class UserNotificationManager: NSObject {
 
     // MARK: - Content Builders (Testable Static API)
 
-    public nonisolated static func makeNodeFailureContent(
+    nonisolated public static func makeNodeFailureContent(
         nodeName: String,
         latencyMs: Int
     ) -> UNMutableNotificationContent {
@@ -191,7 +191,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeSubscriptionExpiringContent(
+    nonisolated public static func makeSubscriptionExpiringContent(
         name: String,
         daysRemaining: Int
     ) -> UNMutableNotificationContent {
@@ -207,7 +207,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeSystemProxyChangedContent(
+    nonisolated public static func makeSystemProxyChangedContent(
         autoRestored: Bool
     ) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
@@ -222,7 +222,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeMihomoExitedContent() -> UNMutableNotificationContent {
+    nonisolated public static func makeMihomoExitedContent() -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = "mihomo 进程退出"
         content.body = "代理核心意外退出,网络可能中断"
@@ -234,7 +234,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeTrafficThresholdContent(
+    nonisolated public static func makeTrafficThresholdContent(
         usedBytes: Int64,
         limitBytes: Int64
     ) -> UNMutableNotificationContent {
@@ -251,7 +251,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeConfigUpdateSuccessContent(
+    nonisolated public static func makeConfigUpdateSuccessContent(
         profileName: String
     ) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
@@ -266,7 +266,7 @@ public final class UserNotificationManager: NSObject {
         return content
     }
 
-    public nonisolated static func makeConfigUpdateFailedContent(
+    nonisolated public static func makeConfigUpdateFailedContent(
         profileName: String,
         error: String
     ) -> UNMutableNotificationContent {
@@ -285,7 +285,7 @@ public final class UserNotificationManager: NSObject {
 
     /// Formats a byte count using the same unit scheme as the rest of the
     /// app's traffic displays (K/M/G with one decimal place).
-    public nonisolated static func formatBytes(_ bytes: Int64) -> String {
+    nonisolated public static func formatBytes(_ bytes: Int64) -> String {
         let abs = Double(bytes.magnitude)
         if abs < 1_000 { return "<1K" }
         if abs < 1_000_000 { return String(format: "%.1fK", abs / 1_000) }
@@ -334,7 +334,7 @@ public final class UserNotificationManager: NSObject {
 
 extension UserNotificationManager: UNUserNotificationCenterDelegate {
 
-    public nonisolated func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
@@ -343,7 +343,7 @@ extension UserNotificationManager: UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound])
     }
 
-    public nonisolated func userNotificationCenter(
+    nonisolated public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
