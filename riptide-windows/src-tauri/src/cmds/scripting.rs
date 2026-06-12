@@ -1,5 +1,4 @@
 use tauri::State;
-use tauri::State;
 
 use crate::core::scripting::engine::{ScriptContext, ScriptEngine, ScriptType};
 

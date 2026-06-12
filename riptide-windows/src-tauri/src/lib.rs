@@ -158,6 +158,7 @@ pub fn run() {
             crate::core::subscription_scheduler::set_logbook_writer(Some(
                 logbook_for_inject.clone(),
             ));
+            #[cfg(target_os = "windows")]
             crate::core::service::set_logbook_writer(Some(logbook_for_inject.clone()));
             crate::core::sysproxy::set_logbook_writer(Some(logbook_for_inject.clone()));
             crate::core::recovery_watchdog::set_logbook_writer(Some(logbook_for_inject));
