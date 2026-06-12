@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.5.0] — 2026-06-XX
+## [2.5.0] — 2026-06-12
 
 > **macOS UI Enhancement** — major UX pass closing the feature gap with ClashX Pro / Surge / Stash. Adds 14 new view files, modifies 15 existing files; ~1,900 net lines.
 
