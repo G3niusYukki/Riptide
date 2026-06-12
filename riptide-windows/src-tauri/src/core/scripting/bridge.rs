@@ -231,9 +231,10 @@ impl SurgeScriptBridge {
                 Ok(JsValue::undefined())
             })
         };
+        let done_js_fn = FunctionObjectBuilder::new(ctx, done_fn).build();
         ctx.register_global_property(
             js_string!("$done"),
-            done_fn.into(),
+            JsValue::from(done_js_fn),
             boa_engine::property::Attribute::all(),
         );
         Ok(())
@@ -283,9 +284,10 @@ impl SurgeScriptBridge {
                 Ok(JsValue::undefined())
             })
         };
+        let done_js_fn = FunctionObjectBuilder::new(ctx, done_fn).build();
         ctx.register_global_property(
             js_string!("$done"),
-            done_fn.into(),
+            JsValue::from(done_js_fn),
             boa_engine::property::Attribute::all(),
         );
         Ok(())
@@ -393,16 +395,43 @@ fn js_object_to_hashmap(
     ctx: &mut Context,
     obj: &boa_engine::JsObject,
 ) -> Result<HashMap<String, String>, ScriptError> {
-    let keys = obj.own_property_keys(ctx);
+    // boa_engine 0.17 removed `JsObject::own_property_keys`. Use the JS
+    // `Object.keys()` builtin instead, which returns the same set of
+    // enumerable own property names.
+    let keys_value = ctx
+        .eval(Source::from_bytes(
+            b"(function(o){return Object.keys(o);})",
+        ))
+        .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+    let keys_fn = keys_value
+        .as_object()
+        .ok_or_else(|| ScriptError::RuntimeError("Object.keys wrapper missing".into()))?
+        .clone();
+
+    let result = keys_fn
+        .call(&JsValue::undefined(), &[JsValue::from(obj.clone())], ctx)
+        .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+
     let mut map = HashMap::new();
-    for key in &keys {
-        if let boa_engine::property::PropertyKey::String(js_str) = key {
-            let k = js_str.to_std_string().unwrap_or_default();
-            let v = obj
-                .get(key.clone(), ctx)
+    if let Some(keys_array) = result.as_object() {
+        let length = keys_array
+            .get(js_string!("length"), ctx)
+            .ok()
+            .and_then(|v| v.as_number())
+            .unwrap_or(0.0) as usize;
+        for i in 0..length {
+            let key_val = keys_array
+                .get(i, ctx)
                 .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
-            if let Ok(val_jsstr) = v.to_string(ctx) {
-                map.insert(k, val_jsstr.to_std_string().unwrap_or_default());
+            let Some(k) = key_val.as_string() else { continue };
+            let Ok(k_std) = k.to_std_string() else { continue };
+            let v = obj
+                .get(k.clone(), ctx)
+                .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
+            if let Ok(v_str) = v.to_string(ctx) {
+                if let Ok(v_std) = v_str.to_std_string() {
+                    map.insert(k_std, v_std);
+                }
             }
         }
     }
