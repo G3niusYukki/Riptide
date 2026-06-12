@@ -110,12 +110,12 @@ impl ScriptEngine {
                 let mut output = HashMap::new();
                 for key in &keys {
                     if let boa_engine::property::PropertyKey::String(js_str) = key {
-                        let key_str = js_str.to_std_string_lossy();
+                        let key_str = js_str.to_std_string().unwrap_or_default();
                         let val = obj
                             .get(key.clone(), &mut ctx)
                             .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
                         if let Ok(val_jsstr) = val.to_string(&mut ctx) {
-                            output.insert(key_str, val_jsstr.to_std_string_lossy());
+                            output.insert(key_str, val_jsstr.to_std_string().unwrap_or_default());
                         }
                     }
                 }
@@ -166,7 +166,7 @@ impl ScriptEngine {
             .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
 
         match result.to_string(&mut ctx) {
-            Ok(js_str) => Ok(js_str.to_std_string_lossy()),
+            Ok(js_str) => Ok(js_str.to_std_string().unwrap_or_default()),
             Err(_) => Ok(response_body.to_string()),
         }
     }
@@ -209,7 +209,7 @@ impl ScriptEngine {
 
         result
             .to_string(&mut ctx)
-            .map(|s| s.to_std_string_lossy())
+            .map(|s| s.to_std_string().unwrap_or_default())
             .map_err(|e| ScriptError::RuntimeError(e.to_string()))
     }
 

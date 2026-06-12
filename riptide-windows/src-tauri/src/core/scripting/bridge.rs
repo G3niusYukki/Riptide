@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use boa_engine::{
-    js_string, Context, FunctionObjectBuilder, JsValue, NativeFunction, Source,
+    js_string, object::FunctionObjectBuilder, Context, JsValue, NativeFunction, Source,
 };
 use serde::{Deserialize, Serialize};
 
@@ -212,7 +212,7 @@ impl SurgeScriptBridge {
                         let body = resp_obj
                             .get(js_string!("body"), ctx)
                             .ok()
-                            .and_then(|v| v.as_string().map(|s| s.to_std_string()));
+                            .and_then(|v| v.as_string().and_then(|s| s.to_std_string().ok()));
                         ScriptAction::Modified(ScriptResponse {
                             status,
                             headers,
@@ -266,7 +266,7 @@ impl SurgeScriptBridge {
                     let body = obj
                         .get(js_string!("body"), ctx)
                         .ok()
-                        .and_then(|v| v.as_string().map(|s| s.to_std_string()))
+                        .and_then(|v| v.as_string().and_then(|s| s.to_std_string().ok()))
                         .or_else(|| original.body.clone());
                     ScriptAction::Modified(ScriptResponse {
                         status,
@@ -302,7 +302,7 @@ impl SurgeScriptBridge {
                     let key = args
                         .first()
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_std_string())
+                        .and_then(|s| s.to_std_string().ok())
                         .unwrap_or_default();
                     let value = store
                         .lock()
@@ -321,12 +321,12 @@ impl SurgeScriptBridge {
                 let key = args
                     .first()
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_std_string())
+                    .and_then(|s| s.to_std_string().ok())
                     .unwrap_or_default();
                 let value = args
                     .get(1)
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_std_string())
+                    .and_then(|s| s.to_std_string().ok())
                     .unwrap_or_default();
                 if let Ok(mut m) = store.lock() {
                     m.insert(key, value);
@@ -347,7 +347,7 @@ impl SurgeScriptBridge {
 
         ctx.register_global_property(
             js_string!("$persistentStore"),
-            store_JsValue::from(obj),
+            JsValue::from(store_obj),
             boa_engine::property::Attribute::all(),
         );
         Ok(())
@@ -368,7 +368,7 @@ impl SurgeScriptBridge {
 
         ctx.register_global_property(
             js_string!("$notification"),
-            notif_JsValue::from(obj),
+            JsValue::from(notif_obj),
             boa_engine::property::Attribute::all(),
         );
         Ok(())
@@ -397,12 +397,12 @@ fn js_object_to_hashmap(
     let mut map = HashMap::new();
     for key in &keys {
         if let boa_engine::property::PropertyKey::String(js_str) = key {
-            let k = js_str.to_std_string();
+            let k = js_str.to_std_string().unwrap_or_default();
             let v = obj
                 .get(key.clone(), ctx)
                 .map_err(|e| ScriptError::RuntimeError(e.to_string()))?;
             if let Ok(val_jsstr) = v.to_string(ctx) {
-                map.insert(k, val_jsstr.to_std_string());
+                map.insert(k, val_jsstr.to_std_string().unwrap_or_default());
             }
         }
     }
