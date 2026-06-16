@@ -37,6 +37,9 @@ public struct ProxyNode: Equatable, Sendable {
     public let sni: String?
     public let alpn: [String]?
     public let skipCertVerify: Bool?
+    /// Whether TLS is enabled (Clash `tls:` flag). Authoritative signal for
+    /// protocols where TLS is optional (vmess/vless). nil = unspecified.
+    public let tls: Bool?
     public let network: String?
     public let wsPath: String?
     public let wsHost: String?
@@ -47,6 +50,9 @@ public struct ProxyNode: Equatable, Sendable {
     public let realityShortId: String?
     public let realityPublicKey: String?
     public let realityFingerprint: String?
+    /// TUIC QUIC congestion control: "cubic" | "new_reno" | "bbr". Must match the
+    /// server's setting. nil = let sing-box default (cubic).
+    public let congestionControl: String?
     public let wireguardPrivateKey: String?
     public let wireguardPublicKey: String?
     public let wireguardPreSharedKey: String?
@@ -68,6 +74,7 @@ public struct ProxyNode: Equatable, Sendable {
         sni: String? = nil,
         alpn: [String]? = nil,
         skipCertVerify: Bool? = nil,
+        tls: Bool? = nil,
         network: String? = nil,
         wsPath: String? = nil,
         wsHost: String? = nil,
@@ -78,6 +85,7 @@ public struct ProxyNode: Equatable, Sendable {
         realityShortId: String? = nil,
         realityPublicKey: String? = nil,
         realityFingerprint: String? = nil,
+        congestionControl: String? = nil,
         wireguardPrivateKey: String? = nil,
         wireguardPublicKey: String? = nil,
         wireguardPreSharedKey: String? = nil,
@@ -98,6 +106,7 @@ public struct ProxyNode: Equatable, Sendable {
         self.sni = sni
         self.alpn = alpn
         self.skipCertVerify = skipCertVerify
+        self.tls = tls
         self.network = network
         self.wsPath = wsPath
         self.wsHost = wsHost
@@ -108,6 +117,7 @@ public struct ProxyNode: Equatable, Sendable {
         self.realityShortId = realityShortId
         self.realityPublicKey = realityPublicKey
         self.realityFingerprint = realityFingerprint
+        self.congestionControl = congestionControl
         self.wireguardPrivateKey = wireguardPrivateKey
         self.wireguardPublicKey = wireguardPublicKey
         self.wireguardPreSharedKey = wireguardPreSharedKey

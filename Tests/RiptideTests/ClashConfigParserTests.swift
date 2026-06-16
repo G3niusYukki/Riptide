@@ -439,4 +439,72 @@ struct ClashConfigParserTests {
         #expect(config.rules[0] == .ruleSet(name: "my-provider", policy: .direct))
         #expect(config.rules[1] == .final(policy: .direct))
     }
+
+    @Test("parses vless reality, vmess ws-tls, and tuic congestion fields")
+    func parsesRealityWsTlsTuicFields() throws {
+        let yaml = """
+        mode: rule
+        proxies:
+          - name: "vless-reality"
+            type: vless
+            server: "1.2.3.4"
+            port: 443
+            uuid: "bf000d23-0752-40b4-affe-68f7707a9661"
+            flow: xtls-rprx-vision
+            tls: true
+            servername: www.microsoft.com
+            client-fingerprint: chrome
+            reality-opts:
+              public-key: jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0
+              short-id: "0123456789abcdef"
+          - name: "vmess-ws"
+            type: vmess
+            server: "5.6.7.8"
+            port: 443
+            uuid: "bf000d23-0752-40b4-affe-68f7707a9661"
+            alterId: 0
+            cipher: auto
+            tls: true
+            servername: cdn.example.com
+            network: ws
+            ws-opts:
+              path: /vm
+              headers:
+                Host: cdn.example.com
+          - name: "tuic-1"
+            type: tuic
+            server: "9.9.9.9"
+            port: 443
+            uuid: "bf000d23-0752-40b4-affe-68f7707a9661"
+            password: pw
+            congestion-controller: bbr
+            alpn:
+              - h3
+        rules:
+          - "MATCH,vless-reality"
+        """
+
+        let (config, _) = try ClashConfigParser.parse(yaml: yaml)
+
+        let vless = try #require(config.proxies.first { $0.name == "vless-reality" })
+        #expect(vless.kind == .vless)
+        #expect(vless.flow == "xtls-rprx-vision")
+        #expect(vless.tls == true)
+        #expect(vless.realityServerName == "www.microsoft.com")
+        #expect(vless.realityPublicKey == "jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0")
+        #expect(vless.realityShortId == "0123456789abcdef")
+        #expect(vless.realityFingerprint == "chrome")
+        #expect(vless.sni == "www.microsoft.com")  // sni falls back to servername
+
+        let vmess = try #require(config.proxies.first { $0.name == "vmess-ws" })
+        #expect(vmess.tls == true)
+        #expect(vmess.network == "ws")
+        #expect(vmess.wsPath == "/vm")
+        #expect(vmess.wsHost == "cdn.example.com")
+        #expect(vmess.sni == "cdn.example.com")
+
+        let tuic = try #require(config.proxies.first { $0.name == "tuic-1" })
+        #expect(tuic.congestionControl == "bbr")
+        #expect(tuic.alpn == ["h3"])
+    }
 }

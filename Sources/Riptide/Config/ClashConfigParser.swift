@@ -184,13 +184,18 @@ public enum ClashConfigParser {
             port: port,
             uuid: uuid,
             flow: proxy.flow,
-            sni: proxy.sni,
+            sni: proxy.sni ?? proxy.serverName,
             alpn: proxy.alpn,
             skipCertVerify: proxy.skipCertVerify,
+            tls: proxy.tls,
             network: proxy.network,
             wsPath: proxy.wsOpts?.path,
             wsHost: proxy.wsOpts?.headers?["Host"],
-            grpcServiceName: proxy.grpcOpts?.grpcServiceName
+            grpcServiceName: proxy.grpcOpts?.grpcServiceName,
+            realityServerName: proxy.serverName,
+            realityShortId: proxy.realityOpts?.shortId,
+            realityPublicKey: proxy.realityOpts?.publicKey,
+            realityFingerprint: proxy.clientFingerprint
         )
     }
 
@@ -204,10 +209,14 @@ public enum ClashConfigParser {
             server: proxy.server,
             port: port,
             password: password,
-            sni: proxy.sni,
+            sni: proxy.sni ?? proxy.serverName,
             alpn: proxy.alpn,
             skipCertVerify: proxy.skipCertVerify,
-            network: proxy.network
+            tls: proxy.tls,
+            network: proxy.network,
+            wsPath: proxy.wsOpts?.path,
+            wsHost: proxy.wsOpts?.headers?["Host"],
+            grpcServiceName: proxy.grpcOpts?.grpcServiceName
         )
     }
 
@@ -223,12 +232,14 @@ public enum ClashConfigParser {
             uuid: uuid,
             alterId: proxy.alterId,
             security: proxy.security,
-            sni: proxy.sni,
+            sni: proxy.sni ?? proxy.serverName,
             alpn: proxy.alpn,
             skipCertVerify: proxy.skipCertVerify,
+            tls: proxy.tls,
             network: proxy.network,
             wsPath: proxy.wsOpts?.path,
-            wsHost: proxy.wsOpts?.headers?["Host"]
+            wsHost: proxy.wsOpts?.headers?["Host"],
+            grpcServiceName: proxy.grpcOpts?.grpcServiceName
         )
     }
 
@@ -242,7 +253,8 @@ public enum ClashConfigParser {
             server: proxy.server,
             port: port,
             password: password,
-            sni: proxy.sni,
+            sni: proxy.sni ?? proxy.serverName,
+            alpn: proxy.alpn,
             skipCertVerify: proxy.skipCertVerify
         )
     }
@@ -261,9 +273,10 @@ public enum ClashConfigParser {
             port: port,
             password: password,
             uuid: uuid,
-            sni: proxy.sni,
+            sni: proxy.sni ?? proxy.serverName,
             alpn: proxy.alpn,
-            skipCertVerify: proxy.skipCertVerify
+            skipCertVerify: proxy.skipCertVerify,
+            congestionControl: proxy.congestionController
         )
     }
 
@@ -843,8 +856,14 @@ private struct ClashRawProxy: Decodable {
     let network: String?
     let tls: Bool?
     let sni: String?
+    /// Clash uses `servername` for the VLESS/VMess TLS SNI (and Reality handshake host).
+    let serverName: String?
     let alpn: [String]?
     let skipCertVerify: Bool?
+    let clientFingerprint: String?
+    let realityOpts: ClashRawRealityOpts?
+    /// TUIC congestion controller (e.g. "bbr").
+    let congestionController: String?
     let wsOpts: ClashRawWSOpts?
     let grpcOpts: ClashRawGRPCOpts?
     let chain: String?
@@ -859,7 +878,11 @@ private struct ClashRawProxy: Decodable {
     private enum CodingKeys: String, CodingKey {
         case name, type, server, port, cipher, password
         case uuid, alterId, security, flow, network, tls, sni, alpn
+        case serverName = "servername"
         case skipCertVerify = "skip-cert-verify"
+        case clientFingerprint = "client-fingerprint"
+        case realityOpts = "reality-opts"
+        case congestionController = "congestion-controller"
         case wsOpts = "ws-opts"
         case grpcOpts = "grpc-opts"
         case chain
@@ -870,6 +893,16 @@ private struct ClashRawProxy: Decodable {
         case reserved
         case mtu
         case wireguardIP = "ip"
+    }
+}
+
+private struct ClashRawRealityOpts: Decodable {
+    let publicKey: String?
+    let shortId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case publicKey = "public-key"
+        case shortId = "short-id"
     }
 }
 

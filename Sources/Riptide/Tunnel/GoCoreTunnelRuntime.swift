@@ -18,9 +18,24 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     }
 
     private var eventHandler: (@Sendable (RuntimeEvent) -> Void)?
-    
-    public init(helperConnection: HelperToolConnection = HelperToolConnection()) {
+
+    /// Local mixed-proxy port sing-box listens on; the macOS system proxy is
+    /// pointed here in system-proxy mode. Kept in sync with the value passed to
+    /// `SingBoxConfigGenerator`.
+    private let mixedPort: Int
+
+    /// Sets/clears the macOS system proxy in system-proxy mode via direct
+    /// `networksetup` (no privileged helper, no sudo). Injectable for testing.
+    private let systemProxyController: any SystemProxyControlling
+
+    public init(
+        helperConnection: HelperToolConnection = HelperToolConnection(),
+        systemProxyController: any SystemProxyControlling = NetworksetupSystemProxyController(),
+        mixedPort: Int = 6152
+    ) {
         self.helperConnection = helperConnection
+        self.systemProxyController = systemProxyController
+        self.mixedPort = mixedPort
     }
     
     public func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
@@ -39,7 +54,7 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
         do {
             configJSON = try SingBoxConfigGenerator.generate(
                 config: profile.config,
-                options: SingBoxConfigGenerator.GenerationOptions(mode: mode)
+                options: SingBoxConfigGenerator.GenerationOptions(mode: mode, mixedPort: mixedPort)
             )
         } catch {
             self.currentMode = nil
@@ -60,6 +75,31 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
             throw error
         }
 
+        // In system-proxy mode, point the macOS system proxy at sing-box's local
+        // mixed listener. sing-box does not set the OS proxy itself, so without
+        // this the engine runs but no traffic is routed through it. Needs no
+        // root/helper for an admin user (direct networksetup).
+        if mode == .systemProxy {
+            do {
+                try await systemProxyController.enable(httpPort: mixedPort, socksPort: mixedPort)
+            } catch {
+                // Non-fatal: the engine is up, but traffic won't route until the
+                // OS proxy is set. Surface a real error instead of failing quietly.
+                let snapshot = RuntimeErrorSnapshot(
+                    code: "E_SYSPROXY_SET_FAILED",
+                    message: "Failed to set system proxy: \(error.localizedDescription)"
+                )
+                self.latestRecoveryError = snapshot
+                self.eventHandler?(.error(snapshot))
+                Task { [weak writer = logbookWriter] in
+                    await writer?.logError(
+                        "Failed to set system proxy: \(error.localizedDescription)",
+                        category: .mihomoCore
+                    )
+                }
+            }
+        }
+
         self.isRunning = true
 
         self.eventHandler?(.stateChanged(.running))
@@ -70,6 +110,12 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     }
 
     public func stop() async throws {
+        // Clear the system proxy first so apps stop routing through a
+        // soon-to-be-dead listener.
+        if currentMode == .systemProxy {
+            try? await systemProxyController.disable()
+        }
+
         await GoCoreBridge.shared.stop()
         self.isRunning = false
         self.currentMode = nil

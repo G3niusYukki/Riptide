@@ -32,17 +32,25 @@ public enum SingBoxConfigGenerator {
         public let mixedPort: Int
         public let logLevel: String
         public let tunDeviceName: String
+        /// Whether the linked sing-box core was built with `-tags with_utls`.
+        /// The shipped `libgocore.a` is NOT, so uTLS/REALITY would make the core
+        /// reject the WHOLE config. When false, REALITY/uTLS fields are omitted
+        /// (reality nodes degrade to plain VLESS+TLS) so the rest of the config
+        /// still loads. Flip to true once the core is rebuilt with uTLS.
+        public let supportsUTLS: Bool
 
         public init(
             mode: RuntimeMode,
             mixedPort: Int = 6152,
             logLevel: String = "info",
-            tunDeviceName: String = "utun120"
+            tunDeviceName: String = "utun120",
+            supportsUTLS: Bool = false
         ) {
             self.mode = mode
             self.mixedPort = mixedPort
             self.logLevel = logLevel
             self.tunDeviceName = tunDeviceName
+            self.supportsUTLS = supportsUTLS
         }
     }
 
@@ -59,7 +67,7 @@ public enum SingBoxConfigGenerator {
                 "level": options.logLevel
             ],
             "inbounds": inbounds,
-            "outbounds": try outbounds(for: config.proxies),
+            "outbounds": try outbounds(for: config.proxies, supportsUTLS: options.supportsUTLS),
             "route": try route(for: config, options: options)
         ]
 
@@ -104,7 +112,7 @@ public enum SingBoxConfigGenerator {
         ]
     }
 
-    private static func outbounds(for proxies: [ProxyNode]) throws -> [[String: Any]] {
+    private static func outbounds(for proxies: [ProxyNode], supportsUTLS: Bool) throws -> [[String: Any]] {
         var result: [[String: Any]] = [
             [
                 "type": "direct",
@@ -117,12 +125,12 @@ public enum SingBoxConfigGenerator {
         ]
 
         for proxy in proxies {
-            result.append(try outbound(for: proxy))
+            result.append(try outbound(for: proxy, supportsUTLS: supportsUTLS))
         }
         return result
     }
 
-    private static func outbound(for proxy: ProxyNode) throws -> [String: Any] {
+    private static func outbound(for proxy: ProxyNode, supportsUTLS: Bool) throws -> [String: Any] {
         switch proxy.kind {
         case .wireguard:
             return try wireGuardOutbound(for: proxy)
@@ -133,9 +141,16 @@ public enum SingBoxConfigGenerator {
         case .http:
             return httpOutbound(for: proxy)
         case .trojan:
-            return try trojanOutbound(for: proxy)
-        case .vmess, .vless, .hysteria2, .relay, .snell, .tuic,
-             .reality, .anytls, .ssh:
+            return try trojanOutbound(for: proxy, supportsUTLS: supportsUTLS)
+        case .vmess:
+            return try vmessOutbound(for: proxy, supportsUTLS: supportsUTLS)
+        case .vless:
+            return try vlessOutbound(for: proxy, supportsUTLS: supportsUTLS)
+        case .hysteria2:
+            return hysteria2Outbound(for: proxy, supportsUTLS: supportsUTLS)
+        case .tuic:
+            return try tuicOutbound(for: proxy, supportsUTLS: supportsUTLS)
+        case .relay, .snell, .reality, .anytls, .ssh:
             throw SingBoxConfigGeneratorError.unsupportedProxyKind(proxyName: proxy.name, kind: proxy.kind)
         }
     }
@@ -177,20 +192,201 @@ public enum SingBoxConfigGenerator {
         return outbound
     }
 
-    private static func trojanOutbound(for proxy: ProxyNode) throws -> [String: Any] {
+    private static func trojanOutbound(for proxy: ProxyNode, supportsUTLS: Bool) throws -> [String: Any] {
         guard let password = proxy.password, !password.isEmpty else {
             throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "password")
         }
 
         var outbound = baseServerOutbound(proxy: proxy, type: "trojan")
         outbound["password"] = password
-        if let sni = proxy.sni, !sni.isEmpty {
-            outbound["tls"] = [
-                "enabled": true,
-                "server_name": sni
-            ]
+        // Trojan always runs over TLS.
+        if let tls = tlsOptions(for: proxy, forceEnabled: true, supportsUTLS: supportsUTLS) {
+            outbound["tls"] = tls
+        }
+        if let transport = transportOptions(for: proxy) {
+            outbound["transport"] = transport
         }
         return outbound
+    }
+
+    private static func vmessOutbound(for proxy: ProxyNode, supportsUTLS: Bool) throws -> [String: Any] {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "uuid")
+        }
+        var outbound = baseServerOutbound(proxy: proxy, type: "vmess")
+        outbound["uuid"] = uuid
+        outbound["security"] = proxy.security ?? proxy.cipher ?? "auto"
+        outbound["alter_id"] = proxy.alterId ?? 0
+        // TLS only when the node opts in (vmess can run plaintext over tcp/ws).
+        if let tls = tlsOptions(for: proxy, forceEnabled: false, supportsUTLS: supportsUTLS) {
+            outbound["tls"] = tls
+        }
+        if let transport = transportOptions(for: proxy) {
+            outbound["transport"] = transport
+        }
+        return outbound
+    }
+
+    private static func vlessOutbound(for proxy: ProxyNode, supportsUTLS: Bool) throws -> [String: Any] {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "uuid")
+        }
+        var outbound = baseServerOutbound(proxy: proxy, type: "vless")
+        outbound["uuid"] = uuid
+
+        // v1.9.0 accepts only "" or "xtls-rprx-vision". Vision needs a raw TLS
+        // stream, so it is mutually exclusive with a v2ray transport.
+        let usesVision = proxy.flow == "xtls-rprx-vision"
+        if usesVision {
+            outbound["flow"] = "xtls-rprx-vision"
+        }
+
+        if let tls = tlsOptions(for: proxy, forceEnabled: false, supportsUTLS: supportsUTLS) {
+            outbound["tls"] = tls
+        }
+        if !usesVision, let transport = transportOptions(for: proxy) {
+            outbound["transport"] = transport
+        }
+        return outbound
+    }
+
+    private static func hysteria2Outbound(for proxy: ProxyNode, supportsUTLS: Bool) -> [String: Any] {
+        var outbound = baseServerOutbound(proxy: proxy, type: "hysteria2")
+        if let password = proxy.password, !password.isEmpty {
+            outbound["password"] = password
+        }
+        // Hysteria2 is QUIC/TLS — tls is mandatory; default ALPN to ["h3"].
+        outbound["tls"] = tlsOptions(for: proxy, forceEnabled: true, defaultALPN: ["h3"], supportsUTLS: supportsUTLS) ?? ["enabled": true]
+        return outbound
+    }
+
+    private static func tuicOutbound(for proxy: ProxyNode, supportsUTLS: Bool) throws -> [String: Any] {
+        guard let uuid = proxy.uuid, !uuid.isEmpty else {
+            throw SingBoxConfigGeneratorError.missingRequiredField(proxyName: proxy.name, field: "uuid")
+        }
+        var outbound = baseServerOutbound(proxy: proxy, type: "tuic")
+        outbound["uuid"] = uuid
+        if let password = proxy.password, !password.isEmpty {
+            outbound["password"] = password
+        }
+        if let cc = normalizedCongestionControl(proxy.congestionControl) {
+            outbound["congestion_control"] = cc
+        }
+        // TUIC is QUIC/TLS — tls is mandatory; default ALPN to ["h3"].
+        outbound["tls"] = tlsOptions(for: proxy, forceEnabled: true, defaultALPN: ["h3"], supportsUTLS: supportsUTLS) ?? ["enabled": true]
+        return outbound
+    }
+
+    // MARK: - Shared TLS / transport builders (sing-box v1.9.0 schema)
+
+    /// Builds the shared outbound `tls` object, or nil when TLS is not used.
+    /// Only emits fields that exist in sing-box v1.9.0 (no v1.10+ keys).
+    /// - Parameters:
+    ///   - forceEnabled: protocols where TLS is mandatory (trojan/hysteria2/tuic).
+    ///   - defaultALPN: fallback ALPN when the node specifies none (e.g. ["h3"]).
+    private static func tlsOptions(
+        for proxy: ProxyNode,
+        forceEnabled: Bool,
+        defaultALPN: [String]? = nil,
+        supportsUTLS: Bool
+    ) -> [String: Any]? {
+        let realityRequested = (proxy.realityPublicKey?.isEmpty == false)
+        let hasFlow = (proxy.flow?.isEmpty == false)
+        let enabled = forceEnabled || realityRequested || proxy.tls == true || hasFlow
+        guard enabled else { return nil }
+
+        var tls: [String: Any] = ["enabled": true]
+
+        // Prefer the REALITY/handshake host as SNI when present.
+        let serverName = (realityRequested ? proxy.realityServerName : nil) ?? proxy.sni
+        if let serverName, !serverName.isEmpty {
+            tls["server_name"] = serverName
+        }
+        // REALITY authenticates via its public key; never weaken it with insecure.
+        if proxy.skipCertVerify == true && !realityRequested {
+            tls["insecure"] = true
+        }
+        if let alpn = proxy.alpn, !alpn.isEmpty {
+            tls["alpn"] = alpn
+        } else if let defaultALPN, !defaultALPN.isEmpty {
+            tls["alpn"] = defaultALPN
+        }
+
+        // uTLS / REALITY require the core to be built with `-tags with_utls`.
+        // When it isn't, omit them so the whole config still loads (a REALITY
+        // node degrades to plain TLS — non-functional but non-fatal).
+        guard supportsUTLS else { return tls }
+
+        if realityRequested {
+            tls["utls"] = [
+                "enabled": true,
+                "fingerprint": normalizedFingerprint(proxy.realityFingerprint) ?? "chrome"
+            ]
+            var reality: [String: Any] = [
+                "enabled": true,
+                "public_key": proxy.realityPublicKey ?? ""
+            ]
+            reality["short_id"] = proxy.realityShortId ?? ""
+            tls["reality"] = reality
+        } else if let fingerprint = normalizedFingerprint(proxy.realityFingerprint) {
+            tls["utls"] = ["enabled": true, "fingerprint": fingerprint]
+        }
+
+        return tls
+    }
+
+    /// Builds the shared v2ray `transport` object for ws/grpc/http, or nil for
+    /// raw TCP. sing-box has no "tcp"/"mkcp" transport — those map to no object.
+    private static func transportOptions(for proxy: ProxyNode) -> [String: Any]? {
+        switch proxy.network?.lowercased() {
+        case "ws":
+            var transport: [String: Any] = ["type": "ws"]
+            if let path = proxy.wsPath, !path.isEmpty {
+                transport["path"] = path
+            }
+            if let host = proxy.wsHost, !host.isEmpty {
+                transport["headers"] = ["Host": host]
+            }
+            return transport
+        case "grpc":
+            var transport: [String: Any] = ["type": "grpc"]
+            if let service = proxy.grpcServiceName, !service.isEmpty {
+                transport["service_name"] = service
+            }
+            return transport
+        case "http", "h2":
+            var transport: [String: Any] = ["type": "http"]
+            if let path = proxy.wsPath, !path.isEmpty {
+                transport["path"] = path
+            }
+            if let host = proxy.wsHost, !host.isEmpty {
+                transport["host"] = [host]
+            }
+            return transport
+        default:
+            return nil
+        }
+    }
+
+    /// uTLS fingerprints recognized by sing-box v1.9.0.
+    private static let validFingerprints: Set<String> = [
+        "chrome", "firefox", "edge", "safari", "360", "qq",
+        "ios", "android", "random", "randomized"
+    ]
+
+    private static func normalizedFingerprint(_ fingerprint: String?) -> String? {
+        guard let fingerprint, !fingerprint.isEmpty else { return nil }
+        return validFingerprints.contains(fingerprint) ? fingerprint : "chrome"
+    }
+
+    private static func normalizedCongestionControl(_ value: String?) -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        switch value.lowercased() {
+        case "bbr": return "bbr"
+        case "new_reno", "newreno", "reno": return "new_reno"
+        case "cubic": return "cubic"
+        default: return nil
+        }
     }
 
     private static func wireGuardOutbound(for proxy: ProxyNode) throws -> [String: Any] {

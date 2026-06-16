@@ -319,11 +319,26 @@ public final class AppViewModel: @unchecked Sendable {
             await self.subscriptionManager.setLogbookWriter(writer)
             await self.overrideStore.setLogbookWriter(writer)
             await self.mihomoManager.helperConnection.setLogbookWriter(writer)
+            // Clear a system proxy left pointing at our local port by a prior
+            // crashed/force-quit session, so the user isn't stranded without internet.
+            await cleanupStaleSystemProxy()
             await loadProfilesFromStore()
 
             await loadSubscriptionsFromBackend()
             startSubscriptionScheduler()
             await checkMihomoOnLaunch()
+        }
+    }
+
+    // MARK: - Stale System Proxy Cleanup
+
+    /// At launch the engine is never running, so if the macOS system proxy still
+    /// points at our local mixed port (6152), it is a leftover from a session that
+    /// crashed or was force-quit without clearing it. Reset it so traffic flows.
+    private func cleanupStaleSystemProxy() async {
+        let controller = NetworksetupSystemProxyController()
+        if await controller.activeHTTPProxyPort() == 6152 {
+            try? await controller.disable()
         }
     }
 
