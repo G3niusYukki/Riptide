@@ -92,9 +92,11 @@ struct GoCoreTunnelRuntimeTests {
             let didReceiveRunningEvent = await latch.wait(timeoutNanoseconds: 2_000_000_000)
             #expect(didReceiveRunningEvent)
 
+            // The rebuilt core reports real counters (0 until the clash-api traffic
+            // manager is wired) rather than the previous hard-coded mock values.
             let traffic = try await runtime.getTraffic()
-            #expect(traffic.up == 102456)
-            #expect(traffic.down == 509210)
+            #expect(traffic.up == 0)
+            #expect(traffic.down == 0)
 
             let status = try await runtime.getProxyStatus()
             #expect(status.count == 2)
@@ -147,6 +149,50 @@ struct GoCoreTunnelRuntimeTests {
             try await runtime.setup()
             // Throws if sing-box rejects any generated outbound's schema.
             try await runtime.start(mode: .systemProxy, profile: profile)
+            #expect(await runtime.isRunning == true)
+            try await runtime.stop()
+        }
+    }
+
+    @Test("a vless REALITY share-URI subscription parses into reality fields")
+    func parsesVlessRealitySubscription() async throws {
+        let uri = "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443"
+            + "?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome"
+            + "&pbk=jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0&sid=0123456789abcdef&type=tcp#Reality"
+        let base64 = Data(uri.utf8).base64EncodedString()
+
+        let nodes = try await SubscriptionManager().parseBase64URIList(base64)
+        let node = try #require(nodes.first)
+        #expect(node.kind == .vless)
+        #expect(node.uuid == "11111111-2222-3333-4444-555555555555")
+        #expect(node.tls == true)
+        #expect(node.realityPublicKey == "jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0")
+        #expect(node.realityShortId == "0123456789abcdef")
+        #expect(node.realityServerName == "www.microsoft.com")
+        #expect(node.realityFingerprint == "chrome")
+        #expect(node.network == "tcp")
+    }
+
+    // Manual end-to-end: parse a REAL subscription file and feed the generated
+    // config to the real core. Gated behind an env var (the file holds private
+    // credentials). Run with:
+    //   RIPTIDE_TEST_SUB_FILE=/path/to/sub swift test --filter realCoreAcceptsRealSubscription
+    @Test("real core accepts a real subscription (manual)")
+    func realCoreAcceptsRealSubscription() async throws {
+        guard isGitHubActionsRuntime == false,
+              let subFile = ProcessInfo.processInfo.environment["RIPTIDE_TEST_SUB_FILE"],
+              let content = try? String(contentsOfFile: subFile, encoding: .utf8) else {
+            return
+        }
+        let nodes = try await SubscriptionManager().parseBase64URIList(content)
+        #expect(!nodes.isEmpty)
+
+        let config = RiptideConfig(mode: .rule, proxies: nodes, rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "RealSub", config: config)
+        try await withExclusiveGoCore {
+            let runtime = GoCoreTunnelRuntime(systemProxyController: MockSystemProxyController())
+            try await runtime.setup()
+            try await runtime.start(mode: .systemProxy, profile: profile)  // throws if core rejects
             #expect(await runtime.isRunning == true)
             try await runtime.stop()
         }

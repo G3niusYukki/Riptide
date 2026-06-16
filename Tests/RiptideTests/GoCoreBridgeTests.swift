@@ -73,10 +73,11 @@ struct GoCoreBridgeTests {
             let didReceiveRunningEvent = await latch.wait(timeoutNanoseconds: 2_000_000_000)
             #expect(didReceiveRunningEvent)
 
-            // Verify traffic getters
+            // The rebuilt core reports real counters (0 until the clash-api traffic
+            // manager is wired) rather than the previous hard-coded mock values.
             let traffic = await bridge.getTraffic()
-            #expect(traffic.up == 102456)
-            #expect(traffic.down == 509210)
+            #expect(traffic.up == 0)
+            #expect(traffic.down == 0)
 
             // Stop bridge
             await bridge.stop()

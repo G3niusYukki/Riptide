@@ -21,7 +21,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 /* Start of preamble from import "C" comments.  */
 
 
-#line 3 "main.go"
+#line 14 "main.go"
 
 #include <stdlib.h>
 typedef void (*EventCallback)(const char* eventType, const char* eventData);

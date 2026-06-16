@@ -298,7 +298,7 @@ public actor SubscriptionManager {
 
     // MARK: - Private Methods
 
-    private func parseBase64URIList(_ text: String) throws -> [ProxyNode] {
+    func parseBase64URIList(_ text: String) throws -> [ProxyNode] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SubscriptionError.parseFailed("empty content") }
 
@@ -319,7 +319,20 @@ public actor SubscriptionManager {
                 nodes.append(ProxyNode(
                     name: parsed.name.isEmpty ? "node-\(index)" : parsed.name,
                     kind: parsed.kind, server: parsed.server, port: parsed.port,
-                    cipher: parsed.cipher, password: parsed.password
+                    cipher: parsed.cipher, password: parsed.password,
+                    uuid: parsed.uuid,
+                    flow: parsed.flow,
+                    sni: parsed.sni,
+                    alpn: parsed.alpn,
+                    tls: parsed.tls,
+                    network: parsed.network,
+                    wsPath: parsed.wsPath,
+                    wsHost: parsed.wsHost,
+                    grpcServiceName: parsed.grpcServiceName,
+                    realityServerName: parsed.realityServerName,
+                    realityShortId: parsed.realityShortId,
+                    realityPublicKey: parsed.realityPublicKey,
+                    realityFingerprint: parsed.realityFingerprint
                 ))
                 index += 1
             }
@@ -413,14 +426,58 @@ public actor SubscriptionManager {
     private func parseVLESS(_ body: String, fragment: String) -> ParsedProxy? {
         guard let atIdx = body.firstIndex(of: "@") else { return nil }
         let uuid = String(body[..<atIdx])
-        let serverAndPort = String(body[body.index(after: atIdx)...])
+        let afterAt = String(body[body.index(after: atIdx)...])
 
-        guard let colonIdx = serverAndPort.lastIndex(of: ":") else { return nil }
-        let host = String(serverAndPort[..<colonIdx])
-        let portStr = String(serverAndPort[serverAndPort.index(after: colonIdx)...])
-        let port = Int(portStr.components(separatedBy: CharacterSet(charactersIn: "?/")).first ?? "") ?? 443
+        // Separate `host:port` from the `?query`.
+        let hostPort: String
+        let query: [String: String]
+        if let qIdx = afterAt.firstIndex(of: "?") {
+            hostPort = String(afterAt[..<qIdx])
+            query = Self.parseQueryParams(String(afterAt[afterAt.index(after: qIdx)...]))
+        } else {
+            hostPort = afterAt
+            query = [:]
+        }
+        guard let colonIdx = hostPort.lastIndex(of: ":") else { return nil }
+        let host = String(hostPort[..<colonIdx])
+        let port = Int(hostPort[hostPort.index(after: colonIdx)...]) ?? 443
 
-        return ParsedProxy(name: fragment, kind: .vless, server: host, port: port, cipher: nil, password: uuid)
+        let security = query["security"]?.lowercased()
+        let isReality = (security == "reality")
+        let isTLS = isReality || security == "tls" || security == "xtls"
+        let sni = query["sni"] ?? query["peer"]
+
+        return ParsedProxy(
+            name: fragment, kind: .vless, server: host, port: port,
+            cipher: nil, password: uuid,
+            uuid: uuid,
+            flow: query["flow"].flatMap { $0.isEmpty ? nil : $0 },
+            sni: sni,
+            alpn: query["alpn"].map { $0.components(separatedBy: ",") },
+            tls: isTLS ? true : nil,
+            network: query["type"],
+            wsPath: query["path"],
+            wsHost: query["host"],
+            grpcServiceName: query["serviceName"],
+            realityPublicKey: isReality ? query["pbk"] : nil,
+            realityShortId: isReality ? query["sid"] : nil,
+            realityServerName: isReality ? sni : nil,
+            realityFingerprint: query["fp"]
+        )
+    }
+
+    /// Parses a URL query string (`a=b&c=d`) into a map, percent-decoding values.
+    private static func parseQueryParams(_ query: String) -> [String: String] {
+        var result: [String: String] = [:]
+        for pair in query.components(separatedBy: "&") {
+            guard let eq = pair.firstIndex(of: "=") else { continue }
+            let key = String(pair[..<eq])
+            let rawValue = String(pair[pair.index(after: eq)...])
+            if !key.isEmpty {
+                result[key] = rawValue.removingPercentEncoding ?? rawValue
+            }
+        }
+        return result
     }
 
     private func parseTrojan(_ body: String, fragment: String) -> ParsedProxy? {
@@ -443,6 +500,19 @@ public actor SubscriptionManager {
         let port: Int
         let cipher: String?
         let password: String?
+        var uuid: String?
+        var flow: String?
+        var sni: String?
+        var alpn: [String]?
+        var tls: Bool?
+        var network: String?
+        var wsPath: String?
+        var wsHost: String?
+        var grpcServiceName: String?
+        var realityPublicKey: String?
+        var realityShortId: String?
+        var realityServerName: String?
+        var realityFingerprint: String?
     }
 
     // MARK: - Persistence

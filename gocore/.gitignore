@@ -1,0 +1,3 @@
+# Build artifacts (the committed binary lives in the xcframework)
+libgocore*.a
+libgocore*.h

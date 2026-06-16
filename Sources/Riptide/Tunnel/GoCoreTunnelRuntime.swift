@@ -54,7 +54,9 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
         do {
             configJSON = try SingBoxConfigGenerator.generate(
                 config: profile.config,
-                options: SingBoxConfigGenerator.GenerationOptions(mode: mode, mixedPort: mixedPort)
+                // The bundled libgocore.a is rebuilt with `-tags with_utls`, so
+                // REALITY/uTLS outbounds are supported (see Scripts/build-gocore.sh).
+                options: SingBoxConfigGenerator.GenerationOptions(mode: mode, mixedPort: mixedPort, supportsUTLS: true)
             )
         } catch {
             self.currentMode = nil
