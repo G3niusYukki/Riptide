@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.6.0] — 2026-06-16
+
+> **macOS — a proxy core that actually proxies.** Fixes system-proxy mode (it previously started the core but never pointed the OS at it), adds REALITY/uTLS support by rebuilding the in-process sing-box core, and broadens protocol coverage. macOS-only release; Windows/Linux are unchanged.
+
+### Added
+
+- **REALITY / uTLS support (macOS).** Rebuilt the in-process sing-box core (`libgocore.a`) with `-tags with_utls`, so `vless` + REALITY nodes negotiate uTLS and connect instead of being rejected/degraded to plain TLS. The previously-opaque Cgo wrapper is now checked in at `gocore/` with a reproducible universal-binary build script (`Scripts/build-gocore.sh`); `GenerationOptions.supportsUTLS` is enabled on the GoCore path. Verified end-to-end against a live `vless`+REALITY subscription.
+- **Broader sing-box protocol coverage (macOS).** `SingBoxConfigGenerator` now emits correct sing-box v1.9 outbounds for `vmess` (ws/grpc transports), `vless` (REALITY, `flow`, ws/grpc), `hysteria2`, and `tuic` (with `congestion-control`). Clash YAML parsing and base64 share-URI subscriptions gained REALITY fields (`pbk`/`sid`/`fp`/`sni`/`flow`), `tls`, and `congestion-control`.
+
+### Fixed
+
+- **System-proxy mode now sets the OS proxy (macOS).** `GoCoreTunnelRuntime` points the macOS system proxy at sing-box's mixed listener (`127.0.0.1:6152`) via `networksetup` on start — no root/helper/sudo needed for an admin user — and clears it on stop. Previously the core started but the OS proxy was never configured, so traffic was not actually routed through it.
+- **Stale system-proxy cleanup on launch (macOS).** A leftover `127.0.0.1:6152` system proxy from a prior run is cleared on startup when the app isn't running.
+- **Honest traffic counters.** Removed the hard-coded mock traffic values; `GoCoreGetTraffic` now reports real counters (0 until the clash-api traffic manager is wired).
+- **Test robustness.** `AppGroupStateStore` falls back to Application Support when the app-group container exists but rejects writes (unentitled test/CLI runs), fixing two environment-dependent test failures and hardening state persistence in production.
+
 ## [2.5.0] — 2026-06-12
 
 > **macOS UI Enhancement** — major UX pass closing the feature gap with ClashX Pro / Surge / Stash. Adds 14 new view files, modifies 15 existing files; ~1,900 net lines.
