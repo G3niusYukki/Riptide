@@ -316,6 +316,7 @@ public final class AppViewModel: @unchecked Sendable {
             await loadProfilesFromStore()
 
             await loadSubscriptionsFromBackend()
+            await ensureSubscriptionProfiles()
             startSubscriptionScheduler()
             await checkMihomoOnLaunch()
         }
@@ -835,6 +836,25 @@ public final class AppViewModel: @unchecked Sendable {
     public func refreshAllSubscriptions() async {
         for sub in await subscriptionManager.allSubscriptions() {
             await updateSubscription(id: sub.id)
+        }
+    }
+
+    /// Subscription-backed profiles are held in memory only (not written to
+    /// ProfileStore), so after a relaunch they are gone until refreshed —
+    /// previously the user had to click 更新 once per session to get a usable
+    /// profile. On launch, recreate any subscription whose profile is missing by
+    /// refreshing it (updateSubscription creates the profile when none exists).
+    private func ensureSubscriptionProfiles() async {
+        for sub in await subscriptionManager.allSubscriptions() {
+            let hasProfile = await MainActor.run {
+                profiles.contains { profile in
+                    if case .subscription(let sid, _) = profile.source { return sid == sub.id }
+                    return false
+                }
+            }
+            if !hasProfile {
+                await updateSubscription(id: sub.id)
+            }
         }
     }
 
