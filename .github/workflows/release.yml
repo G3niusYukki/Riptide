@@ -74,9 +74,17 @@ jobs:
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
         run: |
-          mkdir -p Riptide.app/Contents/MacOS
+          mkdir -p Riptide.app/Contents/MacOS Riptide.app/Contents/Resources
           cp .build/apple/Products/Release/RiptideApp Riptide.app/Contents/MacOS/Riptide
-          
+
+          # Bundle the standalone sing-box core used for TUN mode (launched as
+          # root via a launchd daemon). Committed in Binaries/; build if absent.
+          if [ ! -f Binaries/riptide-singbox ]; then
+            ./Scripts/build-singbox-bin.sh
+          fi
+          cp Binaries/riptide-singbox Riptide.app/Contents/Resources/riptide-singbox
+          chmod +x Riptide.app/Contents/Resources/riptide-singbox
+
           # Create Info.plist if not exists
           if [ ! -f "Riptide.app/Contents/Info.plist" ]; then
             cat > Riptide.app/Contents/Info.plist << 'EOF'

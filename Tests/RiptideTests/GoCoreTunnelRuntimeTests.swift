@@ -197,4 +197,60 @@ struct GoCoreTunnelRuntimeTests {
             try await runtime.stop()
         }
     }
+
+    // TUN routes through the privileged daemon, never the in-process core. Inject
+    // a pre-installed daemon over temp dirs so no elevation / real core is needed
+    // (this runs on CI). Verifies config+flag are written, the system proxy is
+    // untouched, and stop() drops the flag.
+    @Test("TUN mode drives the launchd daemon (config + flag), not the in-process core or system proxy")
+    func tunModeUsesDaemon() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("riptide-tun-rt-\(UUID().uuidString)", isDirectory: true)
+        let support = root.appendingPathComponent("Support", isDirectory: true)
+        let launchDaemons = root.appendingPathComponent("LaunchDaemons", isDirectory: true)
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: launchDaemons, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let binary = support.appendingPathComponent("riptide-singbox")
+        FileManager.default.createFile(atPath: binary.path, contents: Data())
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        FileManager.default.createFile(
+            atPath: launchDaemons.appendingPathComponent("\(TunDaemonController.daemonLabel).plist").path,
+            contents: Data())
+
+        let daemon = TunDaemonController(
+            supportDir: support, launchDaemonsDir: launchDaemons, uid: 501, privilegedRunner: { _ in })
+        let proxyController = MockSystemProxyController()
+        let runtime = GoCoreTunnelRuntime(
+            systemProxyController: proxyController, tunDaemon: daemon, tunBinaryLocator: { binary })
+
+        let node = ProxyNode(name: "ss", kind: .shadowsocks, server: "1.2.3.4", port: 8388,
+                             cipher: "aes-128-gcm", password: "pw")
+        let config = RiptideConfig(mode: .rule, proxies: [node], rules: [.final(policy: .direct)])
+        let profile = TunnelProfile(name: "TunProfile", config: config)
+
+        try await runtime.setup()
+        try await runtime.start(mode: .tun, profile: profile)
+
+        #expect(await runtime.isRunning == true)
+        #expect(await runtime.currentMode == .tun)
+        // System proxy must NOT be touched in TUN mode.
+        #expect(proxyController.currentState() == .disabled)
+
+        let tunDir = support.appendingPathComponent("tun", isDirectory: true)
+        let configPath = tunDir.appendingPathComponent("config.json")
+        let flagPath = tunDir.appendingPathComponent("enabled")
+        #expect(FileManager.default.fileExists(atPath: configPath.path))
+        #expect(FileManager.default.fileExists(atPath: flagPath.path))
+        let written = try String(contentsOf: configPath, encoding: .utf8)
+        #expect(written.contains("\"tun\""))
+        #expect(written.contains("auto_route"))
+
+        try await runtime.stop()
+        #expect(await runtime.isRunning == false)
+        #expect(await runtime.currentMode == nil)
+        // Stop drops the flag so launchd SIGTERMs the root core.
+        #expect(FileManager.default.fileExists(atPath: flagPath.path) == false)
+    }
 }

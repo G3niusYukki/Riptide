@@ -36,6 +36,16 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/"
 
+# Bundle the standalone sing-box core used for TUN mode. It is launched as root
+# via a launchd daemon (see TunDaemonController); the in-process core handles
+# system-proxy mode. Build it if the committed universal binary is missing.
+if [ ! -f "Binaries/riptide-singbox" ]; then
+    echo "riptide-singbox missing — building it..."
+    ./Scripts/build-singbox-bin.sh
+fi
+cp "Binaries/riptide-singbox" "$APP_DIR/Contents/Resources/riptide-singbox"
+chmod +x "$APP_DIR/Contents/Resources/riptide-singbox"
+
 # Compile asset catalog if actool is available
 ASSET_CATALOG="Sources/RiptideApp/Assets.xcassets"
 if [ -d "$ASSET_CATALOG" ] && command -v actool &>/dev/null; then

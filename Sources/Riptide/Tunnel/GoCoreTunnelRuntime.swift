@@ -28,14 +28,25 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     /// `networksetup` (no privileged helper, no sudo). Injectable for testing.
     private let systemProxyController: any SystemProxyControlling
 
+    /// Drives the privileged launchd daemon that runs sing-box as root for TUN
+    /// mode. Only used on the `.tun` path; system-proxy stays fully in-process.
+    private let tunDaemon: TunDaemonController
+
+    /// Locates the bundled standalone core for TUN. Injectable for testing.
+    private let tunBinaryLocator: @Sendable () -> URL?
+
     public init(
         helperConnection: HelperToolConnection = HelperToolConnection(),
         systemProxyController: any SystemProxyControlling = NetworksetupSystemProxyController(),
-        mixedPort: Int = 6152
+        mixedPort: Int = 6152,
+        tunDaemon: TunDaemonController = TunDaemonController(),
+        tunBinaryLocator: @escaping @Sendable () -> URL? = { SingBoxBinaryLocator.locate() }
     ) {
         self.helperConnection = helperConnection
         self.systemProxyController = systemProxyController
         self.mixedPort = mixedPort
+        self.tunDaemon = tunDaemon
+        self.tunBinaryLocator = tunBinaryLocator
     }
     
     public func setEventHandler(_ handler: (@Sendable (RuntimeEvent) -> Void)?) async {
@@ -62,6 +73,20 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
             self.currentMode = nil
             self.currentProfile = nil
             throw TunnelRuntimeError.startFailed("Failed to generate sing-box config: \(error)")
+        }
+
+        // TUN runs the core out-of-process as root via a launchd daemon (creating
+        // the utun + routes needs privileges the in-process GoCore can't get).
+        // System-proxy stays fully in-process; only `.tun` takes this branch.
+        if mode == .tun {
+            do {
+                try await startTunDaemon(configJSON: configJSON)
+            } catch {
+                self.currentMode = nil
+                self.currentProfile = nil
+                throw error
+            }
+            return
         }
 
         do {
@@ -112,9 +137,26 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
     }
 
     public func stop() async throws {
+        let mode = currentMode
+
+        // TUN: drop the KeepAlive flag so launchd SIGTERMs the root core, which
+        // makes sing-box revert the routes/utun it created. The in-process core
+        // was never started for TUN.
+        if mode == .tun {
+            try? await tunDaemon.disable()
+            self.isRunning = false
+            self.currentMode = nil
+            self.currentProfile = nil
+            self.eventHandler?(.stateChanged(.stopped))
+            Task { [weak writer = logbookWriter] in
+                await writer?.logInfo("TUN daemon stopped", category: .mihomoCore)
+            }
+            return
+        }
+
         // Clear the system proxy first so apps stop routing through a
         // soon-to-be-dead listener.
-        if currentMode == .systemProxy {
+        if mode == .systemProxy {
             try? await systemProxyController.disable()
         }
 
@@ -125,6 +167,30 @@ public actor GoCoreTunnelRuntime: MihomoRuntimeManaging {
         self.eventHandler?(.stateChanged(.stopped))
         Task { [weak writer = logbookWriter] in
             await writer?.logInfo("mihomo stopped", category: .mihomoCore)
+        }
+    }
+
+    /// Starts TUN via the privileged launchd daemon: locate the bundled core,
+    /// install the daemon on first use (one administrator-password prompt), then
+    /// enable it (prompt-free). System-proxy never touches this path.
+    private func startTunDaemon(configJSON: String) async throws {
+        guard let binary = tunBinaryLocator() else {
+            throw TunnelRuntimeError.startFailed(
+                "找不到 riptide-singbox 核心（TUN 模式需要它）。"
+                + "请确保它随 app 打包，或先运行 Scripts/build-singbox-bin.sh。"
+            )
+        }
+        if !(await tunDaemon.isInstalled()) {
+            // One-time install — shows the macOS administrator-password prompt.
+            try await tunDaemon.install(binarySource: binary)
+        }
+        try await tunDaemon.enable(configJSON: configJSON)
+
+        self.isRunning = true
+        self.eventHandler?(.stateChanged(.running))
+        self.eventHandler?(.modeChanged(.tun))
+        Task { [weak writer = logbookWriter] in
+            await writer?.logInfo("TUN daemon started", category: .mihomoCore)
         }
     }
     

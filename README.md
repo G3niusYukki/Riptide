@@ -39,7 +39,7 @@ This gives you:
 - **Clash-compatible** — drop in your existing `.yaml` configs and subscriptions
 - **Transparent boundaries** — Swift-native code and delegated sidecar/runtime paths are called out explicitly in the feature status table
 
-> **Mode recommendation:** TUN mode is the most complete interception path — it captures all traffic at the packet level via mihomo's gVisor stack and works regardless of whether the build is signed. System Proxy mode is lighter-weight (HTTP/HTTPS/SOCKS5 only) and is a good fit for everyday browsing.
+> **Mode recommendation (macOS):** **System Proxy** is the rock-solid daily driver — the proxy core (an in-process sing-box) runs entirely in user space and points the macOS system proxy at itself via `networksetup`, so it needs **no root, helper, or password**. **TUN mode** captures *all* traffic at the packet level (covers apps that ignore the HTTP proxy, UDP, games) but creating the `utun` + routes requires root: Riptide installs a small launchd daemon on first use (one administrator-password prompt), after which TUN toggles with no further prompts. See [macOS TUN mode](#macos-tun-mode) below.
 
 ---
 
@@ -178,8 +178,42 @@ Local Proxy / TUN packet
 
 | Mode | Status | Description |
 |------|--------|-------------|
-| **System Proxy** | Beta | mihomo sidecar (macOS) / direct REST (Windows) + system proxy configuration with auto-guard (guard requires signed helper on macOS) |
-| **TUN Mode** | Beta | Full traffic interception via mihomo gVisor TUN + auto-recovery. macOS uses sudo for first-time helper install; no Network Extension entitlement needed. Windows uses `riptide-tun-service.exe` registered as a SYSTEM service |
+| **System Proxy** | Stable | macOS: in-process **sing-box** core + `networksetup` (no root/helper/sudo). Windows: direct REST + system-proxy configuration with a 3s drift-guard |
+| **TUN Mode** | Beta | Full packet-level interception. macOS: a standalone sing-box core run as **root** via a one-time launchd-daemon install (one admin prompt; prompt-free thereafter) — no Network Extension entitlement needed. Windows: `riptide-tun-service.exe` registered as a SYSTEM service |
+
+#### macOS TUN mode
+
+macOS can't create a `utun` device or change the routing table from an unentitled
+GUI app, so Riptide runs the proxy core as **root** for TUN — the same approach
+Hiddify uses on desktop — and does so **without** an Apple Developer account /
+Network Extension entitlement:
+
+1. **The first time you enable TUN**, Riptide shows one macOS administrator-password
+   prompt and installs a launchd daemon (`com.riptide.tun`) that runs a bundled
+   standalone `riptide-singbox` core. It is the *same* sing-box v1.9 (+`with_utls`)
+   build the app links in-process for system-proxy mode, so the two cores accept
+   identical configs.
+2. The daemon's `KeepAlive.PathState` watches a flag file, so **enabling/disabling
+   TUN afterwards just creates/removes that flag** — launchd starts the root core
+   when the flag appears and sends it `SIGTERM` (clean route teardown) when it's
+   removed. **No further password prompts.**
+3. The generated config and flag live in `/Library/Application Support/Riptide/tun/`
+   (mode `0700`, owned by you), so your node credentials aren't readable by other
+   local users.
+
+**Trade-offs (vs a signed Network Extension):** one admin prompt at install time;
+a `LaunchDaemon` plist remains in `/Library/LaunchDaemons/`; switching nodes
+mid-session isn't supported yet in TUN mode (the elevated daemon exposes no
+clash-api). System-proxy mode has none of these caveats and needs no password.
+
+**Remove the TUN daemon** entirely, if you ever want to:
+
+```bash
+sudo launchctl bootout system/com.riptide.tun 2>/dev/null
+sudo rm -f /Library/LaunchDaemons/com.riptide.tun.plist
+sudo rm -rf "/Library/Application Support/Riptide/tun" \
+            "/Library/Application Support/Riptide/riptide-singbox"
+```
 
 ---
 
@@ -328,7 +362,7 @@ For an authoritative description of every directory's responsibility, see **[AGE
 - **Privileged helper** boundary: the XPC helper launches mihomo **only** from `/Library/Application Support/Riptide/mihomo/`, validates all config paths, and refuses to execute arbitrary commands.
 - **Windows service** boundary: `riptide-tun-service.exe` runs as `SYSTEM` and writes only to `%PROGRAMDATA%\Riptide\`. All user-scope state is rooted at `%APPDATA%\Riptide\`.
 - **Proxy credentials** are never written to logs. The diagnostic report (Diagnostics tab + `GET /diagnostics` REST) explicitly omits profile YAML contents, active connection list, and WebDAV credentials.
-- **TUN mode** uses mihomo's gVisor stack via sudo — it does not require a Network Extension entitlement.
+- **macOS TUN mode** runs a bundled standalone sing-box core as `root` via a launchd daemon (`com.riptide.tun`), gated by a `KeepAlive.PathState` flag file — it does **not** require a Network Extension entitlement. The daemon's working dir (`/Library/Application Support/Riptide/tun/`, mode `0700`) holds only the generated config + flag; system-proxy mode runs entirely in user space with no elevation.
 
 ### Sandbox status (honest)
 

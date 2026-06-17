@@ -42,6 +42,15 @@ Resources/mihomo
 Resources/mihomo-*
 *.gz
 
+# Binaries dir: track only the committed standalone TUN core; ignore anything
+# else dropped here (e.g. a downloaded upstream sing-box from download-singbox.sh).
+Binaries/*
+!Binaries/riptide-singbox
+# gocore standalone build temporaries (Scripts/build-singbox-bin.sh cleans these)
+gocore/riptide-singbox-arm64
+gocore/riptide-singbox-amd64
+gocore/riptide-singbox
+
 # Node / frontend
 node_modules/
 

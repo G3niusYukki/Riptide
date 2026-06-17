@@ -453,9 +453,11 @@ public final class AppViewModel: @unchecked Sendable {
 
         let runtimeMode: RuntimeMode = connectionMode == .tun ? .tun : .systemProxy
 
-        // TUN mode pre-check: mihomo binary must exist
-        if runtimeMode == .tun && !FileManager.default.isExecutableFile(atPath: MihomoPaths().executable) {
-            lastError = "TUN 模式需要 mihomo 二进制，请先下载"
+        // TUN mode pre-check: the standalone sing-box core must be locatable. It
+        // runs as root via a launchd daemon (see TunDaemonController); the first
+        // TUN start shows one administrator-password prompt to install that daemon.
+        if runtimeMode == .tun && SingBoxBinaryLocator.locate() == nil {
+            lastError = "TUN 模式需要 riptide-singbox 核心（打包缺失）。开发时先运行 Scripts/build-singbox-bin.sh。"
             return
         }
 
