@@ -7,12 +7,10 @@ public final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private weak var vm: AppViewModel?
-    private let speedView: MenuBarSpeedView
     private var speedObservationTask: Task<Void, Never>?
 
     override public init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        speedView = MenuBarSpeedView(frame: .zero)
 
         popover = NSPopover()
         popover.behavior = .transient
@@ -55,12 +53,15 @@ public final class StatusBarController: NSObject {
     private func updateDisplay(uploadBytesPerSec: Int64, downloadBytesPerSec: Int64, isRunning: Bool) {
         guard let button = statusItem.button else { return }
         if isRunning {
-            speedView.update(uploadBytesPerSec: uploadBytesPerSec, downloadBytesPerSec: downloadBytesPerSec)
-            // Remove any existing image before adding subview
-            button.image = nil
-            button.subviews = [speedView]
-            speedView.frame = button.bounds
-            speedView.autoresizingMask = [.width, .height]
+            // Running: keep the menu bar minimal — just a small green arrow, no
+            // speed text. Live speed still shows in the popover when clicked.
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            button.image = NSImage(systemSymbolName: "arrow.up.arrow.down", accessibilityDescription: "代理运行中")?
+                .withSymbolConfiguration(config)
+            button.image?.isTemplate = true
+            button.contentTintColor = .systemGreen
+            button.title = ""
+            button.subviews = []
         } else {
             // Show shield icon when stopped
             let symbolName = "network"
