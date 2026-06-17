@@ -82,11 +82,11 @@ public enum OverrideMerger {
         // Map + Map → deep merge
         if let baseMap = base as? [String: Any], let overrideMap = override as? [String: Any] {
             var out = baseMap
-            for (k, v) in overrideMap {
-                if let existing = baseMap[k] {
-                    out[k] = try mergeValue(key: "\(key).\(k)", base: existing, override: v, replaceMode: replaceMode)
+            for (mapKey, mapValue) in overrideMap {
+                if let existing = baseMap[mapKey] {
+                    out[mapKey] = try mergeValue(key: "\(key).\(mapKey)", base: existing, override: mapValue, replaceMode: replaceMode)
                 } else {
-                    out[k] = v
+                    out[mapKey] = mapValue
                 }
             }
             return out
