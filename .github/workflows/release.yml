@@ -85,6 +85,20 @@ jobs:
           cp Binaries/riptide-singbox Riptide.app/Contents/Resources/riptide-singbox
           chmod +x Riptide.app/Contents/Resources/riptide-singbox
 
+          # Bundle Sparkle.framework + add its rpath. The app links Sparkle
+          # dynamically (@rpath); SwiftPM only drops it under .build/, so without
+          # this the bundle dies at launch with "Library not loaded:
+          # @rpath/Sparkle.framework". The framework binary is already universal.
+          SPARKLE=$(find .build-arm64 .build-x86_64 -type d -name Sparkle.framework 2>/dev/null | head -1)
+          if [ -n "$SPARKLE" ]; then
+            mkdir -p Riptide.app/Contents/Frameworks
+            cp -R "$SPARKLE" Riptide.app/Contents/Frameworks/
+            install_name_tool -add_rpath "@executable_path/../Frameworks" \
+              Riptide.app/Contents/MacOS/Riptide 2>/dev/null || true
+          else
+            echo "::warning::Sparkle.framework not found — bundle may crash at launch"
+          fi
+
           # Create Info.plist if not exists
           if [ ! -f "Riptide.app/Contents/Info.plist" ]; then
             cat > Riptide.app/Contents/Info.plist << 'EOF'
@@ -113,11 +127,16 @@ jobs:
           EOF
           fi
           
-          # Code sign if certificate is available
+          # Always sign the bundle. `lipo` strips signatures and
+          # `install_name_tool` invalidates them, and Apple Silicon refuses to run
+          # an unsigned/invalid binary — so an ad-hoc signature is the minimum even
+          # without a Developer ID certificate.
           if [ -n "$MACOS_CERTIFICATE" ]; then
             codesign --sign "Developer ID Application" --deep --force --options runtime Riptide.app
+          else
+            codesign --sign - --deep --force Riptide.app
           fi
-          
+
           zip -r Riptide-macos-universal.zip Riptide.app
 
       - name: Notarize

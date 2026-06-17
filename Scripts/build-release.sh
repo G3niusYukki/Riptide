@@ -46,6 +46,20 @@ fi
 cp "Binaries/riptide-singbox" "$APP_DIR/Contents/Resources/riptide-singbox"
 chmod +x "$APP_DIR/Contents/Resources/riptide-singbox"
 
+# Bundle Sparkle.framework. The app links Sparkle dynamically (@rpath), but
+# SwiftPM only drops it under .build/, so without this the bundle dies at launch
+# with "Library not loaded: @rpath/Sparkle.framework". Copy it into Frameworks/
+# and add the matching rpath (the binary ships with @loader_path only).
+SPARKLE_SRC="$BUILD_DIR/Sparkle.framework"
+if [ -d "$SPARKLE_SRC" ]; then
+    mkdir -p "$APP_DIR/Contents/Frameworks"
+    cp -R "$SPARKLE_SRC" "$APP_DIR/Contents/Frameworks/"
+    install_name_tool -add_rpath "@executable_path/../Frameworks" \
+        "$APP_DIR/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+else
+    echo "WARNING: Sparkle.framework not found at $SPARKLE_SRC — bundle will crash at launch" >&2
+fi
+
 # Compile asset catalog if actool is available
 ASSET_CATALOG="Sources/RiptideApp/Assets.xcassets"
 if [ -d "$ASSET_CATALOG" ] && command -v actool &>/dev/null; then
