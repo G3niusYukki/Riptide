@@ -887,6 +887,18 @@ public final class AppViewModel: @unchecked Sendable {
                         profiles[idx] = refreshedProfile
                         if wasActiveProfile { activeProfile = refreshedProfile }
                         rebuildProxyGroupDisplays()
+                    } else {
+                        // No profile exists yet for this subscription (e.g. the
+                        // initial add-time fetch failed, or profiles weren't
+                        // persisted across launches). Create one now so refreshing
+                        // a subscription always yields a usable, selectable profile.
+                        let newProfile = Profile(
+                            name: sub.name, config: config,
+                            source: .subscription(id: sub.id, name: sub.name)
+                        )
+                        profiles.append(newProfile)
+                        if activeProfile == nil { activeProfile = newProfile }
+                        rebuildProxyGroupDisplays()
                     }
                 }
             }
