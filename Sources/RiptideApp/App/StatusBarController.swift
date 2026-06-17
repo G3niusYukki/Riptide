@@ -52,26 +52,24 @@ public final class StatusBarController: NSObject {
 
     private func updateDisplay(uploadBytesPerSec: Int64, downloadBytesPerSec: Int64, isRunning: Bool) {
         guard let button = statusItem.button else { return }
-        if isRunning {
-            // Running: keep the menu bar minimal — just a small green arrow, no
-            // speed text. Live speed still shows in the popover when clicked.
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-            button.image = NSImage(systemSymbolName: "arrow.up.arrow.down", accessibilityDescription: "代理运行中")?
-                .withSymbolConfiguration(config)
-            button.image?.isTemplate = true
-            button.contentTintColor = .systemGreen
-            button.title = ""
-            button.subviews = []
-        } else {
-            // Show shield icon when stopped
-            let symbolName = "network"
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Riptide")?
-                .withSymbolConfiguration(config)
-            button.image?.isTemplate = true
-            button.contentTintColor = .secondaryLabelColor
-            button.subviews = []
-        }
+
+        // Render a single template SF Symbol and nothing else. A custom subview
+        // (the old speed-text view) overflowed the status item's slot and drew
+        // over neighbouring menu-bar items, so we never add subviews and force
+        // image-only layout so the item width tracks the icon exactly.
+        button.subviews.forEach { $0.removeFromSuperview() }
+        button.title = ""
+        button.imagePosition = .imageOnly
+
+        let symbolName = isRunning ? "arrow.up.arrow.down" : "network"
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: isRunning ? "代理运行中" : "Riptide"
+        )?.withSymbolConfiguration(config)
+        image?.isTemplate = true
+        button.image = image
+        button.contentTintColor = isRunning ? .systemGreen : .secondaryLabelColor
     }
 
     private func configureStatusItem() {
