@@ -27,7 +27,7 @@ let package = Package(
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.1"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.7.0"),
     ],
     targets: [
         .target(

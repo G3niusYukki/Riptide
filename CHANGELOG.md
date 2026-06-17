@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.7.0] — 2026-06-17
+
+> **macOS — TUN mode lands, and the release actually launches.** Adds working TUN mode, fixes a long-standing bug that crashed every shipped build at launch, and polishes the menu bar / subscription UX. macOS-only release; Windows/Linux are unchanged.
+
+### Added
+
+- **TUN mode (macOS).** Full packet-level interception. Because an unentitled GUI app can't create a `utun` or change the routing table, Riptide runs a **standalone `riptide-singbox` core as root** via a launchd daemon (`com.riptide.tun`) installed once with a single administrator-password prompt (`osascript … with administrator privileges` — no Apple Developer account / Network Extension needed). The daemon uses `KeepAlive.PathState`, so enabling/disabling TUN afterwards just creates/removes a flag file — no further prompts — and stopping sends `SIGTERM` for clean route teardown. The standalone core is built from the *same* sing-box v1.9 (+`with_utls`) source as the in-process system-proxy core (`gocore/cmd/riptide-singbox`, `Scripts/build-singbox-bin.sh`), so configs match exactly. Verified end-to-end against a live `vless`+REALITY subscription.
+- **Minimal menu-bar indicator.** While the proxy is running the menu bar shows a small green arrow; live up/down speed still appears in the popover on click.
+
+### Fixed
+
+- **Every shipped build crashed at launch — fixed.** The app links Sparkle dynamically, but no release since ~v2.1.0 bundled `Sparkle.framework`, so downloaded `.dmg`/`.zip` builds died immediately with `Library not loaded: @rpath/Sparkle.framework` (only `swift run` worked). Now the framework is bundled into `Contents/Frameworks/` with the matching rpath, and the bundle is always code-signed (ad-hoc when no Developer ID is configured — Apple Silicon refuses to run an unsigned/invalidated binary).
+- **Subscription profiles survive relaunch.** A subscription's profile was held in memory only, so after every relaunch it vanished and you had to click 更新 once to get a usable profile. It's now recreated automatically on launch. Refreshing a subscription that has no profile also creates one.
+- **Menu-bar item no longer overlaps adjacent apps.** The old live-speed display was a custom subview that overflowed the status item's slot and drew over neighbouring icons; the item now renders a single image-only symbol sized to the icon.
+
+### Changed
+
+- **Removed the dead mihomo "Helper" UI.** Deleted `SMJobBlessManager` and `HelperSetupView`, the onboarding "install helper" step, and the unused `AppViewModel` helper plumbing. The shipped engine is in-process sing-box (system-proxy) + the elevated launchd daemon (TUN); the SMJobBless helper was never used at runtime. The privileged-helper backend (XPC protocol, diagnostics check) is retained.
+
 ## [2.6.0] — 2026-06-16
 
 > **macOS — a proxy core that actually proxies.** Fixes system-proxy mode (it previously started the core but never pointed the OS at it), adds REALITY/uTLS support by rebuilding the in-process sing-box core, and broadens protocol coverage. macOS-only release; Windows/Linux are unchanged.
