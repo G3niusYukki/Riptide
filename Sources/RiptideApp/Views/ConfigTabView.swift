@@ -4,9 +4,7 @@ import UniformTypeIdentifiers
 import Riptide
 
 struct ConfigTabView: View {
-    // swiftlint:disable:next identifier_name
     @Bindable var vm: AppViewModel
-    @State private var showHelperSetup = false
     @State private var showAddSubscription = false
     @State private var editingSubscription: SubscriptionDisplay?
     @State private var showImportPreview = false
@@ -127,9 +125,6 @@ struct ConfigTabView: View {
             .padding()
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
-        .sheet(isPresented: $showHelperSetup) {
-            HelperSetupView()
-        }
         .sheet(isPresented: $showAddSubscription) {
             AddSubscriptionSheet(vm: vm)
         }
@@ -152,16 +147,6 @@ struct ConfigTabView: View {
         .sheet(isPresented: $showYAMLEditor) {
             if let id = yamlEditorProfileID {
                 YAMLEditorView(vm: vm, profileID: id)
-            }
-        }
-        .onChange(of: vm.showHelperSetup) { _, newValue in
-            showHelperSetup = newValue
-        }
-        .onChange(of: showHelperSetup) { _, newValue in
-            if !newValue {
-                vm.showHelperSetup = false
-                // Recheck helper status when sheet closes
-                vm.checkHelperInstallation()
             }
         }
         .alert("导入失败", isPresented: $showImportError, presenting: importErrorMessage) { _ in
@@ -343,16 +328,6 @@ struct ConfigTabView: View {
                     .font(.headline)
                     .foregroundStyle(Theme.text)
                 Spacer()
-
-                // Helper status indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(vm.helperInstalled ? Theme.success : Theme.danger)
-                        .frame(width: 8, height: 8)
-                    Text(vm.helperInstalled ? "Helper已安装" : "Helper未安装")
-                        .font(.caption)
-                        .foregroundStyle(vm.helperInstalled ? Theme.success : Theme.danger)
-                }
             }
 
             // Mode selector
@@ -379,25 +354,11 @@ struct ConfigTabView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(vm.isRunning ? Theme.danger : Theme.accent)
                 .keyboardShortcut(.return, modifiers: [])
-
-                // Helper setup (only when TUN selected and helper not installed)
-                if vm.connectionMode == .tun && !vm.helperInstalled {
-                    Button {
-                        showHelperSetup = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "lock.shield")
-                            Text("安装Helper")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Theme.warning)
-                }
             }
 
-            // TUN mode sudo info
-            if vm.connectionMode == .tun && !vm.helperInstalled {
-                Text("Helper 未安装时将使用 sudo 提权启动，macOS 会弹出密码框。")
+            // TUN mode elevation info
+            if vm.connectionMode == .tun {
+                Text("TUN 模式以管理员权限运行核心：首次启动会请求一次密码安装后台服务，之后开关无需再输入。")
                     .font(.caption)
                     .foregroundStyle(Theme.subtext)
                     .frame(maxWidth: .infinity, alignment: .leading)
