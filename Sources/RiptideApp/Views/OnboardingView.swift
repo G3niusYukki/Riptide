@@ -5,15 +5,13 @@ import Riptide
 struct OnboardingView: View {
     @Binding var isPresented: Bool
     @State private var step: OnboardingStep = .welcome
-    @State private var helperInstalled = false
     @State private var selectedMode: RuntimeMode = .tun
 
     enum OnboardingStep: Int, CaseIterable {
         case welcome = 0
-        case helperInstall = 1
-        case modeSelect = 2
-        case importConfig = 3
-        case complete = 4
+        case modeSelect = 1
+        case importConfig = 2
+        case complete = 3
     }
 
     var body: some View {
@@ -35,8 +33,6 @@ struct OnboardingView: View {
                 switch step {
                 case .welcome:
                     welcomeStep
-                case .helperInstall:
-                    helperInstallStep
                 case .modeSelect:
                     modeSelectionStep
                 case .importConfig:
@@ -83,7 +79,6 @@ struct OnboardingView: View {
     private var nextButtonTitle: String {
         switch step {
         case .welcome: return "开始设置"
-        case .helperInstall: return "跳过"
         case .modeSelect: return "继续"
         case .importConfig: return "跳过"
         case .complete: return "开始使用 Riptide"
@@ -100,38 +95,12 @@ struct OnboardingView: View {
             Text("欢迎使用 Riptide")
                 .font(.title.bold())
                 .foregroundStyle(Theme.text)
-            Text("原生 macOS 代理客户端，由 mihomo 驱动")
+            Text("原生 macOS 代理客户端，内置 sing-box 核心")
                 .font(.body)
                 .foregroundStyle(Theme.subtext)
             Text("接下来将引导你完成基本设置")
                 .font(.callout)
                 .foregroundStyle(Theme.subtext.opacity(0.7))
-        }
-        .padding(.horizontal, 40)
-    }
-
-    private var helperInstallStep: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.accent)
-            Text("安装辅助工具")
-                .font(.title.bold())
-                .foregroundStyle(Theme.text)
-            Text("Riptide 需要一个特权辅助工具来配置系统代理和 TUN 模式")
-                .font(.body)
-                .foregroundStyle(Theme.subtext)
-                .multilineTextAlignment(.center)
-            Text("辅助工具通过 SMJobBless 安装，需要管理员密码")
-                .font(.callout)
-                .foregroundStyle(Theme.subtext.opacity(0.7))
-                .multilineTextAlignment(.center)
-            Button("安装辅助工具") {
-                helperInstalled = true
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-            .padding(.top, 8)
         }
         .padding(.horizontal, 40)
     }
@@ -146,23 +115,16 @@ struct OnboardingView: View {
                 .font(.title2.bold())
                 .foregroundStyle(Theme.text)
 
-            if helperInstalled {
-                Text("辅助工具已安装，两种模式都完全可用")
-                    .font(.callout)
-                    .foregroundStyle(Theme.success)
-            } else {
-                Text("辅助工具未安装 — TUN 模式推荐")
-                    .font(.callout)
-                    .foregroundStyle(Theme.warning)
-            }
+            Text("系统代理无需任何权限；TUN 首次启动会请求一次管理员密码安装后台服务")
+                .font(.callout)
+                .foregroundStyle(Theme.subtext)
+                .multilineTextAlignment(.center)
 
             // TUN mode option
             ModeOptionView(
                 title: "TUN 模式",
-                subtitle: helperInstalled
-                    ? "全流量拦截 · 系统级代理"
-                    : "全流量拦截 · 无需 Apple Developer · 推荐",
-                isRecommended: !helperInstalled,
+                subtitle: "全流量拦截 · 首次启动需一次管理员密码 · 推荐",
+                isRecommended: true,
                 isSelected: selectedMode == .tun,
                 action: { selectedMode = .tun }
             )
@@ -170,10 +132,8 @@ struct OnboardingView: View {
             // System Proxy option
             ModeOptionView(
                 title: "系统代理模式",
-                subtitle: helperInstalled
-                    ? "轻量级 · 设置系统代理"
-                    : "轻量级 · 系统代理守卫不可用",
-                isRecommended: helperInstalled,
+                subtitle: "轻量级 · 无需密码 · 适合日常浏览",
+                isRecommended: false,
                 isSelected: selectedMode == .systemProxy,
                 action: { selectedMode = .systemProxy }
             )

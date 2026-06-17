@@ -255,10 +255,6 @@ public final class AppViewModel: @unchecked Sendable {
     /// Warning shown when system proxy guard is unavailable (no helper).
     public private(set) var guardUnavailableWarning: String?
 
-    // Helper installation
-    public private(set) var helperInstalled: Bool = false
-    public var showHelperSetup: Bool = false
-
     // Mihomo core management
     public private(set) var mihomoVersion: String = ""
     public private(set) var availableUpdate: MihomoDownloader.UpdateInfo?
@@ -285,7 +281,6 @@ public final class AppViewModel: @unchecked Sendable {
     private let profileStore: ProfileStore
     private let overrideStore: OverrideStore
     private var statsTask: Task<Void, Never>?
-    private let smManager: SMJobBlessManager
     private var subscriptionScheduler: SubscriptionUpdateScheduler?
 
     // MARK: - Init
@@ -306,10 +301,6 @@ public final class AppViewModel: @unchecked Sendable {
         } catch {
             fatalError("Failed to initialize ProfileStore: \(error)")
         }
-        self.smManager = SMJobBlessManager()
-        // Inject the Logbook writer into each business module so its
-        // fire-and-forget logInfo/logError calls reach the persistent store.
-        checkHelperInstallation()
         // Restore any persisted drag/drop node order from a prior session.
         loadNodeOrder()
         let writer = self.logbook.writer
@@ -340,13 +331,6 @@ public final class AppViewModel: @unchecked Sendable {
         if await controller.activeHTTPProxyPort() == 6152 {
             try? await controller.disable()
         }
-    }
-
-    // MARK: - Helper Installation
-
-    public func checkHelperInstallation() {
-        smManager.checkHelperStatus()
-        helperInstalled = smManager.isHelperInstalled
     }
 
     // MARK: - Actions
@@ -443,9 +427,6 @@ public final class AppViewModel: @unchecked Sendable {
     }
 
     public func start() async {
-        // Check helper installation (non-blocking — sudo fallback available)
-        await checkHelperInstallationAsync()
-
         guard let profile = activeProfile else {
             lastError = "No active profile selected"
             return
@@ -1198,13 +1179,6 @@ public final class AppViewModel: @unchecked Sendable {
 
     // MARK: - Status & Polling
 
-    private func checkHelperInstallationAsync() async {
-        let installed = await modeCoordinator.isHelperInstalled()
-        await MainActor.run {
-            helperInstalled = installed
-        }
-    }
-
     private func startStatsPolling() {
         statsTask = Task {
             var logCounter = 0
@@ -1377,27 +1351,6 @@ public final class AppViewModel: @unchecked Sendable {
                     self.mihomoDownloadError = nil
                 }
             }
-        }
-
-        // Install mihomo to system path via helper (needed for privileged TUN mode)
-        await installMihomoToSystemPath()
-    }
-
-    /// Copies the user-space mihomo binary to the system path via the XPC helper.
-    /// The helper runs as root and can write to /Library/Application Support/Riptide/mihomo.
-    private func installMihomoToSystemPath() async {
-        guard helperInstalled else { return }
-
-        let paths = MihomoPaths()
-        let userBinaryPath = paths.executable
-
-        guard FileManager.default.isExecutableFile(atPath: userBinaryPath) else {
-            return
-        }
-
-        if let error = await mihomoManager.helperConnection.installMihomo(binaryPath: userBinaryPath) {
-            // Non-fatal: binary may already be installed and up-to-date
-            print("[AppViewModel] installMihomoToSystemPath: \(error.localizedDescription)")
         }
 
     }
