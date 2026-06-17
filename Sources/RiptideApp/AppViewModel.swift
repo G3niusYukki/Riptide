@@ -1,195 +1,7 @@
-// swiftlint:disable file_length type_body_length
 import Foundation
 import Observation
 import AppKit
 import Riptide
-
-// MARK: - App-Shell Stub Types
-
-/// Stub profile type used by the app layer.
-/// Wraps a Riptide `TunnelProfile` for app-level profile management.
-public struct Profile: Identifiable, Equatable {
-    public let id: UUID
-    public let name: String
-    public let config: RiptideConfig
-    public let source: ProfileSource
-
-    public init(id: UUID = UUID(), name: String, config: RiptideConfig, source: ProfileSource = .local) {
-        self.id = id
-        self.name = name
-        self.config = config
-        self.source = source
-    }
-
-    /// Convert to a `TunnelProfile` for use by the tunnel runtime.
-    public var tunnelProfile: TunnelProfile {
-        TunnelProfile(name: name, config: config)
-    }
-}
-
-/// Where a profile came from.
-public enum ProfileSource: Equatable {
-    case local
-    case subscription(id: UUID, name: String)
-}
-
-// MARK: - Display Models
-
-/// Display-friendly subscription model for the UI layer.
-public struct SubscriptionDisplay: Identifiable, Equatable {
-    public let id: UUID
-    public let name: String
-    public let url: String
-    public let autoUpdate: Bool
-    public let lastUpdated: Date?
-    public let lastError: String?
-    public let profileCount: Int
-    public let userinfo: SubscriptionUserinfo?
-
-    public init(
-        id: UUID, name: String, url: String, autoUpdate: Bool,
-        lastUpdated: Date?, lastError: String?, profileCount: Int = 0,
-        userinfo: SubscriptionUserinfo? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.url = url
-        self.autoUpdate = autoUpdate
-        self.lastUpdated = lastUpdated
-        self.lastError = lastError
-        self.profileCount = profileCount
-        self.userinfo = userinfo
-    }
-}
-
-/// Display-friendly rule set provider model for the UI layer.
-public struct RuleSetDisplay: Identifiable, Equatable {
-    public let id: String  // provider name
-    public let name: String
-    public let url: String
-    public let interval: Int
-    public let ruleCount: Int
-    public let lastUpdated: Date?
-
-    public init(id: String, name: String, url: String, interval: Int, ruleCount: Int, lastUpdated: Date? = nil) {
-        self.id = id
-        self.name = name
-        self.url = url
-        self.interval = interval
-        self.ruleCount = ruleCount
-        self.lastUpdated = lastUpdated
-    }
-}
-
-public struct ProxyNodeDisplay: Identifiable, Equatable {
-    public let id: String
-    public let name: String
-    public let kind: ProxyKind
-    public let delayMs: Int?
-    public let isSelected: Bool
-    public let status: ProxyStatus
-
-    public enum ProxyStatus: Equatable {
-        case available
-        case timeout
-        case error
-    }
-}
-
-public struct ProxyGroupDisplay: Identifiable, Equatable {
-    public let id: String
-    public let name: String
-    public let kind: ProxyGroupKind
-    public let nodes: [ProxyNodeDisplay]
-    public let selectedNodeName: String?
-}
-
-public struct ConnectionInfo: Identifiable {
-    public let id: UUID
-    /// Raw backend connection ID — use this for close operations.
-    public let backendId: String
-    public let host: String
-    public let port: Int
-    public let `protocol`: String
-    public let proxyName: String
-    public let connectionCount: Int
-
-    // Detail fields for connection detail panel
-    public let sourceIP: String?
-    public let sourcePort: String?
-    public let destinationIP: String?
-    public let destinationPort: String?
-    public let matchedRule: String?
-    public let rulePayload: String?
-    public let chain: [String]
-    public let startTime: String?
-    public let uploadBytes: Int
-    public let downloadBytes: Int
-    public let networkType: String?
-
-    public init(
-        id: UUID, backendId: String, host: String, port: Int,
-        protocol: String, proxyName: String, connectionCount: Int,
-        sourceIP: String? = nil, sourcePort: String? = nil,
-        destinationIP: String? = nil, destinationPort: String? = nil,
-        matchedRule: String? = nil, rulePayload: String? = nil,
-        chain: [String] = [], startTime: String? = nil,
-        uploadBytes: Int = 0, downloadBytes: Int = 0,
-        networkType: String? = nil
-    ) {
-        self.id = id
-        self.backendId = backendId
-        self.host = host
-        self.port = port
-        self.protocol = `protocol`
-        self.proxyName = proxyName
-        self.connectionCount = connectionCount
-        self.sourceIP = sourceIP
-        self.sourcePort = sourcePort
-        self.destinationIP = destinationIP
-        self.destinationPort = destinationPort
-        self.matchedRule = matchedRule
-        self.rulePayload = rulePayload
-        self.chain = chain
-        self.startTime = startTime
-        self.uploadBytes = uploadBytes
-        self.downloadBytes = downloadBytes
-        self.networkType = networkType
-    }
-}
-
-public struct RuleMatchLog: Identifiable {
-    public let id: UUID
-    public let timestamp: Date
-    public let domain: String
-    public let matchedRule: String
-    public let resolvedNode: String
-}
-
-public enum ConnectionMode: String, Equatable, CaseIterable {
-    case systemProxy
-    case tun
-
-    public static var productAvailableModes: [ConnectionMode] {
-        RuntimeMode.productAvailableModes.map { mode in
-            switch mode {
-            case .systemProxy:
-                return .systemProxy
-            case .tun:
-                return .tun
-            }
-        }
-    }
-
-    public var displayName: String {
-        switch self {
-        case .systemProxy:
-            return "系统代理"
-        case .tun:
-            return "TUN模式"
-        }
-    }
-}
 
 // MARK: - AppViewModel
 
@@ -206,27 +18,31 @@ public final class AppViewModel: @unchecked Sendable {
     public var isRunning: Bool { tunnelState == .running }
 
     // Config
-    public private(set) var profiles: [Profile] = []
-    public private(set) var activeProfile: Profile?
-    public private(set) var subscriptions: [SubscriptionDisplay] = []
+    public internal(set) var profiles: [Profile] = []
+    public internal(set) var activeProfile: Profile?
+    public internal(set) var subscriptions: [SubscriptionDisplay] = []
 
     // Proxies
-    public private(set) var proxyGroups: [ProxyGroupDisplay] = []
-    public private(set) var allProxies: [ProxyNodeDisplay] = []
+    public internal(set) var proxyGroups: [ProxyGroupDisplay] = []
+    public internal(set) var allProxies: [ProxyNodeDisplay] = []
     private var proxyDelays: [String: Int] = [:]  // proxy name -> delay ms
 
     /// Per-group user-customized node order. Persisted to UserDefaults so
     /// drag/drop rearrangements survive app relaunches. Maps groupID to an
     /// ordered list of node names. Nodes not present in the list (or new
     /// nodes from a refreshed profile) are appended at the end.
-    public private(set) var nodeOrder: [String: [String]] = [:]
+    public internal(set) var nodeOrder: [String: [String]] = [:]
+
+    // URL Scheme — stored properties must live in the main type body
+    public var pendingImportURL: String?
+    public var urlSchemeError: String?
 
     // Traffic
-    public private(set) var currentSpeedUp: Int64 = 0
-    public private(set) var currentSpeedDown: Int64 = 0
-    public private(set) var totalTrafficUp: Int64 = 0
-    public private(set) var totalTrafficDown: Int64 = 0
-    public private(set) var activeConnections: [ConnectionInfo] = []
+    public internal(set) var currentSpeedUp: Int64 = 0
+    public internal(set) var currentSpeedDown: Int64 = 0
+    public internal(set) var totalTrafficUp: Int64 = 0
+    public internal(set) var totalTrafficDown: Int64 = 0
+    public internal(set) var activeConnections: [ConnectionInfo] = []
 
     // Rules
     public private(set) var rules: [ProxyRule] = []
@@ -251,17 +67,17 @@ public final class AppViewModel: @unchecked Sendable {
     public var logLevelFilter: Riptide.LogLevel = .debug
 
     // Errors
-    public private(set) var lastError: String?
+    public internal(set) var lastError: String?
     /// Warning shown when system proxy guard is unavailable (no helper).
     public private(set) var guardUnavailableWarning: String?
 
     // Mihomo core management
-    public private(set) var mihomoVersion: String = ""
-    public private(set) var availableUpdate: MihomoDownloader.UpdateInfo?
-    public private(set) var isDownloadingMihomo: Bool = false
-    public private(set) var mihomoDownloadProgress: Double = 0
+    public internal(set) var mihomoVersion: String = ""
+    public internal(set) var availableUpdate: MihomoDownloader.UpdateInfo?
+    public internal(set) var isDownloadingMihomo: Bool = false
+    public internal(set) var mihomoDownloadProgress: Double = 0
     public var mihomoChannel: MihomoDownloader.Channel = .stable
-    public private(set) var mihomoDownloadError: String?
+    public internal(set) var mihomoDownloadError: String?
 
     // MARK: - Window Reference
     public weak var mainWindow: NSWindow?
@@ -275,13 +91,13 @@ public final class AppViewModel: @unchecked Sendable {
     // MARK: - Private
 
     private let mihomoManager: any MihomoRuntimeManaging
-    private let modeCoordinator: ModeCoordinator
+    internal let modeCoordinator: ModeCoordinator
     private let importService: ConfigImportService
-    private let subscriptionManager: SubscriptionManager
+    internal let subscriptionManager: SubscriptionManager
     private let profileStore: ProfileStore
     private let overrideStore: OverrideStore
-    private var statsTask: Task<Void, Never>?
-    private var subscriptionScheduler: SubscriptionUpdateScheduler?
+    internal var statsTask: Task<Void, Never>?
+    internal var subscriptionScheduler: SubscriptionUpdateScheduler?
 
     // MARK: - Init
 
@@ -731,194 +547,6 @@ public final class AppViewModel: @unchecked Sendable {
         }
     }
 
-    // MARK: - Subscription Management
-
-    /// Starts the subscription auto-update scheduler (5-minute interval).
-    private func startSubscriptionScheduler() {
-        let scheduler = SubscriptionUpdateScheduler(manager: subscriptionManager, checkInterval: 300)
-        Task { await scheduler.start() }
-        subscriptionScheduler = scheduler
-    }
-
-    /// Stops the subscription auto-update scheduler.
-    private func stopSubscriptionScheduler() {
-        guard let scheduler = subscriptionScheduler else { return }
-        Task { await scheduler.stop() }
-        subscriptionScheduler = nil
-    }
-
-    /// Loads subscriptions from the backend and refreshes their display profiles.
-    public func loadSubscriptionsFromBackend() async {
-        let subs = await subscriptionManager.allSubscriptions()
-        await MainActor.run {
-            subscriptions = subs.map { sub in
-                // Match by subscription ID only (name may change over time)
-                let profileCount = profiles.count {
-                    guard case let .subscription(id, _) = $0.source else { return false }
-                    return id == sub.id
-                }
-                return SubscriptionDisplay(
-                    id: sub.id, name: sub.name, url: sub.url,
-                    autoUpdate: sub.autoUpdate, lastUpdated: sub.lastUpdated,
-                    lastError: sub.lastError, profileCount: profileCount,
-                    userinfo: sub.userinfo
-                )
-            }
-        }
-        await notifyExpiringSubscriptions(subs)
-    }
-
-    /// Surfaces a system notification for any subscription that is within
-    /// 3 days of expiry. Called whenever the subscription list is reloaded.
-    private func notifyExpiringSubscriptions(_ subs: [Riptide.Subscription]) async {
-        for sub in subs {
-            guard let userinfo = sub.userinfo,
-                  let expiry = userinfo.expireDate else { continue }
-            let secondsRemaining = expiry.timeIntervalSinceNow
-            guard secondsRemaining > 0, secondsRemaining <= 3 * 24 * 3600 else { continue }
-            let days = max(1, Int((secondsRemaining / 86_400).rounded(.up)))
-            await UserNotificationManager.shared.notifySubscriptionExpiring(
-                name: sub.name, daysRemaining: days
-            )
-        }
-    }
-
-    /// Adds a new subscription, fetches its nodes, and creates a profile.
-    public func addSubscription(url subscriptionURL: String, name: String, autoUpdate: Bool, interval: TimeInterval) async {
-        let sub = await subscriptionManager.addSubscription(
-            name: name, url: subscriptionURL, autoUpdate: autoUpdate, interval: interval
-        )
-        let result = await subscriptionManager.updateSubscription(id: sub.id)
-        switch result {
-        case .success(let proxies):
-            let config = RiptideConfig(
-                mode: .rule,
-                proxies: proxies,
-                rules: [],
-                proxyGroups: [],
-                dnsPolicy: DNSPolicy()
-            )
-            let profile = Profile(name: name, config: config, source: .subscription(id: sub.id, name: sub.name))
-            await MainActor.run {
-                lastError = nil  // Clear any previous error
-                profiles.append(profile)
-                if activeProfile == nil { activeProfile = profile }
-                rebuildProxyGroupDisplays()
-            }
-        case .failure(let error):
-            await MainActor.run { lastError = "订阅拉取失败: \(error)" }
-        case .noChange:
-            await MainActor.run { lastError = nil }  // Clear stale error
-        }
-        await loadSubscriptionsFromBackend()
-    }
-
-    /// Removes a subscription and its associated profile.
-    public func removeSubscription(id: UUID) async {
-        await subscriptionManager.removeSubscription(id: id)
-        await MainActor.run {
-            profiles.removeAll { profile in
-                if case .subscription(let subID, _) = profile.source { return subID == id }
-                return false
-            }
-            if let active = activeProfile,
-               case .subscription(let subID, _) = active.source, subID == id {
-                activeProfile = profiles.first
-            }
-            rebuildProxyGroupDisplays()
-        }
-        await loadSubscriptionsFromBackend()
-    }
-
-    /// Refresh every subscription sequentially. Used by the dashboard quick-action
-    /// button. Failures are recorded on each subscription's `lastError` and don't
-    /// short-circuit the rest.
-    public func refreshAllSubscriptions() async {
-        for sub in await subscriptionManager.allSubscriptions() {
-            await updateSubscription(id: sub.id)
-        }
-    }
-
-    /// Subscription-backed profiles are held in memory only (not written to
-    /// ProfileStore), so after a relaunch they are gone until refreshed —
-    /// previously the user had to click 更新 once per session to get a usable
-    /// profile. On launch, recreate any subscription whose profile is missing by
-    /// refreshing it (updateSubscription creates the profile when none exists).
-    private func ensureSubscriptionProfiles() async {
-        for sub in await subscriptionManager.allSubscriptions() {
-            let hasProfile = await MainActor.run {
-                profiles.contains { profile in
-                    if case .subscription(let sid, _) = profile.source { return sid == sub.id }
-                    return false
-                }
-            }
-            if !hasProfile {
-                await updateSubscription(id: sub.id)
-            }
-        }
-    }
-
-    /// Updates (refreshes) a subscription by fetching fresh nodes.
-    public func updateSubscription(id: UUID) async {
-        let result = await subscriptionManager.updateSubscription(id: id)
-        switch result {
-        case .success(let proxies):
-            let sub = await subscriptionManager.subscription(id: id)
-            if let sub {
-                let config = RiptideConfig(
-                    mode: .rule,
-                    proxies: proxies,
-                    rules: [],
-                    proxyGroups: [],
-                    dnsPolicy: DNSPolicy()
-                )
-                await MainActor.run {
-                    if let idx = profiles.firstIndex(where: { profile in
-                        if case .subscription(let sid, _) = profile.source { return sid == id }
-                        return false
-                    }) {
-                        // Preserve original profile ID so activeProfile reference stays valid
-                        let existingProfile = profiles[idx]
-                        let wasActiveProfile = activeProfile?.id == existingProfile.id
-                        let refreshedProfile = Profile(
-                            id: existingProfile.id,
-                            name: sub.name, config: config,
-                            source: .subscription(id: sub.id, name: sub.name)
-                        )
-                        profiles[idx] = refreshedProfile
-                        if wasActiveProfile { activeProfile = refreshedProfile }
-                        rebuildProxyGroupDisplays()
-                    } else {
-                        // No profile exists yet for this subscription (e.g. the
-                        // initial add-time fetch failed, or profiles weren't
-                        // persisted across launches). Create one now so refreshing
-                        // a subscription always yields a usable, selectable profile.
-                        let newProfile = Profile(
-                            name: sub.name, config: config,
-                            source: .subscription(id: sub.id, name: sub.name)
-                        )
-                        profiles.append(newProfile)
-                        if activeProfile == nil { activeProfile = newProfile }
-                        rebuildProxyGroupDisplays()
-                    }
-                }
-            }
-        case .failure(let error):
-            await MainActor.run { lastError = "订阅更新失败: \(error)" }
-        case .noChange:
-            break
-        }
-        await loadSubscriptionsFromBackend()
-    }
-
-    /// Edits subscription properties.
-    public func editSubscription(id: UUID, name: String? = nil, url: String? = nil, autoUpdate: Bool? = nil, interval: TimeInterval? = nil) async {
-        await subscriptionManager.updateSubscription(
-            id: id, name: name, url: url, autoUpdate: autoUpdate, interval: interval
-        )
-        await loadSubscriptionsFromBackend()
-    }
-
     /// Closes a specific connection.
     public func closeConnection(id: String) async {
         await modeCoordinator.closeConnection(id: id)
@@ -1197,72 +825,9 @@ public final class AppViewModel: @unchecked Sendable {
         rebuildProxyGroupDisplays()
     }
 
-    // MARK: - Status & Polling
-
-    private func startStatsPolling() {
-        statsTask = Task {
-            var logCounter = 0
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                await refreshStats()
-                // Refresh logs every 3 polling cycles (3 seconds)
-                logCounter += 1
-                if logCounter >= 3 {
-                    logCounter = 0
-                    await fetchLogs()
-                }
-            }
-        }
-    }
-
-    private func stopStatsPolling() {
-        statsTask?.cancel()
-        statsTask = nil
-        currentSpeedUp = 0
-        currentSpeedDown = 0
-    }
-
-    private func refreshStats() async {
-        let traffic = await modeCoordinator.getTraffic()
-        let connections = await modeCoordinator.getConnections()
-
-        await MainActor.run {
-            currentSpeedUp = traffic.up
-            currentSpeedDown = traffic.down
-            totalTrafficUp += traffic.up
-            totalTrafficDown += traffic.down
-
-            // Map enriched backend ConnectionInfo to app-level ConnectionInfo
-            let mapped = connections.map { conn in
-                let meta = conn.metadata
-                return ConnectionInfo(
-                    id: UUID(uuidString: conn.id) ?? UUID(),
-                    backendId: conn.id,
-                    host: meta.host ?? meta.destinationIP ?? "unknown",
-                    port: Int(meta.destinationPort ?? "") ?? 0,
-                    protocol: meta.network.uppercased(),
-                    proxyName: conn.chains.last ?? "Direct",
-                    connectionCount: 1,
-                    sourceIP: meta.sourceIP,
-                    sourcePort: meta.sourcePort,
-                    destinationIP: meta.destinationIP,
-                    destinationPort: meta.destinationPort,
-                    matchedRule: conn.rule,
-                    rulePayload: conn.rulePayload,
-                    chain: conn.chains,
-                    startTime: conn.start,
-                    uploadBytes: conn.upload,
-                    downloadBytes: conn.download,
-                    networkType: meta.type
-                )
-            }
-            activeConnections = mapped
-        }
-    }
-
     // MARK: - Helpers
 
-    private func rebuildProxyGroupDisplays() {
+    internal func rebuildProxyGroupDisplays() {
         guard let profile = activeProfile else {
             proxyGroups = []
             allProxies = []
@@ -1314,277 +879,4 @@ public final class AppViewModel: @unchecked Sendable {
 
         rules = profile.config.rules
     }
-
-    // MARK: - Node Order (drag/drop persistence)
-
-    /// Returns the persisted node-name order for a group, or an empty array
-    /// if the user has not yet reordered the group.
-    public func nodeOrder(for groupID: String) -> [String] {
-        nodeOrder[groupID] ?? []
-    }
-
-    /// Persists a new node-name order for a group and updates the in-memory
-    /// state. Saving is best-effort; a JSON encode failure is silently
-    /// ignored (the in-memory change still applies for the current session).
-    public func setNodeOrder(_ order: [String], for groupID: String) {
-        nodeOrder[groupID] = order
-        saveNodeOrder()
-    }
-
-    /// Reads the persisted node-order map from UserDefaults. Missing or
-    /// undecodable data is treated as "no persisted order".
-    public func loadNodeOrder() {
-        guard let data = UserDefaults.standard.data(forKey: "riptide.proxyGroup.nodeOrder"),
-              let decoded = try? JSONDecoder().decode([String: [String]].self, from: data) else {
-            return
-        }
-        nodeOrder = decoded
-    }
-
-    private func saveNodeOrder() {
-        guard let data = try? JSONEncoder().encode(nodeOrder) else { return }
-        UserDefaults.standard.set(data, forKey: "riptide.proxyGroup.nodeOrder")
-    }
-
-    // MARK: - Mihomo Core Management
-
-    /// Checks mihomo status on launch and downloads if needed.
-    public func checkMihomoOnLaunch() async {
-        let paths = MihomoPaths()
-        let mihomoPath = paths.baseDirectory.appendingPathComponent("mihomo").path
-
-        if !FileManager.default.fileExists(atPath: mihomoPath) {
-            // First launch - no kernel installed
-            await downloadLatestMihomo(channel: mihomoChannel)
-        } else {
-            // Check current version
-            let version = getCurrentMihomoVersion(executablePath: mihomoPath)
-            await MainActor.run {
-                self.mihomoVersion = version
-            }
-
-            // Check for updates
-            let downloader = MihomoDownloader()
-            if let update = await downloader.checkForUpdate(currentVersion: version, channel: mihomoChannel) {
-                await MainActor.run {
-                    self.availableUpdate = update
-                    self.mihomoDownloadError = nil
-                }
-            }
-        }
-
-    }
-
-    /// Downloads the latest mihomo version.
-    public func downloadLatestMihomo(channel: MihomoDownloader.Channel? = nil) async {
-        let effectiveChannel = channel ?? mihomoChannel
-
-        await MainActor.run {
-            isDownloadingMihomo = true
-            mihomoDownloadProgress = 0
-            mihomoDownloadError = nil
-        }
-
-        defer {
-            Task { @MainActor in
-                isDownloadingMihomo = false
-            }
-        }
-
-        do {
-            let downloader = MihomoDownloader(progressDelegate: self)
-            let downloadedPath = try await downloader.downloadLatest(channel: effectiveChannel)
-
-            // Replace current kernel
-            try replaceCurrentMihomo(with: downloadedPath)
-
-            // Update version info
-            let paths = MihomoPaths()
-            let mihomoPath = paths.baseDirectory.appendingPathComponent("mihomo").path
-            let newVersion = getCurrentMihomoVersion(executablePath: mihomoPath)
-
-            await MainActor.run {
-                mihomoVersion = newVersion
-                availableUpdate = nil
-                mihomoDownloadProgress = 1.0
-            }
-        } catch {
-            await MainActor.run {
-                mihomoDownloadError = error.localizedDescription
-            }
-        }
-    }
-
-    /// Switches to a specific mihomo version.
-    public func switchMihomoVersion(to version: String) async {
-        // 1. Stop current proxy if running
-        if tunnelState == .running {
-            await stop()
-        }
-
-        // 2. Check if version is already downloaded
-        let downloader = MihomoDownloader()
-        if let existingPath = downloader.pathForVersion(version) {
-            do {
-                try replaceCurrentMihomo(with: existingPath)
-
-                let paths = MihomoPaths()
-                let mihomoPath = paths.baseDirectory.appendingPathComponent("mihomo").path
-                let currentVersion = getCurrentMihomoVersion(executablePath: mihomoPath)
-
-                await MainActor.run {
-                    mihomoVersion = currentVersion
-                    availableUpdate = nil
-                }
-            } catch {
-                await MainActor.run {
-                    mihomoDownloadError = error.localizedDescription
-                }
-            }
-            return
-        }
-
-        // 3. Download the specified version
-        await MainActor.run {
-            isDownloadingMihomo = true
-            mihomoDownloadProgress = 0
-        }
-
-        defer {
-            Task { @MainActor in
-                isDownloadingMihomo = false
-            }
-        }
-
-        do {
-            let downloadedPath = try await downloader.downloadVersion(version)
-            try replaceCurrentMihomo(with: downloadedPath)
-
-            let paths = MihomoPaths()
-            let mihomoPath = paths.baseDirectory.appendingPathComponent("mihomo").path
-            let currentVersion = getCurrentMihomoVersion(executablePath: mihomoPath)
-
-            await MainActor.run {
-                mihomoVersion = currentVersion
-                availableUpdate = nil
-            }
-        } catch {
-            await MainActor.run {
-                mihomoDownloadError = error.localizedDescription
-            }
-        }
-    }
-
-    /// Lists all locally available mihomo versions.
-    public func listLocalMihomoVersions() -> [String] {
-        let downloader = MihomoDownloader()
-        return downloader.listLocalVersions()
-    }
-
-    // MARK: - URL Scheme Support
-    //
-    // Properties and methods below are entry points used by
-    // `URLSchemeHandler` to route `riptide://...` commands delivered by
-    // LaunchServices. They are intentionally minimal — they delegate to
-    // existing runtime APIs rather than introducing new orchestration.
-
-    /// URL string pre-filled into the import dialog when a
-    /// `riptide://import?url=...` command is delivered. The UI watches this
-    /// property and clears it after consumption.
-    public var pendingImportURL: String?
-
-    /// Last error from URL-scheme routing (e.g. unrecognized URL, missing
-    /// group). Distinct from `lastError` so URL failures don't pollute the
-    /// proxy-runner error stream.
-    public var urlSchemeError: String?
-
-    /// Activates the proxy group with the given id and selects its first
-    /// available node. Fails explicitly (via `urlSchemeError`) if the group
-    /// is not present in the active profile — no silent fallback.
-    public func selectGroup(named name: String) async {
-        guard let profile = activeProfile else {
-            urlSchemeError = "Cannot switch group: no active profile"
-            return
-        }
-        guard let group = profile.config.proxyGroups.first(where: { $0.id == name }) else {
-            urlSchemeError = "Proxy group '\(name)' not found"
-            return
-        }
-        guard let firstNode = group.proxies.first else {
-            urlSchemeError = "Proxy group '\(name)' has no nodes"
-            return
-        }
-        await selectProxy(groupID: group.id, nodeName: firstNode)
-    }
-
-    /// Selects a node by name in whichever group contains it. Fails
-    /// explicitly if the node is not present in the active profile.
-    public func selectNode(named name: String) async {
-        guard let profile = activeProfile else {
-            urlSchemeError = "Cannot select node: no active profile"
-            return
-        }
-        guard let group = profile.config.proxyGroups.first(where: { $0.proxies.contains(name) }) else {
-            urlSchemeError = "Node '\(name)' not found in any group"
-            return
-        }
-        await selectProxy(groupID: group.id, nodeName: name)
-    }
-
-    /// Switches the connection mode from a URL value. Accepts
-    /// `"tun"`, `"system"`, and `"off"`. If the tunnel is currently running
-    /// and a non-`off` value is given, the runtime is restarted in the new
-    /// mode. Unknown values set `urlSchemeError` and are otherwise ignored.
-    public func setMode(fromString value: String) async {
-        let normalized = value.lowercased()
-        let wasRunning = tunnelState == .running
-        switch normalized {
-        case "tun":
-            connectionMode = .tun
-        case "system":
-            connectionMode = .systemProxy
-        case "off":
-            if wasRunning {
-                await stop()
-            }
-            return
-        default:
-            urlSchemeError = "Unknown mode '\(value)' (expected: tun, system, off)"
-            return
-        }
-        if wasRunning {
-            await stop()
-            await start()
-        }
-    }
-
-    /// Generates a diagnostic report from the runtime and stores it in
-    /// `lastError` for now (a dedicated diagnostics sheet can be wired up
-    /// later by the UI layer). Returns the JSON-encoded report.
-    @discardableResult
-    public func runDiagnostics() async -> String {
-        let report = await modeCoordinator.generateDiagnosticReport()
-        // Surface a concise one-line summary so the UI shows something even
-        // before a dedicated diagnostics sheet is implemented.
-        let summary = "diagnostics: mihomo=\(report.mihomoRunning ? "running" : "stopped")"
-        lastError = summary
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return (try? encoder.encode(report))
-            .flatMap { String(data: $0, encoding: .utf8) } ?? summary
-    }
 }
-
-// MARK: - MihomoDownloadProgressDelegate
-
-extension AppViewModel: MihomoDownloadProgressDelegate {
-    nonisolated public func downloadProgress(_ bytesDownloaded: Int64, totalBytes: Int64) {
-        guard totalBytes > 0 else { return }
-        let progress = Double(bytesDownloaded) / Double(totalBytes)
-        Task { @MainActor in
-            self.mihomoDownloadProgress = min(max(progress, 0.0), 1.0)
-        }
-    }
-}
-// swiftlint:enable file_length type_body_length

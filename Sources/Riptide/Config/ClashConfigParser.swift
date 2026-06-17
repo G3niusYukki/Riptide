@@ -151,8 +151,10 @@ public enum ClashConfigParser {
             return try wireGuardProxyNode(proxy, port: port, index: index)
 
         case .reality, .anytls, .ssh:
-            // NOTE(Task 16/17): parse these kinds once data fields land.
-            throw ClashConfigError.invalidProxy(index: index, reason: "proxy kind \(kind) is not yet supported")
+            // These kinds are placeholders on ProxyNode. REALITY is handled
+            // via vless + reality-* fields (see vlessProxyNode). anytls/ssh
+            // are not supported as standalone proxy kinds.
+            throw ClashConfigError.invalidProxy(index: index, reason: "proxy kind \(kind) is not supported as a standalone kind")
         }
     }
 

@@ -39,11 +39,11 @@ public enum OverrideMerger {
         }
     }
 
-    // MARK: - Map merge (stub for Task 4; full impl in Task 5+)
+    // MARK: - Map merge
 
     private static func mergeMaps(base: [String: Any], override: [String: Any]) throws -> [String: Any] {
-        // For now, override wins on scalar sections; lists are appended;
-        // nested maps recurse. meta.replace / removed: handled in Task 6+.
+        // Override wins on scalar sections; lists are appended (or
+        // replaced by name when meta.replace is true); nested maps recurse.
         var result = base
         let meta = override["meta"] as? [String: Any] ?? [:]
         let replaceMode = (meta["replace"] as? Bool) ?? false

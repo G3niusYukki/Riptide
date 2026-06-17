@@ -65,7 +65,9 @@ public struct ProxyConnector: Sendable {
                 // reach ProxyConnector.connect() directly; it is always unwrapped there.
                 throw ProtocolError.malformedResponse("unexpected relay node in ProxyConnector")
             case .reality, .anytls, .ssh:
-                // NOTE(Task 16/17): wire up connectors for these kinds once data fields land.
+                // These are placeholder kinds on ProxyKind. REALITY connections
+                // are handled via the .vless path with reality-* fields above.
+                // anytls/ssh have no native connector implementation.
                 throw ProtocolError.malformedResponse("unsupported proxy kind: \(node.kind)")
             }
             return ConnectedProxyContext(node: node, connection: connection)

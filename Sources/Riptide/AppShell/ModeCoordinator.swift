@@ -16,6 +16,7 @@ public actor ModeCoordinator {
     private var healthCheckTask: Task<Void, Never>?
     private var healthResults: [String: HealthResult] = [:]
     private var sleepWakeObserver: SleepWakeObserver?
+    private var connectedAt: Date?
     private let pathMonitor = NWPathMonitor()
     private var pathMonitorQueue: DispatchQueue?
     private let environmentManager = NetworkEnvironmentManager()
@@ -57,6 +58,7 @@ public actor ModeCoordinator {
         do {
             try await mihomoManager.start(mode: mode, profile: profile)
             activeMode = mode
+            connectedAt = Date()
             emit(.modeChanged(mode))
             emit(.stateChanged(.running))
             Task { [weak writer = logbookWriter] in
@@ -114,6 +116,7 @@ public actor ModeCoordinator {
 
         do {
             try await mihomoManager.stop()
+            connectedAt = nil
             emit(.stateChanged(.stopped))
             Task { [weak writer = logbookWriter] in
                 await writer?.logInfo("mode stopped", category: .modeChange)
@@ -232,7 +235,7 @@ public actor ModeCoordinator {
             activeConnections: activeConnections,
             bytesUp: UInt64(traffic.up),
             bytesDown: UInt64(traffic.down),
-            uptimeSeconds: nil, // uptime tracking not yet implemented
+            uptimeSeconds: connectedAt.map { Date().timeIntervalSince($0) },
             helperInstalled: helperInstalled
         )
     }
@@ -519,6 +522,7 @@ public actor ModeCoordinator {
                 }
                 try await mihomoManager.start(mode: targetMode, profile: currentProfile)
                 activeMode = targetMode
+                connectedAt = Date()
                 emit(.modeChanged(targetMode))
                 Task { [weak writer = logbookWriter] in
                     await writer?.logInfo("env switch: \(activeMode) → \(targetMode)", category: .modeChange)

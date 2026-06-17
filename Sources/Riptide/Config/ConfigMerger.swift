@@ -200,7 +200,8 @@ public struct ConfigMerger: Sendable {
         case .tuic: return "tuic"
         case .wireguard: return "wireguard"
         case .reality, .anytls, .ssh:
-            // NOTE(Task 16/17): map to mihomo type string once data fields land.
+            // These kinds are not emitted to mihomo YAML. REALITY is
+            // represented as a vless outbound with reality-* fields.
             return ""
         }
     }

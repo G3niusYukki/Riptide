@@ -24,7 +24,7 @@ Both platforms cut the same `vX.Y.Z` git tag and are bundled together in a
 single GitHub release. Linux is built by CI but not yet packaged for
 distribution.
 
-**Current state (v2.4.0)** — 593 tests in 93 suites, all passing. SwiftLint
+**Current state (v2.7.0)** — 968 tests in 103 test files, all passing. SwiftLint
 strict is green on the new code. The macOS app is the primary development
 target; Windows and Linux track it. iOS is **explicitly out of scope** for
 v3.0.0 — see the archived `docs/_archive/riptide-ios-stub/`.
@@ -58,7 +58,7 @@ Sources/RiptideApp/                 # SwiftUI macOS app target
 Sources/RiptideCLI/                 # `riptide` command-line tool
 Sources/RiptideTunnel/              # NetworkExtension (macOS only)
 RiptideHelper/                      # privileged XPC service (SMJobBless)
-Tests/RiptideTests/                 # 72 files, 593 tests, 93 suites
+Tests/RiptideTests/                 # 103 files, 968 tests
 Scripts/                            # build-release.sh, bump-version.sh, signing
 .github/workflows/                  # release.yml, ci.yml, deploy-docs.yml, …
 homebrew/                           # Homebrew Formula + auto-update workflow
@@ -143,7 +143,7 @@ the same `Riptide` library as the app, with no UI.
 
 ## 7. Tests — Tests/RiptideTests/
 
-72 files, 593 tests in 93 suites. Coverage includes: config parsing and
+103 files, 968 tests. Coverage includes: config parsing and
 merging, rule engine (15+ rule types), DNS (UDP/TCP/DoH/DoT/DoQ/FakeIP),
 protocol framing (SS/VLESS/Trojan/Hy2/Snell), transports, tunnel runtime,
 mihomo API + config generation, subscription URI parser + serializer,
@@ -161,7 +161,7 @@ launch-at-login, URL scheme, Touch Bar, and menu bar popover.
 
 ```bash
 swift build                              # library + CLI + app
-swift test                               # 593 tests, 93 suites
+swift test                               # 968 tests
 swift test --filter "RuleEngine"         # single suite
 swift run RiptideApp                     # launch UI
 swift run riptide --help                 # CLI
@@ -296,7 +296,7 @@ User selects TUN → UI checks is_elevated; if not, install_tun_service
 - Run targeted tests first when changing a focused area:
   `swift test --filter "SuiteName"`.
 - Run `swift test` before claiming the work is complete
-  (593 / 593 must pass).
+  (968 / 968 must pass).
 - If changing CLI behavior, verify with `swift run riptide ...`.
 - If changing app-facing state or workflow code, sanity-check
   `swift run RiptideApp` builds and launches.
@@ -304,6 +304,10 @@ User selects TUN → UI checks is_elevated; if not, install_tun_service
   enforces 0 violations on new code.
 - On Windows changes, run `cargo check` (or `cargo build` for
   full verification) and `npm run tsc` before claiming done.
+- After building a release bundle, smoke-test the actual `.dmg`/`.zip`
+  download (launch the app, confirm it doesn't crash at startup). The
+  v2.1–v2.6 builds all crashed because Sparkle.framework wasn't bundled —
+  `swift run` hid the bug because it doesn't exercise the packaged bundle.
 - Never push directly to `master` without a green CI on the prior
   commit. The release tag flow is: bump version → push --follow-tags →
   release workflow runs → GitHub Release published with 7 assets

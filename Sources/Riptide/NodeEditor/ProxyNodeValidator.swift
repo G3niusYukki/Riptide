@@ -121,7 +121,7 @@ public actor ProxyNodeValidator {
             break
 
         case .reality, .anytls, .ssh:
-            // NOTE(Task 16/17): add field validation for these kinds once data fields land.
+            // Placeholder kinds — no additional field validation.
             break
         }
         return errors
