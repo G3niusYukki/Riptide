@@ -2,10 +2,10 @@ import Foundation
 import SwiftUI
 import AppKit
 
-/// Theme manager that persists and applies user theme preferences.
 @MainActor
-public final class ThemeManager: ObservableObject {
-    @Published public private(set) var appearanceMode: AppearanceMode
+@Observable
+public final class ThemeManager {
+    public private(set) var appearanceMode: AppearanceMode
 
     public enum AppearanceMode: String, Codable {
         case system
@@ -21,14 +21,12 @@ public final class ThemeManager: ObservableObject {
         applyAppearance()
     }
 
-    /// Sets the appearance mode and persists the choice.
     public func setAppearance(_ mode: AppearanceMode) {
         appearanceMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: defaultsKey)
         applyAppearance()
     }
 
-    /// Applies the current appearance mode to the app.
     private func applyAppearance() {
         let appearance: NSAppearance?
         switch appearanceMode {
@@ -42,7 +40,6 @@ public final class ThemeManager: ObservableObject {
         NSApp.appearance = appearance
     }
 
-    /// Returns whether the current effective appearance is dark.
     public var isDark: Bool {
         let effective = NSApp.effectiveAppearance
         let name = effective.bestMatch(from: [.aqua, .darkAqua]) ?? .aqua

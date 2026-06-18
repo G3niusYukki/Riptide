@@ -28,7 +28,7 @@ extension AppViewModel {
         currentSpeedDown = 0
     }
 
-    internal func refreshStats() async {
+    public func refreshStats() async {
         let traffic = await modeCoordinator.getTraffic()
         let connections = await modeCoordinator.getConnections()
 

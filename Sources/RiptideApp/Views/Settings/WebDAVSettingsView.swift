@@ -4,12 +4,12 @@ import Riptide
 /// WebDAV configuration synchronization settings view
 @MainActor
 struct WebDAVSettingsView: View {
-    @StateObject private var viewModel: WebDAVViewModel
+    @State private var viewModel: WebDAVViewModel
     @State private var showConflictResolution = false
     @Environment(\.dismiss) private var dismiss
     
     init(profileStore: ProfileStore? = nil) {
-        _viewModel = StateObject(wrappedValue: WebDAVViewModel(profileStore: profileStore))
+        _viewModel = State(wrappedValue: WebDAVViewModel(profileStore: profileStore))
     }
     
     var body: some View {

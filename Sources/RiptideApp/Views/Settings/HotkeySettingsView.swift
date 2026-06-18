@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 struct HotkeySettingsView: View {
-    @ObservedObject var hotkeyManager: HotkeyManager
+    @Bindable var hotkeyManager: HotkeyManager
     @State private var recordingAction: HotkeyManager.HotkeyAction?
     @State private var recordingMonitor: Any?
     @State private var conflictWarning: String?

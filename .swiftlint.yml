@@ -61,6 +61,17 @@ identifier_name:
     - k
     - dx
     - dy
+    - a
+    - r
+    - g
+    - b
+    - c
+    - p
+    - n
+    - d
+    - s
+    - h
+    - h
 
 excluded:
   - vendor/

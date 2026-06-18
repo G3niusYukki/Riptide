@@ -5,13 +5,14 @@ import Riptide
 
 /// ViewModel for MITM settings, bridging the MITMManager to SwiftUI.
 @MainActor
-public final class MITMSettingsViewModel: ObservableObject {
-    @Published public var enabled: Bool = false
-    @Published public var hosts: [String] = []
-    @Published public var excludeHosts: [String] = []
-    @Published public var isCAInstalled: Bool = false
-    @Published public var interceptLog: [String] = []
-    @Published public var httpFlowRecords: [MITMHTTPFlowRecord] = []
+@Observable
+public final class MITMSettingsViewModel {
+    public var enabled: Bool = false
+    public var hosts: [String] = []
+    public var excludeHosts: [String] = []
+    public var isCAInstalled: Bool = false
+    public var interceptLog: [String] = []
+    public var httpFlowRecords: [MITMHTTPFlowRecord] = []
 
     private let mitmManager: MITMManager
 

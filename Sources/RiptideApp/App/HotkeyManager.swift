@@ -1,10 +1,12 @@
 import Foundation
+import Observation
 import AppKit
 
 /// Manages global keyboard shortcuts using NSEvent global monitors.
 @MainActor
-public final class HotkeyManager: ObservableObject {
-    @Published public var shortcuts: [HotkeyShortcut]
+@Observable
+public final class HotkeyManager {
+    public var shortcuts: [HotkeyShortcut]
 
     public struct HotkeyShortcut: Identifiable, Codable, Equatable {
         public let id: UUID

@@ -50,6 +50,8 @@ struct ValidationErrorView: View {
             Image(systemName: hasErrors ? "xmark.circle.fill" : (hasWarnings ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"))
                 .font(.title)
                 .foregroundStyle(hasErrors ? Theme.danger : (hasWarnings ? Theme.warning : Theme.success))
+                .symbolEffect(.bounce, value: hasErrors)
+                .symbolEffect(.bounce, value: hasWarnings)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(NSLocalizedString(Localized.configMode.rawValue, comment: "Configuration Validation"))
@@ -104,6 +106,7 @@ struct ValidationErrorView: View {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.success)
+                .symbolEffect(.bounce, value: result.issues.isEmpty)
 
             Text(NSLocalizedString(Localized.logsNoLogs.rawValue, comment: ""))
                 .font(.headline)

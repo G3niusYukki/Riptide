@@ -8,7 +8,7 @@ struct ProxyListView: View {
     var body: some View {
         List(proxies, id: \.name, selection: $selected) { node in
             HStack {
-                Circle().fill(.green).frame(width: 8, height: 8)
+                Circle().fill(Theme.success).frame(width: 8, height: 8)
                 Text(node.name).font(.system(.body))
                 Spacer()
                 Text(node.kind.kindString)
@@ -33,7 +33,7 @@ struct RuleTableView: View {
                     .font(.system(.caption))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                    .background(Theme.info.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
                 Text(rule.ruleDescription)
                     .font(.system(.callout))
                 Spacer()
@@ -194,7 +194,7 @@ struct SettingsView: View {
                 if let error = viewModel.mihomoDownloadError {
                     Text("错误: \(error)")
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundColor(Theme.danger)
                 }
 
                 // Version switcher
@@ -294,16 +294,16 @@ extension ProxyRule {
         case .domain(let d, _): return d
         case .domainSuffix(let s, _): return s
         case .domainKeyword(let k, _): return k
-        case .ipCIDR(let c, _): return c
-        case .ipCIDR6(let c, _): return c
-        case .srcIPCIDR(let c, _): return c
-        case .srcPort(let p, _): return "\(p)"
-        case .dstPort(let p, _): return "\(p)"
-        case .processName(let n, _): return n
-        case .geoIP(let c, _): return c
-        case .ipASN(let a, _): return "AS\(a)"
-        case .geoSite(let c, let cat, _): return "\(c),\(cat)"
-        case .ruleSet(let n, _): return n
+        case .ipCIDR(let cidr, _): return cidr
+        case .ipCIDR6(let cidr, _): return cidr
+        case .srcIPCIDR(let cidr, _): return cidr
+        case .srcPort(let port, _): return "\(port)"
+        case .dstPort(let port, _): return "\(port)"
+        case .processName(let name, _): return name
+        case .geoIP(let code, _): return code
+        case .ipASN(let asn, _): return "AS\(asn)"
+        case .geoSite(let code, let cat, _): return "\(code),\(cat)"
+        case .ruleSet(let name, _): return name
         case .script(let code, _): return String(code.prefix(30)) + "..."
         case .not(let ruleType, let value, _): return "\(ruleType) \(value)"
         case .matchAll: return "*"

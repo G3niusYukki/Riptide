@@ -100,7 +100,7 @@ public struct ProxyGroupDisplay: Identifiable, Equatable {
     public let selectedNodeName: String?
 }
 
-public struct ConnectionInfo: Identifiable {
+public struct ConnectionInfo: Identifiable, Hashable {
     public let id: UUID
     /// Raw backend connection ID — use this for close operations.
     public let backendId: String

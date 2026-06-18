@@ -33,8 +33,8 @@ final class AppCoordinator {
 struct RiptideApp: App {
     @State private var appVM = AppViewModel()
     @State private var statusBar: StatusBarController?
-    @StateObject private var themeManager = ThemeManager()
-    @StateObject private var hotkeyManager = HotkeyManager()
+    @State private var themeManager = ThemeManager()
+    @State private var hotkeyManager = HotkeyManager()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     private var shouldShowMainUI: Bool {
@@ -48,7 +48,7 @@ struct RiptideApp: App {
         WindowGroup {
             Group {
                 if shouldShowMainUI {
-                    MainTabView(vm: appVM, themeManager: themeManager)
+                    MainTabView(vm: appVM)
                         .accessibilityIdentifier(A11yID.App.mainWindow)
                         .preferredColorScheme(colorScheme)
                         .frame(minWidth: 800, minHeight: 500)
@@ -121,6 +121,21 @@ struct RiptideApp: App {
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
             }
+
+            CommandGroup(replacing: .appSettings) {
+                Button("设置…") {
+                    if #available(macOS 14.0, *) {
+                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    } else {
+                        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                    }
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+        Settings {
+            SettingsTabView(vm: appVM, themeManager: themeManager)
+                .preferredColorScheme(colorScheme)
         }
     }
 

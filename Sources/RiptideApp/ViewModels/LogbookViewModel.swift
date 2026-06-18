@@ -1,23 +1,24 @@
 import Foundation
-import Combine
+import Observation
 import Riptide
 
 /// UI-facing view model for the Logbook (Diagnostics) tab.
 ///
 /// Reads/writes are mediated by `LogbookStore` and `LogbookWriter`. The
-/// view model is `@MainActor` and `ObservableObject` so SwiftUI can drive
-/// re-renders directly from its `@Published` filter properties.
+/// view model is `@MainActor` and `@Observable` so SwiftUI can drive
+/// re-renders directly from its filter properties.
 @MainActor
-public final class LogbookViewModel: ObservableObject {
+@Observable
+public final class LogbookViewModel {
 
     // MARK: - Published State
 
-    @Published public private(set) var entries: [LogbookEntry] = []
-    @Published public private(set) var isLoading: Bool = false
-    @Published public private(set) var totalSize: Int64 = 0
-    @Published public var filterLevel: Riptide.LogLevel?
-    @Published public var filterCategory: LogbookCategory?
-    @Published public var dateRange: DateRange = .last24h
+    public private(set) var entries: [LogbookEntry] = []
+    public private(set) var isLoading: Bool = false
+    public private(set) var totalSize: Int64 = 0
+    public var filterLevel: Riptide.LogLevel?
+    public var filterCategory: LogbookCategory?
+    public var dateRange: DateRange = .last24h
 
     // MARK: - Date Range
 

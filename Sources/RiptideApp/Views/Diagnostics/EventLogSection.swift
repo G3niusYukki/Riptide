@@ -4,12 +4,12 @@ import AppKit
 
 struct EventLogSection: View {
     @Bindable var vm: AppViewModel
-    @ObservedObject private var logbookVM: LogbookViewModel
+    @Bindable var logbookVM: LogbookViewModel
     @State private var saveError: String?
 
     init(vm: AppViewModel) {
         self.vm = vm
-        self._logbookVM = ObservedObject(wrappedValue: vm.logbook.viewModel)
+        self.logbookVM = vm.logbook.viewModel
     }
 
     private var filtered: [LogbookEntry] {

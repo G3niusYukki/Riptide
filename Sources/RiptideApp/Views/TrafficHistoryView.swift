@@ -37,9 +37,9 @@ struct TrafficHistoryView: View {
 
             HStack(spacing: 24) {
                 Label("\(formatBytes(Int(totalUp))) ↑", systemImage: "arrow.up.circle.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Theme.accent)
                 Label("\(formatBytes(Int(totalDown))) ↓", systemImage: "arrow.down.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
             }
             .font(.subheadline)
 
@@ -52,12 +52,12 @@ struct TrafficHistoryView: View {
                             x: .value("Date", point.date, unit: .day),
                             y: .value("Up", point.up)
                         )
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Theme.accent)
                         BarMark(
                             x: .value("Date", point.date, unit: .day),
                             y: .value("Down", point.down)
                         )
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.success)
                     }
                 }
                 .frame(height: 200)

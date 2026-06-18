@@ -59,7 +59,7 @@ private struct KernelRow: View {
     private var badge: some View {
         switch availability {
         case .active:
-            return Text("已启用").font(.caption.bold()).foregroundStyle(.green)
+            return Text("已启用").font(.caption.bold()).foregroundStyle(Theme.success)
         case .installed:
             return Text("已安装").font(.caption).foregroundStyle(.secondary)
         case .notInstalled:

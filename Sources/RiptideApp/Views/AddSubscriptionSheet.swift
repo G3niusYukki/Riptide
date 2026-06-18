@@ -62,7 +62,7 @@ struct AddSubscriptionSheet: View {
                 if let error = fetchError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.danger)
                     }
                 }
             }

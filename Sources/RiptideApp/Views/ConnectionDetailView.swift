@@ -98,7 +98,7 @@ struct ConnectionDetailView: View {
                             .foregroundStyle(Theme.subtext)
                         Text(formatBytes(conn.uploadBytes))
                             .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Theme.accent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("下载")
@@ -106,7 +106,7 @@ struct ConnectionDetailView: View {
                             .foregroundStyle(Theme.subtext)
                         Text(formatBytes(conn.downloadBytes))
                             .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.success)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("总计")
@@ -219,9 +219,9 @@ struct TimingWaterfallSection: View {
 
     private var phases: [Phase] {
         [
-            Phase(id: "dns", label: "DNS", color: .blue, durationMs: 12.0),
-            Phase(id: "tcp", label: "TCP", color: .green, durationMs: 45.0),
-            Phase(id: "tls", label: "TLS", color: .orange, durationMs: conn.protocol == "http" ? nil : 80.0),
+            Phase(id: "dns", label: "DNS", color: Theme.accent, durationMs: 12.0),
+            Phase(id: "tcp", label: "TCP", color: Theme.success, durationMs: 45.0),
+            Phase(id: "tls", label: "TLS", color: Theme.warning, durationMs: conn.protocol == "http" ? nil : 80.0),
             Phase(id: "proxy", label: "代理握手", color: .purple, durationMs: conn.proxyName == "Direct" ? nil : 120.0),
         ]
     }

@@ -197,7 +197,7 @@ struct NodeEditSheet: View {
                     Section {
                         ForEach(validationErrors, id: \.self) { error in
                             Label(error, systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Theme.danger)
                         }
                     }
                 }
@@ -354,7 +354,7 @@ struct NodeQRSheet: View {
                     .foregroundStyle(.secondary)
             } else {
                 Text("以下节点不支持分享: \(unsupportedNames.joined(separator: ", "))")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
             }
 
             // Grid of QRs

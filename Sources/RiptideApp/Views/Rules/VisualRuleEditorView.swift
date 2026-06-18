@@ -108,7 +108,7 @@ struct VisualRuleEditorView: View {
             if let validationError {
                 Text(validationError)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
             }
 
             HStack {

@@ -38,6 +38,7 @@ public struct MenuBarPopoverView: View {
             Image(systemName: viewModel.isRunning ? "shield.lefthalf.filled" : "shield.slash")
                 .foregroundStyle(viewModel.isRunning ? Theme.success : Theme.subtext)
                 .font(.title3)
+                .contentTransition(.symbolEffect(.replace))
             VStack(alignment: .leading, spacing: 1) {
                 Text("Riptide")
                     .font(.headline)
@@ -78,6 +79,7 @@ public struct MenuBarPopoverView: View {
                 } label: {
                     Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
                         .frame(width: 16, height: 16)
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(viewModel.isRunning ? Theme.danger : Theme.success)
@@ -152,9 +154,9 @@ public struct MenuBarPopoverView: View {
 
     private var speedCard: some View {
         HStack(spacing: 0) {
-            speedCell(title: "↑ 上传", bytes: viewModel.currentSpeedUp, color: .blue)
+            speedCell(title: "↑ 上传", bytes: viewModel.currentSpeedUp, color: Theme.accent)
             Divider().frame(height: 24)
-            speedCell(title: "↓ 下载", bytes: viewModel.currentSpeedDown, color: .green)
+            speedCell(title: "↓ 下载", bytes: viewModel.currentSpeedDown, color: Theme.success)
         }
         .padding(.vertical, 6)
         .background(Color.primary.opacity(0.04))
@@ -206,6 +208,7 @@ public struct MenuBarPopoverView: View {
             Image(systemName: "circle.fill")
                 .font(.system(size: 5))
                 .foregroundStyle(group.selectedNodeName == nil ? Theme.subtext : Theme.accent)
+                .symbolEffect(.bounce, value: group.selectedNodeName)
             Text(group.name)
                 .font(.caption)
                 .fontWeight(.medium)

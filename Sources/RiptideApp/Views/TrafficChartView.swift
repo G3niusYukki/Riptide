@@ -28,14 +28,14 @@ public struct TrafficChartView: View {
                     title: "Upload",
                     value: formatSpeed(currentUpSpeed),
                     icon: "arrow.up",
-                    color: .blue
+                    color: Theme.accent
                 )
 
                 TrafficStatBox(
                     title: "Download",
                     value: formatSpeed(currentDownSpeed),
                     icon: "arrow.down",
-                    color: .green
+                    color: Theme.success
                 )
             }
 
@@ -45,14 +45,14 @@ public struct TrafficChartView: View {
                     title: "Total Up",
                     bytes: totalTraffic.totalUp,
                     icon: "arrow.up.circle",
-                    color: .blue
+                    color: Theme.accent
                 )
 
                 TotalTrafficBox(
                     title: "Total Down",
                     bytes: totalTraffic.totalDown,
                     icon: "arrow.down.circle",
-                    color: .green
+                    color: Theme.success
                 )
             }
 
@@ -63,7 +63,7 @@ public struct TrafficChartView: View {
                         x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.upSpeed)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Theme.accent)
                     .interpolationMethod(.catmullRom)
                     .accessibilityLabel("Upload")
                     .accessibilityValue("\(Int(point.upSpeed)) bytes per second")
@@ -72,14 +72,14 @@ public struct TrafficChartView: View {
                         x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.upSpeed)
                     )
-                    .foregroundStyle(.blue.opacity(0.1))
+                    .foregroundStyle(Theme.accent.opacity(0.1))
                     .interpolationMethod(.catmullRom)
 
                     LineMark(
                         x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.downSpeed)
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
                     .interpolationMethod(.catmullRom)
                     .accessibilityLabel("Download")
                     .accessibilityValue("\(Int(point.downSpeed)) bytes per second")
@@ -88,7 +88,7 @@ public struct TrafficChartView: View {
                         x: .value("Time", Date(timeIntervalSince1970: point.timestamp)),
                         y: .value("Speed", point.downSpeed)
                     )
-                    .foregroundStyle(.green.opacity(0.1))
+                    .foregroundStyle(Theme.success.opacity(0.1))
                     .interpolationMethod(.catmullRom)
                 }
             }
@@ -109,13 +109,13 @@ public struct TrafficChartView: View {
             .chartLegend(position: .top, alignment: .leading) {
                 HStack {
                     Circle()
-                        .fill(.blue)
+                        .fill(Theme.accent)
                         .frame(width: 8, height: 8)
                     Text("Upload")
                         .font(.caption)
 
                     Circle()
-                        .fill(.green)
+                        .fill(Theme.success)
                         .frame(width: 8, height: 8)
                     Text("Download")
                         .font(.caption)
@@ -132,7 +132,7 @@ public struct TrafficChartView: View {
                         .foregroundStyle(.secondary)
                     Text(formatSpeed(peakUpload))
                         .font(.callout)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Theme.accent)
                 }
 
                 Spacer()
@@ -143,7 +143,7 @@ public struct TrafficChartView: View {
                         .foregroundStyle(.secondary)
                     Text(formatSpeed(peakDownload))
                         .font(.callout)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.success)
                 }
             }
             .padding(.horizontal)
@@ -182,14 +182,14 @@ public struct TrafficChartView: View {
     }
 
     private func refreshData() async {
-        let h = await viewModel.history
+        let hist = await viewModel.history
         let total = await viewModel.totalTraffic
         let peakUp = await viewModel.peakUploadSpeed
         let peakDown = await viewModel.peakDownloadSpeed
         let speed = await viewModel.currentSpeed()
 
         await MainActor.run {
-            history = h
+            history = hist
             totalTraffic = total
             peakUpload = peakUp
             peakDownload = peakDown

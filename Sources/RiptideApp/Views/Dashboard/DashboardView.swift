@@ -6,6 +6,7 @@ import SwiftUI
 struct DashboardView: View {
     @Bindable var vm: AppViewModel
     @State private var showDiagnostics = false
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var currentSelectedNode: String {
         // Find the currently selected proxy from the first non-direct group
@@ -49,9 +50,13 @@ struct DashboardView: View {
                 // MARK: - Recent Connections
                 recentConnectionsSection
             }
-            .padding()
         }
+        .contentMargins(.all, Theme.Spacing.lg, for: .scrollContent)
         .background(Theme.backgroundGradient.ignoresSafeArea())
+        .refreshable {
+            await vm.refreshStats()
+            await vm.loadSubscriptionsFromBackend()
+        }
         .sheet(isPresented: $showDiagnostics) {
             DiagnosticsView()
                 .frame(width: 560, height: 600)
@@ -61,8 +66,11 @@ struct DashboardView: View {
     // MARK: - Status Cards Row
 
     private var statusCardsRow: some View {
-        HStack(spacing: 12) {
-            // Mode Card
+        let layout = typeSize >= .accessibility1
+            ? AnyLayout(VStackLayout(spacing: Theme.Spacing.md))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+
+        return layout {
             StatusCard(
                 icon: modeIcon,
                 iconColor: modeColor,
@@ -72,7 +80,6 @@ struct DashboardView: View {
             )
             .accessibilityIdentifier(A11yID.Dashboard.modeCard)
 
-            // Node Card
             StatusCard(
                 icon: "antenna.radiowaves.left.and.right",
                 iconColor: Theme.success,
@@ -82,13 +89,13 @@ struct DashboardView: View {
             )
             .accessibilityIdentifier(A11yID.Dashboard.nodeCard)
 
-            // Uptime / State Card
             StatusCard(
                 icon: isRunning ? "circle.fill" : "circle",
                 iconColor: isRunning ? Theme.success : Theme.danger,
                 title: "状态",
                 value: isRunning ? "运行中" : "已停止",
-                subtitle: totalTrafficSummary
+                subtitle: totalTrafficSummary,
+                isActive: isRunning
             )
         }
     }
@@ -100,12 +107,12 @@ struct DashboardView: View {
             SpeedBox(
                 title: "↑ 上传",
                 speed: vm.currentSpeedUp,
-                color: .blue
+                color: Theme.accent
             )
             SpeedBox(
                 title: "↓ 下载",
                 speed: vm.currentSpeedDown,
-                color: .green
+                color: Theme.success
             )
         }
         .accessibilityIdentifier(A11yID.Dashboard.speedCard)
@@ -228,12 +235,15 @@ struct StatusCard: View {
     let title: String
     let value: String
     let subtitle: String
+    var isActive: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(iconColor)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.pulse, isActive: isActive)
 
             Text(title)
                 .font(.caption)

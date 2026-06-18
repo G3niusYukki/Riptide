@@ -4,7 +4,7 @@ import Riptide
 struct LogTabView: View {
     @Bindable var vm: AppViewModel
     @State private var searchText = ""
-    @State private var selectedLevel: Riptide.LogLevel? = nil
+    @State private var selectedLevel: Riptide.LogLevel?
 
     private var effectiveLevel: Riptide.LogLevel? {
         selectedLevel
@@ -88,6 +88,9 @@ struct LogTabView: View {
                         }
                     }
                     .padding()
+                }
+                .refreshable {
+                    await vm.fetchLogs()
                 }
                 .background(Theme.background)
                 .onChange(of: filteredLogs.count) { _, _ in

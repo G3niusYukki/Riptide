@@ -97,7 +97,7 @@ public struct LogStreamView: View {
                 if let error = viewModel.lastError {
                     Label(error.localizedDescription, systemImage: "exclamationmark.triangle")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.danger)
                 }
             }
             .padding()
@@ -155,9 +155,9 @@ struct LogEntryRow: View {
     private var levelColor: Color {
         switch entry.level {
         case .debug: return .gray
-        case .info: return .blue
-        case .warning: return .orange
-        case .error: return .red
+        case .info: return Theme.info
+        case .warning: return Theme.warning
+        case .error: return Theme.danger
         }
     }
 

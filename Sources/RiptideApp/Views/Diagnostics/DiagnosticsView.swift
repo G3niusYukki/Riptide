@@ -104,9 +104,11 @@ struct DiagnosticsView: View {
             if report.allPassed {
                 Label("全部正常", systemImage: "checkmark.seal.fill")
                     .foregroundStyle(Theme.success)
+                    .symbolEffect(.bounce, value: report.allPassed)
             } else if report.hasFailures {
                 Label("需要修复", systemImage: "wrench.fill")
                     .foregroundStyle(Theme.danger)
+                    .symbolEffect(.bounce, value: report.hasFailures)
             }
         }
         .padding()
@@ -121,6 +123,7 @@ struct DiagnosticsView: View {
             Image(systemName: check.status.icon)
                 .foregroundStyle(statusColor(check.status))
                 .font(.title3)
+                .symbolEffect(.bounce, value: report?.checks.count ?? 0)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {

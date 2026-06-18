@@ -6,8 +6,8 @@ import Riptide
 /// Unified settings container with navigation to all sub-settings views.
 struct SettingsTabView: View {
     @Bindable var vm: AppViewModel
-    @ObservedObject var themeManager: ThemeManager
-    @StateObject private var hotkeyManager = HotkeyManager()
+    @Bindable var themeManager: ThemeManager
+    @State private var hotkeyManager = HotkeyManager()
 
     @State private var launchAtLogin: Bool = false
     @State private var launchAgentLoaded: Bool = false
@@ -255,8 +255,8 @@ struct SettingsTabView: View {
                         }
                     }
                 }
-                .padding()
             }
+            .contentMargins(.all, Theme.Spacing.lg, for: .scrollContent)
             .navigationTitle("设置")
             .background(Theme.backgroundGradient.ignoresSafeArea())
         }

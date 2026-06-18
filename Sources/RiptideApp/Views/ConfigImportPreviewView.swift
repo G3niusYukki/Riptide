@@ -45,7 +45,7 @@ public struct ConfigImportPreviewView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Theme.warning)
                         Text("解析失败")
                             .font(.headline)
                         Text(error)
@@ -91,13 +91,13 @@ public struct ConfigImportPreviewView: View {
                     label: "节点",
                     value: "\(config.proxies.count)",
                     icon: "server.rack",
-                    color: .blue
+                    color: Theme.accent
                 )
                 StatBadge(
                     label: "规则",
                     value: "\(config.rules.count)",
                     icon: "list.bullet",
-                    color: .green
+                    color: Theme.success
                 )
                 StatBadge(
                     label: "代理组",
@@ -126,7 +126,7 @@ public struct ConfigImportPreviewView: View {
                         .font(.caption)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.blue.opacity(0.15))
+                        .background(Theme.info.opacity(0.15))
                         .clipShape(Capsule())
 
                     Text(proxy.name)

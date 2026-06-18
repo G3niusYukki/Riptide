@@ -347,6 +347,7 @@ struct ConfigTabView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: vm.isRunning ? "stop.fill" : "play.fill")
+                            .contentTransition(.symbolEffect(.replace))
                         Text(vm.isRunning ? "停止代理" : "启动代理")
                     }
                     .frame(maxWidth: .infinity)
@@ -585,6 +586,7 @@ struct SubscriptionRow: View {
             HStack {
                 Image(systemName: "cloud.fill")
                     .foregroundStyle(Theme.accent)
+                    .symbolEffect(.bounce, value: isUpdating)
                 Text(sub.name)
                     .font(.headline)
                     .foregroundStyle(Theme.text)

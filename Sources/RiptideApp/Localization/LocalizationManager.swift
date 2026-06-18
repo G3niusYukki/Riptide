@@ -1,10 +1,12 @@
 import Foundation
+import Observation
 import SwiftUI
 
 /// Manages app localization and language switching for 7 languages.
 @MainActor
-public final class LocalizationManager: ObservableObject {
-    @Published public var currentLanguage: AppLanguage
+@Observable
+public final class LocalizationManager {
+    public var currentLanguage: AppLanguage
 
     private var strings: [String: String] = [:]
     private let defaultsKey = "riptide.language"
@@ -113,7 +115,7 @@ public extension LocalizationManager {
 /// Convenience view modifier for localized text.
 public struct LocalizedText: View {
     let key: Localized
-    @StateObject private var localization = LocalizationManager()
+    @State private var localization = LocalizationManager()
 
     public init(_ key: Localized) {
         self.key = key

@@ -1,10 +1,11 @@
 import SwiftUI
+import Observation
 import Riptide
 
 /// A menu bar extra providing quick access to Riptide controls.
 @available(macOS 14.0, *)
 public struct RiptideMenuBar: View {
-    @ObservedObject private var viewModel: MenuBarViewModel
+    @Bindable private var viewModel: MenuBarViewModel
 
     public init(viewModel: MenuBarViewModel) {
         self.viewModel = viewModel
@@ -113,16 +114,17 @@ public struct RiptideMenuBar: View {
 /// View model driving the menu bar's state.
 @available(macOS 14.0, *)
 @MainActor
-public final class MenuBarViewModel: ObservableObject {
-    @Published var isRunning: Bool = false
-    @Published var selectedMode: RuntimeMode = .systemProxy
-    @Published var statusLabel: String = "未连接"
-    @Published var uploadSpeed: String = "0 B/s"
-    @Published var downloadSpeed: String = "0 B/s"
-    @Published var profiles: [(id: UUID, name: String, isActive: Bool)] = []
+@Observable
+public final class MenuBarViewModel {
+    var isRunning: Bool = false
+    var selectedMode: RuntimeMode = .systemProxy
+    var statusLabel: String = "未连接"
+    var uploadSpeed: String = "0 B/s"
+    var downloadSpeed: String = "0 B/s"
+    var profiles: [(id: UUID, name: String, isActive: Bool)] = []
 
     private let appViewModel: AppViewModel
-    private var statusTimer: Task<Void, Never>?
+    nonisolated(unsafe) private var statusTimer: Task<Void, Never>?
 
     init(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel

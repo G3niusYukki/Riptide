@@ -27,6 +27,9 @@ struct ProxyTabView: View {
                 .padding()
             }
             .background(Theme.backgroundGradient.ignoresSafeArea())
+            .refreshable {
+                await vm.testDelay()
+            }
             .searchable(text: $searchText, prompt: "搜索节点")
             .toolbar {
                 ToolbarItem {
@@ -43,6 +46,7 @@ struct ProxyTabView: View {
                         }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
+                            .contentTransition(.symbolEffect(.replace))
                     }
                 }
                 ToolbarItem {
@@ -70,6 +74,7 @@ struct ProxyGroupCard: View {
     let filter: ProxyFilter
     let searchText: String
     @State private var isExpanded = true
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var visibleNodes: [ProxyNodeDisplay] {
         var nodes = ProxyTabFilter.applySortAndFilter(
@@ -97,21 +102,29 @@ struct ProxyGroupCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 16)
-                Text(group.name)
-                    .font(.headline)
-                    .foregroundStyle(Theme.text)
-                Text("(\(group.kind.rawValue))")
-                    .font(.caption)
-                    .foregroundStyle(Theme.subtext)
-                Spacer()
-                if let selected = group.selectedNodeName {
-                    Text(selected)
+            let headerLayout = typeSize >= .accessibility2
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 8))
+
+            headerLayout {
+                HStack(spacing: 4) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 16)
+                    Text(group.name)
+                        .font(.headline)
+                        .foregroundStyle(Theme.text)
+                    Text("(\(group.kind.rawValue))")
                         .font(.caption)
-                        .foregroundStyle(Theme.success)
+                        .foregroundStyle(Theme.subtext)
+                }
+                HStack(spacing: 4) {
+                    Spacer()
+                    if let selected = group.selectedNodeName {
+                        Text(selected)
+                            .font(.caption)
+                            .foregroundStyle(Theme.success)
+                    }
                 }
             }
             .padding(12)
@@ -196,6 +209,7 @@ struct ProxyNodeRow: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Theme.success)
+                    .symbolEffect(.bounce, value: isSelected)
             }
         }
         .padding(.horizontal, 16)

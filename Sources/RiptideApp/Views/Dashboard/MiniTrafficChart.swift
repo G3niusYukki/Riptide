@@ -18,14 +18,14 @@ struct MiniTrafficChart: View {
                 x: .value("Time", Date()),
                 y: .value("Up", Double(vm.currentSpeedUp))
             )
-            .foregroundStyle(.blue)
+            .foregroundStyle(Theme.accent)
             .interpolationMethod(.linear)
 
             LineMark(
                 x: .value("Time", Date()),
                 y: .value("Down", Double(vm.currentSpeedDown))
             )
-            .foregroundStyle(.green)
+            .foregroundStyle(Theme.success)
             .interpolationMethod(.linear)
         }
         .chartXAxis(.hidden)

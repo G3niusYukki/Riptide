@@ -1,13 +1,14 @@
 import Foundation
+import Observation
 import SwiftUI
 import Riptide
 
 // MARK: - Conflict Resolution
 
 enum ConflictResolution: String, CaseIterable, Identifiable {
-    case newest = "newest"
-    case ask = "ask"
-    case merge = "merge"
+    case newest
+    case ask
+    case merge
     
     var id: String { rawValue }
     
@@ -58,22 +59,23 @@ enum ConnectionStatus: String {
 // MARK: - WebDAV ViewModel
 
 @MainActor
-class WebDAVViewModel: ObservableObject {
-    @Published var serverURL: String = ""
-    @Published var username: String = ""
-    @Published var password: String = ""
-    @Published var connectionStatus: ConnectionStatus = .unknown
-    @Published var autoSync: Bool = false
-    @Published var syncInterval: Int = 30
-    @Published var conflictResolution: ConflictResolution = .newest
-    @Published var lastSyncTime: Date?
-    @Published var showAlert = false
-    @Published var alertMessage = ""
-    @Published var isSyncing = false
-    @Published var localConfigDate: Date?
-    @Published var remoteConfigDate: Date?
-    @Published var showConflictSheet = false
-    @Published var hasPendingConflict = false
+@Observable
+class WebDAVViewModel {
+    var serverURL: String = ""
+    var username: String = ""
+    var password: String = ""
+    var connectionStatus: ConnectionStatus = .unknown
+    var autoSync: Bool = false
+    var syncInterval: Int = 30
+    var conflictResolution: ConflictResolution = .newest
+    var lastSyncTime: Date?
+    var showAlert = false
+    var alertMessage = ""
+    var isSyncing = false
+    var localConfigDate: Date?
+    var remoteConfigDate: Date?
+    var showConflictSheet = false
+    var hasPendingConflict = false
     
     private var syncManager: ConfigSyncManager?
     private var syncScheduler: SyncScheduler?

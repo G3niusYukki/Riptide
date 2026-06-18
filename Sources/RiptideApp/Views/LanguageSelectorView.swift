@@ -5,7 +5,7 @@ struct LanguageSelectorView: View {
     @State private var selectedLanguage: AppLanguage = .system
     @State private var isAutoDetect = true
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var localization = LocalizationManager()
+    @State private var localization = LocalizationManager()
 
     var body: some View {
         NavigationStack {

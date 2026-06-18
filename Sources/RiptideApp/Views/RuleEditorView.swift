@@ -379,7 +379,7 @@ struct RuleAddSheet: View {
                 if let error = validationError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.danger)
                     }
                 }
 

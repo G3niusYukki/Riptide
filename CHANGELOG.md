@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.8.0] — 2026-06-18
+
+> **macOS — UI/UX modernization overhaul.** Migrates the app from a flat 8-tab `TabView` to `NavigationSplitView` sidebar navigation, adds a proper `Settings` scene (⌘,), introduces a complete design token system (spacing, typography, shadow, animation), migrates all view models to `@Observable`, replaces ~50 hardcoded colors with semantic tokens, adds `.inspector` for connection details, `.symbolEffect` animations across 11 locations, and `.refreshable` / `AnyLayout` / `.contentMargins` modern SwiftUI features. macOS-only; Windows/Linux unchanged.
+
+### Added
+
+- **Design token system (`Theme.swift`).** Complete token system with `Theme.Spacing` (6-step: xs/sm/md/lg/xl/xxl), `Theme.Typography` (system styles + monospaced variants + stat sizes), `Theme.Shadow` (3-step elevation), `Theme.Animation` (3 durations + 3 springs), `Theme.Radius` (sm/md/lg), `.cardStyle()` and `.elevatedCardStyle()` ViewModifiers, and new semantic colors (`Theme.tertiary`, `Theme.info`, `Theme.separator`).
+- **`.symbolEffect` animations (11 locations).** Status icons pulse when active (dashboard status, menu bar shield, diagnostics running), checkmarks bounce on selection (proxy nodes, validation results), play/stop toggles use `.contentTransition(.symbolEffect(.replace))` for smooth morphing, diagnostics check icons bounce when report loads.
+- **`.inspector` for connection details.** Connection list now uses `.inspector(isPresented:)` with a trailing panel (`.inspectorColumnWidth(min: 300, ideal: 350, max: 500)`) instead of inline tap-to-expand. `ConnectionInfo` gained `Hashable` conformance for `List` selection binding.
+- **`.refreshable` pull-to-refresh** on Dashboard (subscriptions + stats), Proxy (delay test), Connections (stats refresh), and Logs (fetch logs).
+- **`AnyLayout` adaptive layouts** — Dashboard status cards and Proxy group headers switch from `HStackLayout` to `VStackLayout` at accessibility Dynamic Type sizes.
+- **`.contentMargins`** replaces manual `.padding()` on Dashboard and Settings scroll content for consistent edge insets.
+- **`Settings` scene (⌘,).** Settings is now a separate window via the `Settings { }` scene, matching macOS HIG. Previously it was embedded as the 8th tab inside the main window.
+- **Sidebar navigation groups.** `NavigationSplitView` sidebar organizes 7 destinations into two sections: 主要 (Dashboard, Proxy, Config) and 监控 (Traffic, Rules, Logs, Diagnostics).
+
+### Changed
+
+- **`MainTabView` → `NavigationSplitView`.** The flat 8-tab `TabView` (Settings was the 8th tab, now a separate scene) is replaced with a modern `NavigationSplitView` — sidebar + detail. This is the standard macOS 14+ pattern used by Surge, Finder, and Activity Monitor.
+- **All 7 remaining `ObservableObject` VMs migrated to `@Observable`.** `ThemeManager`, `LogbookViewModel`, `MITMSettingsViewModel`, `WebDAVViewModel`, `HotkeyManager`, `LocalizationManager`, `MenuBarViewModel` — all now use the `@Observable` macro with `@State` / `@Bindable` / `@Environment()` instead of `@StateObject` / `@ObservedObject` / `@EnvironmentObject`.
+- **~50 hardcoded colors replaced with semantic tokens.** `.blue` → `Theme.accent`, `.green` → `Theme.success`, `.red` → `Theme.danger`, `.orange` → `Theme.warning` across 20 view files. Neutral `.white.opacity()` backgrounds and `.secondary`/`.tertiary` system colors were intentionally preserved.
+- **`refreshStats()` made `public`** so views can call it from `.refreshable` handlers.
+
+### Known limitations
+
+- Asset Catalog color sets (light/dark/high-contrast appearances) are deferred — `NSColor`-adapted semantic colors already handle light/dark mode.
+- Windows and Linux ports are unchanged in this release; the Windows token adoption gap (499 hardcoded `slate-*` Tailwind classes vs 1 file using semantic CSS vars) is tracked for a future release.
+
 ## [2.7.0] — 2026-06-17
 
 > **macOS — TUN mode lands, and the release actually launches.** Adds working TUN mode, fixes a long-standing bug that crashed every shipped build at launch, and polishes the menu bar / subscription UX. macOS-only release; Windows/Linux are unchanged.

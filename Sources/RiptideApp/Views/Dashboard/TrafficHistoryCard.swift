@@ -29,11 +29,11 @@ struct TrafficHistoryCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(Theme.subtext)
             HStack(spacing: 4) {
-                Image(systemName: "arrow.up").foregroundStyle(.blue).font(.caption2)
+                Image(systemName: "arrow.up").foregroundStyle(Theme.accent).font(.caption2)
                 Text(formatBytes(Int(up))).font(.caption.monospaced())
             }
             HStack(spacing: 4) {
-                Image(systemName: "arrow.down").foregroundStyle(.green).font(.caption2)
+                Image(systemName: "arrow.down").foregroundStyle(Theme.success).font(.caption2)
                 Text(formatBytes(Int(down))).font(.caption.monospaced())
             }
         }

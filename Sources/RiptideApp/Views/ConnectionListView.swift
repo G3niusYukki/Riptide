@@ -39,7 +39,8 @@ struct ConnectionListView: View {
     @Bindable var vm: AppViewModel
     @State private var searchText = ""
     @State private var isClosingAll = false
-    @State private var expandedConnectionId: UUID?
+    @State private var selectedConnection: ConnectionInfo?
+    @State private var showInspector = false
     @State private var selectedFilter: ConnectionFilter = .all
     @State private var selectedSort: ConnectionSort = .newest
 
@@ -98,7 +99,7 @@ struct ConnectionListView: View {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedFilter = filter
-                                expandedConnectionId = nil
+                                selectedConnection = nil
                             }
                         } label: {
                             HStack(spacing: 4) {
@@ -133,59 +134,51 @@ struct ConnectionListView: View {
                     Image(systemName: "network.slash")
                         .font(.largeTitle)
                         .foregroundStyle(Theme.subtext)
+                        .symbolEffect(.pulse, isActive: vm.activeConnections.isEmpty)
                     Text("暂无连接")
                         .foregroundStyle(Theme.subtext)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
             } else {
-                // Connection list with expandable detail
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(filteredConnections) { conn in
-                            ConnectionRow(
-                                conn: conn,
-                                isExpanded: expandedConnectionId == conn.id,
-                                onClose: {
-                                    Task { await vm.closeConnection(id: conn.backendId) }
-                                }
-                            )
-                            .contentShape(Rectangle())
-                            .accessibilityIdentifier(A11yID.Traffic.connectionRow + ".\(conn.id)")
-                            .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    if expandedConnectionId == conn.id {
-                                        expandedConnectionId = nil
-                                    } else {
-                                        expandedConnectionId = conn.id
-                                    }
-                                }
-                            }
-
-                            if expandedConnectionId == conn.id {
-                                ConnectionDetailView(conn: conn) {
-                                    Task { await vm.closeConnection(id: conn.backendId) }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                            }
+                List(filteredConnections, selection: $selectedConnection) { conn in
+                    ConnectionRow(
+                        conn: conn,
+                        onClose: {
+                            Task { await vm.closeConnection(id: conn.backendId) }
                         }
-                    }
-                    .padding(.horizontal)
+                    )
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier(A11yID.Traffic.connectionRow + ".\(conn.id)")
+                }
+                .listStyle(.plain)
+                .refreshable {
+                    await vm.refreshStats()
                 }
                 .frame(maxHeight: 400)
+                .onChange(of: selectedConnection) { _, newValue in
+                    showInspector = newValue != nil
+                }
             }
         }
         .padding()
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
         .searchable(text: $searchText, prompt: "搜索连接 / 域名 / 代理")
+        .inspector(isPresented: $showInspector) {
+            if let connection = selectedConnection {
+                ConnectionDetailView(conn: connection) {
+                    Task { await vm.closeConnection(id: connection.backendId) }
+                }
+                .inspectorColumnWidth(min: 300, ideal: 350, max: 500)
+            }
+        }
     }
 }
 
-/// A single connection row with tap-to-expand support.
+/// A single connection row.
 struct ConnectionRow: View {
     let conn: ConnectionInfo
-    let isExpanded: Bool
     let onClose: () -> Void
     @State private var isHovered = false
 
@@ -196,13 +189,6 @@ struct ConnectionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Expand chevron indicator
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                .font(.caption)
-                .foregroundStyle(Theme.subtext)
-                .frame(width: 10)
-                .accessibilityIdentifier(A11yID.Traffic.connectionDetailToggle)
-
             // Protocol badge
             Text(conn.`protocol`)
                 .font(.system(.caption, design: .monospaced))
@@ -226,8 +212,8 @@ struct ConnectionRow: View {
                 .font(.caption)
                 .foregroundStyle(proxyColor)
 
-            // Close button — always visible on expanded, hover for collapsed
-            if isHovered || isExpanded {
+            // Close button on hover
+            if isHovered {
                 Button {
                     onClose()
                 } label: {
@@ -239,7 +225,7 @@ struct ConnectionRow: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(isExpanded ? Theme.accent.opacity(0.08) : (isHovered ? Color.white.opacity(0.05) : Color.clear))
+        .background(isHovered ? Color.white.opacity(0.05) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {

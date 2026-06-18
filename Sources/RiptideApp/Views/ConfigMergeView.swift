@@ -59,10 +59,10 @@ public struct ConfigMergeView: View {
                     // Error
                     if let error = viewModel.error {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.danger)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(.red.opacity(0.1))
+                            .background(Theme.danger.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
@@ -133,7 +133,7 @@ public struct ConfigMergeView: View {
                 ForEach(viewModel.mergeSources) { source in
                     HStack {
                         Image(systemName: sourceIcon(source.kind))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Theme.accent)
 
                         VStack(alignment: .leading) {
                             Text(source.name)
@@ -183,7 +183,7 @@ public struct ConfigMergeView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(Theme.success)
                 .disabled(viewModel.isMerging)
             }
         }
@@ -205,27 +205,27 @@ public struct ConfigMergeView: View {
                     Label("+\(diff.addedProxies.count) 新增节点: \(diff.addedProxies.joined(separator: ", "))",
                           systemImage: "plus.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.success)
                 }
 
                 if !diff.removedProxies.isEmpty {
                     Label("-\(diff.removedProxies.count) 移除节点: \(diff.removedProxies.joined(separator: ", "))",
                           systemImage: "minus.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.danger)
                 }
 
                 if !diff.modifiedProxies.isEmpty {
                     Label("~\(diff.modifiedProxies.count) 修改节点: \(diff.modifiedProxies.joined(separator: ", "))",
                           systemImage: "pencil.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                 }
 
                 if diff.addedRules > 0 {
                     Label("+\(diff.addedRules) 新增规则", systemImage: "plus.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.success)
                 }
 
                 if !diff.hasChanges {

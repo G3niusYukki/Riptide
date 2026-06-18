@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B%20%7C%20Linux-blue?logo=apple" alt="Platforms" />
   <img src="https://img.shields.io/badge/Swift-6.2%2B-F05138?logo=swift" alt="Swift" />
   <img src="https://img.shields.io/badge/tests-593%20passed-brightgreen" alt="Tests" />
-  <img src="https://img.shields.io/badge/version-2.7.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.8.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License" />
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
 </p>
@@ -14,7 +14,7 @@
   Library-first architecture · mihomo-powered runtime · Cross-platform packaging
 </p>
 
-> **What ships today (v2.7.0):** macOS is the primary development target with a SwiftUI app + Swift-first proxy library; Windows is a Tauri 2 port (`riptide-windows/`) sharing the same Clash YAML profile format; Linux is built by CI but not yet packaged. iOS support is **not** planned — see the archived `docs/_archive/riptide-ios-stub/`.
+> **What ships today (v2.8.0):** macOS is the primary development target with a SwiftUI app + Swift-first proxy library; Windows is a Tauri 2 port (`riptide-windows/`) sharing the same Clash YAML profile format; Linux is built by CI but not yet packaged. iOS support is **not** planned — see the archived `docs/_archive/riptide-ios-stub/`.
 
 <p align="center">
   <a href="#-why-riptide">Why Riptide?</a> ·
@@ -75,14 +75,14 @@ UDP · TCP · DNS-over-HTTPS · DNS-over-TLS · DNS-over-QUIC (RFC 9250) · Fake
 - **Traffic** — Swift Charts traffic chart (60s/10m/1h) and connection list with **expandable detail panel** (5-tuple, rule hit tracing, proxy chain, timing)
 - **Rules** — visual rule editor with drag-to-reorder, 10 rule types, policy picker, hit preview
 - **Logs** — live mihomo log streaming with level filter, search, and export
-- **诊断 (Diagnostics, v2.7.0)** — persistent diagnostic event journal (Logbook) with level / category / date filters, JSONL export, and clear. Closes the gap between "what's happening right now" (Logs) and "what happened across restarts" (Diagnostics)
+- **诊断 (Diagnostics, v2.8.0)** — persistent diagnostic event journal (Logbook) with level / category / date filters, JSONL export, and clear. Closes the gap between "what's happening right now" (Logs) and "what happened across restarts" (Diagnostics)
 - **Settings** — unified settings container for Network, MITM, Rewrite, Updates, Core, Diagnostics, WebDAV, Language, Theme
 
 ### Node editor
 
 - Real-time validation, protocol-specific forms, add/edit/delete/duplicate
-- **Override schema (v2.7.0)** — per-profile YAML overlays with `meta.replace` and `removed:` semantics, applied at runtime via `OverrideStore`
-- **QR code share (v2.7.0)** — generate industry-standard share URIs for 6 protocols (ss / vmess / vless / trojan / hysteria2 / tuic); per-row QR code + batch "Share All"
+- **Override schema (v2.8.0)** — per-profile YAML overlays with `meta.replace` and `removed:` semantics, applied at runtime via `OverrideStore`
+- **QR code share (v2.8.0)** — generate industry-standard share URIs for 6 protocols (ss / vmess / vless / trojan / hysteria2 / tuic); per-row QR code + batch "Share All"
 
 ### Menu bar extra
 
@@ -114,12 +114,12 @@ UDP · TCP · DNS-over-HTTPS · DNS-over-TLS · DNS-over-QUIC (RFC 9250) · Fake
 - **Apple Shortcuts** — `SwitchProxyMode` + `SelectProfile` Intents (Shortcuts.app discoverable)
 - **Touch Bar support** — node switching on Touch Bar MacBook Pros
 
-### Persistent diagnostics (v2.7.0)
+### Persistent diagnostics (v2.8.0)
 
 - **Logbook** — JSONL-per-UTC-day journal at `~/Library/Application Support/Riptide/logbook/YYYY-MM-DD.jsonl`
 - 5 fire-and-forget writers (`ModeCoordinator`, `SubscriptionManager`, `HelperToolConnection`, `MihomoRuntimeManager`, `OverrideStore`) — diagnostic logging never blocks business paths
 - Skip-malformed-line read, date-range + level + category + host filter, clear, export
-- Diff-based closed-connection watcher (data model + algorithm in v2.7.0; runtime tick loop is the v2.4.x follow-up)
+- Diff-based closed-connection watcher (data model + algorithm in v2.8.0; runtime tick loop is the v2.4.x follow-up)
 
 ---
 
@@ -229,7 +229,7 @@ sudo rm -rf "/Library/Application Support/Riptide/tun" \
 
 ### Install (macOS)
 
-Riptide v2.7.0 is distributed through three channels, **with no `xattr -cr` workaround required** when the build is signed and notarized (the recommended configuration). Pick whichever fits your setup:
+Riptide v2.8.0 is distributed through three channels, **with no `xattr -cr` workaround required** when the build is signed and notarized (the recommended configuration). Pick whichever fits your setup:
 
 #### Option 1 — Homebrew (recommended)
 
@@ -286,12 +286,12 @@ For a deeper walkthrough (including uninstall, TUN-mode helper install, and trou
 swift build                              # library + CLI + app
 swift test                               # 593 tests, 93 suites
 swift test --filter "RuleEngine"         # single suite
-swift test --filter "LogbookStore"       # v2.7.0 Logbook suite
+swift test --filter "LogbookStore"       # v2.8.0 Logbook suite
 swift run RiptideApp                     # launch UI
 swift run riptide --help                 # CLI
 ./Scripts/download-mihomo.sh             # fetch mihomo for sidecar mode
 ./Scripts/build-release.sh               # build + sign a release bundle
-./Scripts/bump-version.sh 2.7.0         # coordinated version bump
+./Scripts/bump-version.sh 2.8.0         # coordinated version bump
 ```
 
 ### Windows
@@ -346,7 +346,7 @@ For an authoritative description of every directory's responsibility, see **[AGE
 
 ## 🔒 Security
 
-> Status reflects the v2.7.0 configuration. Items marked *(when configured)* activate automatically once the corresponding credentials are provided to the release pipeline — see [`docs/signing-setup.md`](docs/signing-setup.md).
+> Status reflects the v2.8.0 configuration. Items marked *(when configured)* activate automatically once the corresponding credentials are provided to the release pipeline — see [`docs/signing-setup.md`](docs/signing-setup.md).
 
 ### Distribution integrity
 
@@ -367,7 +367,7 @@ For an authoritative description of every directory's responsibility, see **[AGE
 ### Sandbox status (honest)
 
 - The shipped macOS app is **not** sandboxed. `Riptide.entitlements` sets `com.apple.security.app-sandbox = false`. This is intentional: Riptide is distributed outside the Mac App Store, and the helper tool / mihomo sidecar / system proxy guard require capabilities that the App Sandbox does not grant.
-- For Mac App Store submission the sandbox would need to be re-enabled and the entitlement set trimmed accordingly — see [`docs/MAC-APP-STORE-CHECKLIST.md`](docs/MAC-APP-STORE-CHECKLIST.md). v2.7.0 does **not** ship to the App Store.
+- For Mac App Store submission the sandbox would need to be re-enabled and the entitlement set trimmed accordingly — see [`docs/MAC-APP-STORE-CHECKLIST.md`](docs/MAC-APP-STORE-CHECKLIST.md). v2.8.0 does **not** ship to the App Store.
 - **Reporting vulnerabilities:** please open a GitHub issue or contact the maintainers privately (do not include credentials or node URIs in reports).
 
 ---
@@ -381,7 +381,7 @@ Contributions are welcome! A few guidelines:
 3. **Test coverage** — add tests for new behavior; `swift test` must pass (593 / 593)
 4. **No force unwraps** in production — use proper error handling with typed error enums
 5. **No silent fallbacks** — fail explicitly rather than silently degrading. The one allowed exception is fire-and-forget diagnostic logging (Logbook), and only because business paths must never block on diagnostic writes
-6. **Dependency injection** over hard-coded global behavior. For v2.7.0+ cross-cutting concerns, the pattern is `Module.setFoo(dependency) async` on actors + a single injection site in `AppViewModel.init`
+6. **Dependency injection** over hard-coded global behavior. For v2.8.0+ cross-cutting concerns, the pattern is `Module.setFoo(dependency) async` on actors + a single injection site in `AppViewModel.init`
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full contribution workflow, PR conventions, and release process.
 

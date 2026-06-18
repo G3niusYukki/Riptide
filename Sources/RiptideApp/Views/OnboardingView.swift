@@ -165,6 +165,7 @@ struct OnboardingView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(Theme.success)
+                .symbolEffect(.bounce, value: true)
             Text("设置完成！")
                 .font(.title.bold())
                 .foregroundStyle(Theme.text)
@@ -215,6 +216,7 @@ private struct ModeOptionView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Theme.accent)
                         .font(.title3)
+                        .contentTransition(.symbolEffect(.replace))
                 } else {
                     Image(systemName: "circle")
                         .foregroundStyle(Theme.subtext.opacity(0.4))

@@ -76,11 +76,11 @@ public struct DiffView: View {
     private func lineColor(for type: DiffLineType) -> Color {
         switch type {
         case .addition:
-            return .green
+            return Theme.success
         case .deletion:
-            return .red
+            return Theme.danger
         case .hunkHeader:
-            return .blue
+            return Theme.info
         case .fileHeader:
             return .secondary
         case .context:
@@ -91,11 +91,11 @@ public struct DiffView: View {
     private func backgroundColor(for type: DiffLineType) -> Color {
         switch type {
         case .addition:
-            return .green.opacity(0.1)
+            return Theme.success.opacity(0.1)
         case .deletion:
-            return .red.opacity(0.1)
+            return Theme.danger.opacity(0.1)
         case .hunkHeader:
-            return .blue.opacity(0.1)
+            return Theme.info.opacity(0.1)
         case .fileHeader:
             return .secondary.opacity(0.1)
         case .context:

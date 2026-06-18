@@ -26,7 +26,7 @@ struct MainView: View {
             List(proxyVM.proxyNodes, id: \ProxyNode.name, selection: $proxyVM.selectedProxy) { node in
                 HStack {
                     Circle()
-                        .fill(Color.green)
+                        .fill(Theme.success)
                         .frame(width: 8, height: 8)
                     Text(node.name)
                         .font(.system(.body))
@@ -58,7 +58,7 @@ struct MainView: View {
                 Text("Status")
                     .font(.title2.bold())
                 Text(vpnVM.statusText)
-                    .foregroundStyle(vpnVM.isRunning ? .green : .secondary)
+                    .foregroundStyle(vpnVM.isRunning ? Theme.success : .secondary)
             }
             Spacer()
             Button(vpnVM.isRunning ? "Stop" : "Start") {
