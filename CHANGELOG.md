@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.9.0] — Unreleased
+## [2.9.0] — 2026-10-10
 
 > **macOS — mihomo Service Mode (Clash Verge-style privileged service).** Adds
 > `riptide-mihomo-service`, a privileged launchd daemon that supervises the
