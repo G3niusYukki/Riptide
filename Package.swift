@@ -131,6 +131,7 @@ let package = Package(
     ],
     // All targets build in the Swift 5 language mode. Declared once at the
     // package level (the per-target `swiftLanguageMode` API is unavailable
-    // in some CLT SwiftPM builds).
-    swiftLanguageVersions: [.v5],
+    // in some CLT SwiftPM builds). No trailing comma: Xcode 16.2's Swift 6.0
+    // parser rejects them in call syntax.
+    swiftLanguageVersions: [.v5]
 )
