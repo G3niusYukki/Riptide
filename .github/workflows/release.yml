@@ -61,9 +61,11 @@ jobs:
           # Service-mode daemon (v2.9.0): also universal, bundled into Resources.
           swift build --product RiptideMihomoService -c release --arch arm64 --scratch-path .build-arm64
           swift build --product RiptideMihomoService -c release --arch x86_64 --scratch-path .build-x86_64
-          # Find the actual binary paths
-          ARM64_BIN=$(find .build-arm64 -name RiptideApp -type f | head -1)
-          X86_64_BIN=$(find .build-x86_64 -name RiptideApp -type f | head -1)
+          # Find the actual binary paths. Exclude .dSYM companions: a bare
+          # `find -name X | head -1` can pick the DWARF file inside
+          # X.dSYM/Contents/Resources/DWARF, which is not executable.
+          ARM64_BIN=$(find .build-arm64 -name RiptideApp -type f -not -path "*.dSYM*" | head -1)
+          X86_64_BIN=$(find .build-x86_64 -name RiptideApp -type f -not -path "*.dSYM*" | head -1)
           echo "arm64 binary: $ARM64_BIN"
           echo "x86_64 binary: $X86_64_BIN"
           lipo -info "$ARM64_BIN"
@@ -72,8 +74,8 @@ jobs:
           mkdir -p .build/apple/Products/Release
           lipo -create "$ARM64_BIN" "$X86_64_BIN" -output .build/apple/Products/Release/RiptideApp
           lipo -info .build/apple/Products/Release/RiptideApp
-          SVC_ARM64=$(find .build-arm64 -name RiptideMihomoService -type f | head -1)
-          SVC_X86_64=$(find .build-x86_64 -name RiptideMihomoService -type f | head -1)
+          SVC_ARM64=$(find .build-arm64 -name RiptideMihomoService -type f -not -path "*.dSYM*" | head -1)
+          SVC_X86_64=$(find .build-x86_64 -name RiptideMihomoService -type f -not -path "*.dSYM*" | head -1)
           lipo -create "$SVC_ARM64" "$SVC_X86_64" -output .build/apple/Products/Release/riptide-mihomo-service
           lipo -info .build/apple/Products/Release/riptide-mihomo-service
 
