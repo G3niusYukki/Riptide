@@ -58,6 +58,9 @@ jobs:
           # Build for each architecture separately (multi-arch SPM build is broken)
           swift build --product RiptideApp -c release --arch arm64 --scratch-path .build-arm64
           swift build --product RiptideApp -c release --arch x86_64 --scratch-path .build-x86_64
+          # Service-mode daemon (v2.9.0): also universal, bundled into Resources.
+          swift build --product RiptideMihomoService -c release --arch arm64 --scratch-path .build-arm64
+          swift build --product RiptideMihomoService -c release --arch x86_64 --scratch-path .build-x86_64
           # Find the actual binary paths
           ARM64_BIN=$(find .build-arm64 -name RiptideApp -type f | head -1)
           X86_64_BIN=$(find .build-x86_64 -name RiptideApp -type f | head -1)
@@ -69,6 +72,10 @@ jobs:
           mkdir -p .build/apple/Products/Release
           lipo -create "$ARM64_BIN" "$X86_64_BIN" -output .build/apple/Products/Release/RiptideApp
           lipo -info .build/apple/Products/Release/RiptideApp
+          SVC_ARM64=$(find .build-arm64 -name RiptideMihomoService -type f | head -1)
+          SVC_X86_64=$(find .build-x86_64 -name RiptideMihomoService -type f | head -1)
+          lipo -create "$SVC_ARM64" "$SVC_X86_64" -output .build/apple/Products/Release/riptide-mihomo-service
+          lipo -info .build/apple/Products/Release/riptide-mihomo-service
 
       - name: Package and Sign
         env:
@@ -84,6 +91,13 @@ jobs:
           fi
           cp Binaries/riptide-singbox Riptide.app/Contents/Resources/riptide-singbox
           chmod +x Riptide.app/Contents/Resources/riptide-singbox
+
+          # Bundle the universal mihomo service-mode daemon (v2.9.0). The GUI
+          # installs it as a root launchd daemon via MihomoServiceInstaller;
+          # MihomoServiceBinaryLocator resolves it from Bundle.main Resources.
+          cp .build/apple/Products/Release/riptide-mihomo-service \
+            Riptide.app/Contents/Resources/riptide-mihomo-service
+          chmod +x Riptide.app/Contents/Resources/riptide-mihomo-service
 
           # Bundle Sparkle.framework + add its rpath. The app links Sparkle
           # dynamically (@rpath); SwiftPM only drops it under .build/, so without
