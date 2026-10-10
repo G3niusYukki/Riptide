@@ -14,7 +14,6 @@ public actor LoadBalancer {
     private let strategy: LoadBalanceStrategy
     private var proxies: [String]  // proxy names in order
     private var roundRobinIndex: Int = 0
-    private var hashSeed: UInt64 = 0
 
     public init(strategy: LoadBalanceStrategy = .consistentHash) {
         self.strategy = strategy
@@ -27,8 +26,10 @@ public actor LoadBalancer {
         if roundRobinIndex >= names.count {
             roundRobinIndex = 0
         }
-        // Re-seed hash when proxy list changes
-        hashSeed = UInt64(Date().timeIntervalSince1970 * 1000)
+        // Intentionally no hash re-seed: consistent hashing must map the
+        // same host to the same proxy for a given membership. Seeding from
+        // the wall clock (the old behavior) silently remapped every host on
+        // each proxy-list refresh, violating the consistent-hash contract.
     }
 
     /// Selects a proxy for the given target host.
@@ -68,7 +69,8 @@ public actor LoadBalancer {
         return proxies[index]
     }
 
-    /// FNV-1a 64-bit hash.
+    /// FNV-1a 64-bit hash. Pure function of the input — deliberately not
+    /// seeded, so a host's mapping is stable across proxy-list refreshes.
     private func fnv1a(_ string: String) -> UInt64 {
         let data = string.data(using: .utf8) ?? Data()
         var hash: UInt64 = 14695981039346656037 // FNV offset basis
@@ -76,6 +78,6 @@ public actor LoadBalancer {
             hash ^= UInt64(byte)
             hash = hash &* 1099511628211 // FNV prime
         }
-        return hash ^ hashSeed
+        return hash
     }
 }

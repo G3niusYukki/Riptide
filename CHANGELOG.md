@@ -47,6 +47,19 @@
   exercising the same routes), installer script/plist shapes, and launch
   strategy ordering.
 
+### Fixed
+
+- **Load-balancer consistent hash was re-seeded from the wall clock on every
+  proxy-list refresh** (`LoadBalancer.updateProxies` set `hashSeed` from
+  `Date()`), silently remapping every host on each refresh and making the
+  stability test flaky on slower CI runners. The hash is now a pure FNV-1a of
+  the host (seed removed), and the regression test crosses a millisecond
+  boundary so any future re-seeding fails deterministically.
+- **Deploy Docs workflow (broken since introduction).** `site/package.json`
+  lacked `"type": "module"`, so Vite loaded the ESM-only `vitepress` config
+  through `require` and the build failed. CI now installs with `npm ci` for
+  lockfile-reproducible docs builds.
+
 ### Changed
 
 - **`Package.swift` declares the Swift 5 language mode once at the package
@@ -54,6 +67,9 @@
   `.swiftLanguageMode(.v5)` settings. Semantics are unchanged on Xcode 16
   toolchains; the per-target API is unavailable in some CommandLineTools
   SwiftPM builds (mismatched `PackageDescription` dylib/interface).
+- **`Scripts/build-release.sh` bundles `riptide-mihomo-service`** into the app
+  bundle's Resources (alongside `riptide-singbox`) so Service Mode can be
+  installed from the shipped app via `MihomoServiceBinaryLocator`.
 
 ### Known limitations
 

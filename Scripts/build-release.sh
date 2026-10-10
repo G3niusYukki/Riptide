@@ -46,6 +46,13 @@ fi
 cp "Binaries/riptide-singbox" "$APP_DIR/Contents/Resources/riptide-singbox"
 chmod +x "$APP_DIR/Contents/Resources/riptide-singbox"
 
+# Bundle the mihomo service-mode daemon (v2.9.0). The GUI installs it as a
+# root launchd daemon via MihomoServiceInstaller; MihomoServiceBinaryLocator
+# resolves it from Bundle.main Resources first.
+swift build --product RiptideMihomoService -c release --arch arm64
+cp "$BUILD_DIR/RiptideMihomoService" "$APP_DIR/Contents/Resources/riptide-mihomo-service"
+chmod +x "$APP_DIR/Contents/Resources/riptide-mihomo-service"
+
 # Bundle Sparkle.framework. The app links Sparkle dynamically (@rpath), but
 # SwiftPM only drops it under .build/, so without this the bundle dies at launch
 # with "Library not loaded: @rpath/Sparkle.framework". Copy it into Frameworks/

@@ -43,13 +43,17 @@ struct LoadBalancerTests {
     }
 
     @Test("selection for a host is stable when the proxy list is unchanged")
-    func selectionIsStableAcrossUpdateProxies() async {
+    func selectionIsStableAcrossUpdateProxies() async throws {
         let balancer = LoadBalancer(strategy: .consistentHash)
         await balancer.updateProxies(["proxy-A", "proxy-B"])
         let first = await balancer.select(forHost: "stable.example.com")
 
+        // Cross a millisecond boundary before re-asserting: the old code
+        // re-seeded the hash from Date() here, which only stayed stable
+        // when both calls landed in the same millisecond.
+        try await Task.sleep(nanoseconds: 5_000_000)
+
         // Calling updateProxies with the same list must NOT reseed the hash.
-        // (The old code re-seeded from Date() here, breaking consistency.)
         await balancer.updateProxies(["proxy-A", "proxy-B"])
         let after = await balancer.select(forHost: "stable.example.com")
 
