@@ -230,8 +230,10 @@ struct ConflictResolutionView: View {
 
 // MARK: - Preview
 
+#if !RIPTIDE_NO_PREVIEWS
 #Preview {
     NavigationStack {
         WebDAVSettingsView()
     }
 }
+#endif

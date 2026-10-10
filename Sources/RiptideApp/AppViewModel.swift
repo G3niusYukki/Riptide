@@ -79,6 +79,16 @@ public final class AppViewModel: @unchecked Sendable {
     public var mihomoChannel: MihomoDownloader.Channel = .stable
     public internal(set) var mihomoDownloadError: String?
 
+    // Mihomo service mode (privileged daemon)
+    /// True when the privileged `riptide-mihomo-service` daemon is installed
+    /// (plist + binary present).
+    public internal(set) var mihomoServiceInstalled: Bool = false
+    /// True when the installed daemon answers on its Unix socket.
+    public internal(set) var mihomoServiceOnline: Bool = false
+    /// True while an install/uninstall prompt is in flight.
+    public internal(set) var isModifyingMihomoService: Bool = false
+    public internal(set) var mihomoServiceError: String?
+
     // MARK: - Window Reference
     public weak var mainWindow: NSWindow?
 
@@ -96,6 +106,8 @@ public final class AppViewModel: @unchecked Sendable {
     internal let subscriptionManager: SubscriptionManager
     private let profileStore: ProfileStore
     private let overrideStore: OverrideStore
+    internal let mihomoServiceInstaller = MihomoServiceInstaller()
+    internal let mihomoServiceClient = MihomoServiceClient()
     internal var statsTask: Task<Void, Never>?
     internal var subscriptionScheduler: SubscriptionUpdateScheduler?
 

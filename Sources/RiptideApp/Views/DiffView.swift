@@ -123,8 +123,10 @@ private let diffViewPreviewSample = """
 +  - MATCH,DIRECT
 """
 
+#if !RIPTIDE_NO_PREVIEWS
 #Preview("Diff View") {
     DiffView(diffText: diffViewPreviewSample)
         .frame(width: 500, height: 300)
         .padding()
 }
+#endif

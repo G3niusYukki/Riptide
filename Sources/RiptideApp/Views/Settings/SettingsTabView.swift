@@ -138,7 +138,7 @@ struct SettingsTabView: View {
                     // MARK: - Core
                     SettingsSection(title: "内核管理", icon: "cpu") {
                         NavigationLink {
-                            KernelSwitcherView()
+                            KernelSwitcherView(vm: vm)
                         } label: {
                             SettingsRow(
                                 icon: "cpu",

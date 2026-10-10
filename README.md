@@ -105,6 +105,7 @@ UDP · TCP · DNS-over-HTTPS · DNS-over-TLS · DNS-over-QUIC (RFC 9250) · Fake
 - **Connection timing metrics** — per-connection policy resolution and proxy connect latency
 - **System proxy guard** — monitors and auto-restores system proxy settings if externally modified
 - **TUN auto-recovery** — continuous interface health monitoring with automatic mihomo restart
+- **Mihomo Service Mode (v2.9.0)** — Clash Verge-style privileged service: a launchd daemon (`riptide-mihomo-service`) runs mihomo as root and exposes an HTTP API over a Unix-domain socket, so core start/stop (incl. TUN) needs no password after a one-time install. Peer-UID gate + path policy prevent other local users from commanding the root service
 - **XPC helper maturation** — automatic reconnection with exponential backoff, 30s heartbeat, version validation
 - **Unified error handling** — `RiptideError` enum with `LocalizedError` conformance for 17 subsystems
 - **First-run onboarding** — guided setup wizard with helper install and config import
@@ -181,6 +182,13 @@ Local Proxy / TUN packet
 | **System Proxy** | Stable | macOS: in-process **sing-box** core + `networksetup` (no root/helper/sudo). Windows: direct REST + system-proxy configuration with a 3s drift-guard |
 | **TUN Mode** | Beta | Full packet-level interception. macOS: a standalone sing-box core run as **root** via a one-time launchd-daemon install (one admin prompt; prompt-free thereafter) — no Network Extension entitlement needed. Windows: `riptide-tun-service.exe` registered as a SYSTEM service |
 
+> **v2.9.0 adds mihomo Service Mode (macOS):** an alternative privileged path that
+> runs the **mihomo** core as root through the `riptide-mihomo-service` launchd
+> daemon (Clash Verge's architecture), controlled over a Unix-socket HTTP API.
+> The app's default runtime remains the sing-box daemon above; service mode
+> currently powers the mihomo runtime path (CLI / kernel switching). See
+> [macOS mihomo Service Mode](#macos-mihomo-service-mode-v290).
+
 #### macOS TUN mode
 
 macOS can't create a `utun` device or change the routing table from an unentitled
@@ -213,6 +221,39 @@ sudo launchctl bootout system/com.riptide.tun 2>/dev/null
 sudo rm -f /Library/LaunchDaemons/com.riptide.tun.plist
 sudo rm -rf "/Library/Application Support/Riptide/tun" \
             "/Library/Application Support/Riptide/riptide-singbox"
+```
+
+#### macOS mihomo Service Mode (v2.9.0)
+
+For the **mihomo** runtime, Riptide ships a Clash Verge-style privileged
+service — the same architecture as `clash-verge-service`, in Swift:
+
+- **`riptide-mihomo-service`** is a launchd daemon (`com.riptide.mihomo.service`,
+  `RunAtLoad` + `KeepAlive`) that runs mihomo as root. It listens on
+  `/Library/Application Support/Riptide/mihomo-service.sock` and speaks a small
+  HTTP API: `GET /health`, `POST /v1/start`, `POST /v1/stop`, `GET /v1/status`,
+  `POST /v1/core/install`.
+- **Install / uninstall** from Settings → 内核管理 → 特权服务 (one admin
+  password each), or at the library level via `MihomoServiceInstaller`. The
+  installing user's UID is recorded in an owner file; the daemon checks every
+  connection's peer credentials (`LOCAL_PEERCRED`) against it, so **other local
+  users cannot command the root service**.
+- **Path policy** — the daemon only executes cores under the admin-writable
+  `/Library/Application Support/Riptide/` and configs under Riptide-managed
+  directories (symlink-resolved, traversal-checked), closing the
+  plant-a-binary-for-root hole.
+- `MihomoRuntimeManager` picks its launch strategy in order: **service → XPC
+  helper → sudo**, and the core's external controller stays on
+  `127.0.0.1:9090`, so traffic/connection stats keep working in TUN mode.
+
+**Remove the mihomo service** entirely:
+
+```bash
+sudo launchctl bootout system/com.riptide.mihomo.service 2>/dev/null
+sudo rm -f /Library/LaunchDaemons/com.riptide.mihomo.service.plist
+sudo rm -f "/Library/Application Support/Riptide/riptide-mihomo-service" \
+            "/Library/Application Support/Riptide/mihomo-service.owner" \
+            "/Library/Application Support/Riptide/mihomo-service.sock"
 ```
 
 ---
@@ -322,14 +363,15 @@ Sources/
 │   ├── Transport/  Tunnel/  Utils/  VPN/  XPC/  Riptide.swift
 ├── RiptideApp/                     # SwiftUI macOS app target
 │   ├── App/  Assets.xcassets/  Intents/  Localization/
-│   ├── RiptideApp.swift  AppViewModel.swift  SMJobBlessManager.swift
+│   ├── RiptideApp.swift  AppViewModel.swift
 │   ├── MenuBarScene.swift  ViewModels/  Views/
 │   └── Views/                      # tab views + subdirs:
 │       ├── Dashboard/  Diagnostics/  MenuBar/  Rules/  Scenes/  Settings/
 ├── RiptideCLI/                     # `riptide` command-line tool
 ├── RiptideTunnel/                  # NetworkExtension (macOS only)
+├── RiptideMihomoService/           # mihomo service-mode daemon (root launchd)
 RiptideHelper/                      # privileged XPC service (SMJobBless)
-Tests/RiptideTests/                 # 593 tests / 93 suites
+Tests/RiptideTests/                 # 990 tests / 104 suites
 RiptideAppUITests/                  # 38 UI tests / 11 suites
 Scripts/                            # build-release.sh, bump-version.sh, signing
 homebrew/                           # Homebrew Formula + auto-update workflow

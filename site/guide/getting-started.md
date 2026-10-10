@@ -35,6 +35,13 @@ Support coming in Riptide v3.0. Target: Ubuntu 24.04+.
 3. **Select a proxy** — pick a node from the proxy group.
 4. **Turn on** — switch to System Proxy or TUN mode.
 
+> **TUN mode on macOS:** enabling TUN the first time installs a small launchd
+> daemon (one administrator-password prompt); toggling TUN afterwards needs no
+> further prompts. v2.9.0 additionally ships **mihomo Service Mode** — a
+> Clash Verge-style privileged service (`riptide-mihomo-service`) that runs the
+> mihomo core as root and is controlled over a Unix-socket HTTP API. Manage it
+> from Settings → 内核管理 → 特权服务.
+
 ## Quick Tour
 
 | Feature | Where |

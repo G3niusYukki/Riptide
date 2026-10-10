@@ -55,6 +55,7 @@ struct ProtocolBadge: View {
     }
 }
 
+#if !RIPTIDE_NO_PREVIEWS
 #Preview {
     HStack(spacing: 6) {
         ProtocolBadge(kind: .shadowsocks)
@@ -64,3 +65,4 @@ struct ProtocolBadge: View {
     }
     .padding()
 }
+#endif

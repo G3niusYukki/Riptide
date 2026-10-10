@@ -108,8 +108,15 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// XPC connection to the privileged helper tool.
     public let helperConnection: HelperToolConnection
 
+    /// Client for the privileged mihomo service daemon (service mode).
+    /// Preferred launch strategy when the daemon is installed and reachable.
+    private let serviceClient: MihomoServiceClient
+
     /// Sudo-based fallback launcher (used when helper is not installed).
     private let sudoLauncher = SudoMihomoLauncher()
+
+    /// Which launcher produced the current run.
+    private var activeLaunchStrategy: MihomoLaunchStrategy?
 
     /// Whether the current session was launched via sudo (vs XPC helper).
     private var launchedViaSudo: Bool = false
@@ -171,14 +178,39 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
     /// - Parameters:
     ///   - paths: The paths instance for file system operations.
     ///   - helperConnection: The XPC connection to the helper tool.
+    ///   - tunDeviceName: TUN interface name for TUN mode.
+    ///   - serviceClient: Client for the privileged service daemon.
     public init(
         paths: MihomoPaths = MihomoPaths(),
         helperConnection: HelperToolConnection = HelperToolConnection(),
-        tunDeviceName: String = "utun120"
+        tunDeviceName: String = "utun120",
+        serviceClient: MihomoServiceClient = MihomoServiceClient()
     ) {
         self.paths = paths
         self.helperConnection = helperConnection
         self.tunDeviceName = tunDeviceName
+        self.serviceClient = serviceClient
+    }
+
+    /// Launch strategies for the mihomo core, in preference order.
+    public enum MihomoLaunchStrategy: String, Equatable, Sendable {
+        /// Privileged launchd daemon over Unix-socket IPC (service mode).
+        case service
+        /// SMJobBless XPC helper.
+        case helper
+        /// Direct sudo fallback.
+        case sudo
+    }
+
+    /// Picks the launch strategy: service mode first (prompt-free after the
+    /// one-time daemon install), then the XPC helper, then sudo.
+    public static func resolveLaunchStrategy(
+        serviceAvailable: Bool,
+        helperInstalled: Bool
+    ) -> MihomoLaunchStrategy {
+        if serviceAvailable { return .service }
+        if helperInstalled { return .helper }
+        return .sudo
     }
 
     // MARK: - Setup
@@ -240,8 +272,14 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             throw RuntimeError.alreadyRunning
         }
 
-        // 2. Check if helper is installed — if not, fall back to sudo
+        // 2. Resolve the launch strategy — service mode first (prompt-free
+        //    after a one-time daemon install), then XPC helper, then sudo.
+        let serviceAvailable = await serviceClient.ping()
         let helperInstalled = await helperConnection.isHelperInstalled()
+        let strategy = Self.resolveLaunchStrategy(
+            serviceAvailable: serviceAvailable,
+            helperInstalled: helperInstalled
+        )
 
         // 3. Setup directories
         do {
@@ -275,8 +313,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         let configPath = paths.configFileURL.path
 
-        // 6. Launch mihomo — XPC helper or sudo fallback
-        try await launchMihomoBinary(configPath: configPath, mode: mode, helperInstalled: helperInstalled)
+        // 6. Launch mihomo — service daemon, XPC helper, or sudo fallback
+        try await launchMihomoBinary(configPath: configPath, mode: mode, strategy: strategy)
 
         // 7. Initialize API client
         let apiURL = URL(string: "http://127.0.0.1:\(defaultAPIPort)")!
@@ -311,9 +349,12 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         guard apiReady else {
             // Attempt cleanup on failure
-            if helperInstalled {
+            switch strategy {
+            case .service:
+                _ = try? await serviceClient.stop()
+            case .helper:
                 _ = await helperConnection.terminateMihomo()
-            } else {
+            case .sudo:
                 try? await sudoLauncher.terminate()
             }
             Task { [weak writer = logbookWriter] in
@@ -332,7 +373,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         isRunning = true
         currentMode = mode
         currentProfile = profile
-        let launcherKind = helperInstalled ? "xpc" : "sudo"
+        activeLaunchStrategy = strategy
+        let launcherKind = strategy.rawValue
         Task { [weak writer = logbookWriter] in
             await writer?.logInfo(
                 "mihomo started: mode=\(mode) launcher=\(launcherKind)",
@@ -485,9 +527,13 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         // 3. Terminate mihomo
         let wasTunMode = currentMode == .tun
 
-        if launchedViaSudo {
+        switch activeLaunchStrategy {
+        case .service:
+            _ = try? await serviceClient.stop()
+            await waitForTermination()
+        case .sudo:
             try? await sudoLauncher.terminate()
-        } else {
+        case .helper, nil:
             let terminationError = await helperConnection.terminateMihomo()
             if terminationError == nil {
                 await waitForTermination()
@@ -529,6 +575,7 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         currentMode = nil
         currentProfile = nil
         launchedViaSudo = false
+        activeLaunchStrategy = nil
     }
 
     // MARK: - API Operations
@@ -733,11 +780,34 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         try yaml.write(toFile: configPath, atomically: true, encoding: .utf8)
     }
 
-    /// Launches mihomo via XPC helper or sudo fallback. Updates `launchedViaSudo`
-    /// to reflect which path was taken.
-    /// - Throws: RuntimeError.launchFailed on either path's failure mode.
-    private func launchMihomoBinary(configPath: String, mode: RuntimeMode, helperInstalled: Bool) async throws {
-        if helperInstalled {
+    /// Launches mihomo via the service daemon, XPC helper, or sudo fallback.
+    /// Updates `launchedViaSudo`/`activeLaunchStrategy` to reflect which path
+    /// was taken.
+    /// - Throws: RuntimeError.launchFailed on any path's failure mode.
+    private func launchMihomoBinary(configPath: String, mode: RuntimeMode, strategy: MihomoLaunchStrategy) async throws {
+        switch strategy {
+        case .service:
+            do {
+                // The daemon only executes cores under the admin-writable
+                // system root, so first make sure the user-downloaded binary
+                // is installed there (idempotent; root does the copy).
+                let userCore = paths.executable
+                guard FileManager.default.isExecutableFile(atPath: userCore) else {
+                    throw RuntimeError.launchFailed("mihomo binary not found at \(userCore)")
+                }
+                let install = try await serviceClient.installCore(sourcePath: userCore)
+                let environment: [String: String] = mode == .tun ? ["MIHOMO_TUN_MODE": "1"] : [:]
+                _ = try await serviceClient.start(
+                    corePath: install.targetPath,
+                    configPath: configPath,
+                    environment: environment
+                )
+            } catch let error as MihomoServiceClientError {
+                throw RuntimeError.launchFailed("service launch failed: \(error)")
+            }
+            launchedViaSudo = false
+            return
+        case .helper:
             let modeString = mode == .systemProxy ? "systemProxy" : "tun"
             if let error = await helperConnection.launchMihomo(
                 configPath: configPath,
@@ -747,24 +817,25 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
             }
             launchedViaSudo = false
             return
+        case .sudo:
+            // Sudo fallback — try system-wide binary first, then user-space
+            let systemBinary = "/Library/Application Support/Riptide/mihomo"
+            let userBinary = paths.executable
+            let binaryPath: String
+            if FileManager.default.isExecutableFile(atPath: systemBinary) {
+                binaryPath = systemBinary
+            } else if FileManager.default.isExecutableFile(atPath: userBinary) {
+                binaryPath = userBinary
+            } else {
+                throw RuntimeError.launchFailed("mihomo binary not found at \(systemBinary) or \(userBinary)")
+            }
+            do {
+                try await sudoLauncher.launch(binaryPath: binaryPath, configPath: configPath)
+            } catch {
+                throw RuntimeError.launchFailed("sudo launch failed: \(error.localizedDescription)")
+            }
+            launchedViaSudo = true
         }
-        // Sudo fallback — try system-wide binary first, then user-space
-        let systemBinary = "/Library/Application Support/Riptide/mihomo"
-        let userBinary = paths.executable
-        let binaryPath: String
-        if FileManager.default.isExecutableFile(atPath: systemBinary) {
-            binaryPath = systemBinary
-        } else if FileManager.default.isExecutableFile(atPath: userBinary) {
-            binaryPath = userBinary
-        } else {
-            throw RuntimeError.launchFailed("mihomo binary not found at \(systemBinary) or \(userBinary)")
-        }
-        do {
-            try await sudoLauncher.launch(binaryPath: binaryPath, configPath: configPath)
-        } catch {
-            throw RuntimeError.launchFailed("sudo launch failed: \(error.localizedDescription)")
-        }
-        launchedViaSudo = true
     }
 
     /// Waits for the mihomo process to terminate.

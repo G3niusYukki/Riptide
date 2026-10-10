@@ -93,6 +93,8 @@ struct LanguageSelectorView: View {
     }
 }
 
+#if !RIPTIDE_NO_PREVIEWS
 #Preview {
     LanguageSelectorView()
 }
+#endif

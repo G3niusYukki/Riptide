@@ -24,7 +24,7 @@ Both platforms cut the same `vX.Y.Z` git tag and are bundled together in a
 single GitHub release. Linux is built by CI but not yet packaged for
 distribution.
 
-**Current state (v2.7.0)** — 968 tests in 103 test files, all passing. SwiftLint
+**Current state (v2.9.0-dev)** — 990 tests in 104 test files, all passing. SwiftLint
 strict is green on the new code. The macOS app is the primary development
 target; Windows and Linux track it. iOS is **explicitly out of scope** for
 v3.0.0 — see the archived `docs/_archive/riptide-ios-stub/`.
@@ -53,12 +53,13 @@ Sources/Riptide/                    # pure-Swift proxy library (macOS)
   Subscription/  Sync/  Traffic/  Transport/  Tunnel/  Utils/  VPN/  XPC/
 Sources/RiptideApp/                 # SwiftUI macOS app target
   App/  Assets.xcassets/  Intents/  Localization/  MenuBarScene.swift
-  RiptideApp.swift  SMJobBlessManager.swift  AppViewModel.swift
+  RiptideApp.swift  AppViewModel.swift
   ViewModels/  Views/
 Sources/RiptideCLI/                 # `riptide` command-line tool
 Sources/RiptideTunnel/              # NetworkExtension (macOS only)
+Sources/RiptideMihomoService/       # mihomo service-mode daemon (root launchd)
 RiptideHelper/                      # privileged XPC service (SMJobBless)
-Tests/RiptideTests/                 # 103 files, 968 tests
+Tests/RiptideTests/                 # 104 files, 990 tests
 Scripts/                            # build-release.sh, bump-version.sh, signing
 .github/workflows/                  # release.yml, ci.yml, deploy-docs.yml, …
 homebrew/                           # Homebrew Formula + auto-update workflow
@@ -95,7 +96,7 @@ docs/_archive/                      # archived iOS / Go stubs
 | `Logbook/` | Persistent diagnostic event + closed-connection journal. JSONL-per-UTC-day files at `~/Library/Application Support/Riptide/logbook/YYYY-MM-DD.jsonl`. `LogbookStore` (actor) + `LogbookWriter` (facade) + `ClosedConnectionWatcher` (diff algorithm; runtime tick loop is W3-2b). |
 | `Logging/` | `LogLevel`, `LogEntry`, parser, formatter. Real-time log surface; `Logbook` owns history. |
 | `MITM/` | MITM framework: config, manager, HTTPS interceptor, CA scaffolding. Production status: 🟡 experimental. |
-| `Mihomo/` | mihomo sidecar integration: `MihomoAPIClient` (actor), `MihomoConfigGenerator`, `MihomoCoreManager`, `MihomoDownloader`, `MihomoLogClient`, `MihomoPaths`, `MihomoRuntimeManager`, `SudoMihomoLauncher`. |
+| `Mihomo/` | mihomo sidecar integration: `MihomoAPIClient` (actor), `MihomoConfigGenerator`, `MihomoCoreManager`, `MihomoDownloader`, `MihomoLogClient`, `MihomoPaths`, `MihomoRuntimeManager`, `SudoMihomoLauncher`. `ServiceMode/` holds the Clash Verge-style privileged-service layer: HTTP-over-Unix-socket transport (`UnixHTTPServer`/`UnixHTTPClient`), wire types (`MihomoServiceProtocol`), app-side client (`MihomoServiceClient`), root-side core supervisor + path policy (`MihomoServiceSupervisor`), launchd installer (`MihomoServiceInstaller`), and filesystem layout (`MihomoServicePaths`). |
 | `Models/` | Core data models: `ProxyNode`, `ProxyRule`, `RoutingPolicy`, `ProxyGroup`. |
 | `NodeEditor/` | Proxy node editing with real-time validation. |
 | `Override/` | Override data model: `Override` value type, `OverrideStore` actor (file-backed JSON sidecar + per-override YAML), `OverrideMerger` (meta.replace / removed: semantics), `OverrideApplyError`. |
@@ -130,7 +131,7 @@ docs/_archive/                      # archived iOS / Go stubs
 | `AppViewModel.swift` | Central application state; holds the `LogbookContainer` and distributes `LogbookWriter` to business modules. |
 | `RiptideApp.swift` | SwiftUI `@main` entry point. |
 | `MenuBarScene.swift` | Menu bar extra scene wiring. |
-| `SMJobBlessManager.swift` | Privileged helper install — `SMAppService` on macOS 13+, `SMJobBless` fallback. |
+| `SMJobBlessManager.swift` | (Documented but not yet present in the tree.) Privileged helper install — `SMAppService` on macOS 13+, `SMJobBless` fallback. Service mode (`Sources/Riptide/Mihomo/ServiceMode/` + `Sources/RiptideMihomoService/`) is the shipping privileged-launch path for mihomo. |
 | `Intents/` | Apple Shortcuts Intents (`SwitchProxyMode`, `SelectProfile`). |
 | `Localization/` | i18n: en, zh-Hans, ja, ru, es, ko, fa, pt-BR, vi + system auto-detect. |
 | `ViewModels/` | `AppViewModel`, `ProxyViewModel`, `LogViewModel`, `LogbookViewModel` (v2.4.0), `NodeEditorViewModel`, `RuleEditorViewModel`, `MITMSettingsViewModel`, `ConfigMergeViewModel`, `WebDAVViewModel`. |
@@ -143,10 +144,12 @@ the same `Riptide` library as the app, with no UI.
 
 ## 7. Tests — Tests/RiptideTests/
 
-103 files, 968 tests. Coverage includes: config parsing and
+104 files, 990 tests. Coverage includes: config parsing and
 merging, rule engine (15+ rule types), DNS (UDP/TCP/DoH/DoT/DoQ/FakeIP),
 protocol framing (SS/VLESS/Trojan/Hy2/Snell), transports, tunnel runtime,
-mihomo API + config generation, subscription URI parser + serializer,
+mihomo API + config generation, mihomo service mode (HTTP-over-UDS
+round-trip, supervisor lifecycle, path policy, installer script shapes),
+subscription URI parser + serializer,
 override merging, logbook append/query/prune/concurrency, MITM config,
 localization, system proxy guard integration, mode switching, health
 checks, TUN recovery.
@@ -161,7 +164,7 @@ launch-at-login, URL scheme, Touch Bar, and menu bar popover.
 
 ```bash
 swift build                              # library + CLI + app
-swift test                               # 968 tests
+swift test                               # 990 tests
 swift test --filter "RuleEngine"         # single suite
 swift run RiptideApp                     # launch UI
 swift run riptide --help                 # CLI
@@ -296,7 +299,7 @@ User selects TUN → UI checks is_elevated; if not, install_tun_service
 - Run targeted tests first when changing a focused area:
   `swift test --filter "SuiteName"`.
 - Run `swift test` before claiming the work is complete
-  (968 / 968 must pass).
+  (990 / 990 must pass).
 - If changing CLI behavior, verify with `swift run riptide ...`.
 - If changing app-facing state or workflow code, sanity-check
   `swift run RiptideApp` builds and launches.

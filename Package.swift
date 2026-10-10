@@ -37,9 +37,6 @@ let package = Package(
                 .product(name: "X509", package: "swift-certificates"),
                 "GoCore",
                 "RiptideSecurityShim",
-            ],
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
             ]
         ),
         .target(
@@ -66,8 +63,20 @@ let package = Package(
                 .process("Assets.xcassets"),
             ],
             swiftSettings: [
-                .swiftLanguageMode(.v5)
+                // Xcode `#Preview` macros need the PreviewsMacros compiler
+                // plugin, which ships with Xcode but not with plain
+                // toolchains / CommandLineTools builds. CLI builds define
+                // this to skip preview bodies; remove it to restore previews
+                // under Xcode.
+                .define("RIPTIDE_NO_PREVIEWS"),
             ]
+        ),
+        .executableTarget(
+            name: "RiptideMihomoService",
+            dependencies: [
+                "Riptide",
+            ],
+            path: "Sources/RiptideMihomoService"
         ),
         .testTarget(
             name: "RiptideAppUITests",
@@ -86,10 +95,7 @@ let package = Package(
             dependencies: [
                 "Riptide",
             ],
-            path: "Sources/RiptideTunnel",
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
-            ]
+            path: "Sources/RiptideTunnel"
         ),
         .target(
             name: "RiptideWidget",
@@ -97,10 +103,7 @@ let package = Package(
                 "Riptide",
             ],
             path: "Sources/RiptideWidget",
-            exclude: ["INSTALLATION.md"],
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
-            ]
+            exclude: ["INSTALLATION.md"]
         ),
         .target(
             name: "RiptideQuickLook",
@@ -109,10 +112,7 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
             ],
             path: "Sources/RiptideQuickLook",
-            exclude: ["INSTALLATION.md"],
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
-            ]
+            exclude: ["INSTALLATION.md"]
         ),
         .testTarget(
             name: "RiptideTests",
@@ -128,5 +128,9 @@ let package = Package(
             name: "GoCore",
             path: "Frameworks/GoCore.xcframework"
         ),
-    ]
+    ],
+    // All targets build in the Swift 5 language mode. Declared once at the
+    // package level (the per-target `swiftLanguageMode` API is unavailable
+    // in some CLT SwiftPM builds).
+    swiftLanguageVersions: [.v5],
 )

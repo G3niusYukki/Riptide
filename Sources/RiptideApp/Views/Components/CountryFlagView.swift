@@ -21,6 +21,7 @@ struct CountryFlagView: View {
     }
 }
 
+#if !RIPTIDE_NO_PREVIEWS
 #Preview {
     HStack(spacing: 12) {
         CountryFlagView(nodeName: "香港01")
@@ -29,3 +30,4 @@ struct CountryFlagView: View {
     }
     .padding()
 }
+#endif

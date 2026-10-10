@@ -1,5 +1,74 @@
 # Changelog
 
+## [2.9.0] — Unreleased
+
+> **macOS — mihomo Service Mode (Clash Verge-style privileged service).** Adds
+> `riptide-mihomo-service`, a privileged launchd daemon that supervises the
+> mihomo core as root and exposes an HTTP API over a Unix domain socket —
+> the same architecture Clash Verge uses on macOS (`clash-verge-service` +
+> `verge-mihomo.sock`). After a one-time install (single admin password
+> prompt), starting/stopping mihomo — including TUN mode — requires no
+> further elevation, and the existing mihomo REST client keeps working, so
+> TUN sessions report real traffic/connections.
+
+### Added
+
+- **`riptide-mihomo-service` daemon (new executable target).** LaunchDaemon
+  (`com.riptide.mihomo.service`, `RunAtLoad` + `KeepAlive`) that runs mihomo
+  as root. IPC routes: `GET /health`, `POST /v1/start`, `POST /v1/stop`,
+  `GET /v1/status`, `POST /v1/core/install`. Connection peer credentials are
+  checked via `LOCAL_PEERCRED` against an owner file recorded at install
+  time; only the installing user (or root) may command the daemon.
+- **HTTP-over-Unix-socket transport in the `Riptide` library.**
+  `UnixHTTPServer` / `UnixHTTPClient` + request/response primitives with
+  Content-Length framing, size caps, and socket timeouts
+  (`Sources/Riptide/Mihomo/ServiceMode/`). `URLSession` cannot speak HTTP
+  over UDS, so these are hand-rolled POSIX-socket implementations.
+- **`MihomoServiceSupervisor`.** Root-side core lifecycle: path validation
+  (`MihomoServicePathPolicy` — cores must live under the admin-writable
+  system root, configs under Riptide-managed directories), spawn with
+  `-f/-d`, SIGTERM → 5s → SIGKILL termination, append-to log file, and
+  idempotent core installation (byte-compare before copy).
+- **`MihomoServiceInstaller`.** launchd install/uninstall with a single
+  `osascript … with administrator privileges` prompt per operation,
+  mirroring `TunDaemonController`'s proven script shapes.
+- **Service-first launch strategy in `MihomoRuntimeManager`.**
+  `resolveLaunchStrategy(serviceAvailable:helperInstalled:)` picks
+  service → XPC helper → sudo. When the service is reachable, the manager
+  asks the daemon to install (if needed) and start the core, and `stop()`
+  routes termination through the daemon.
+- **Service Mode UI in Settings → 内核管理.** Status row (installed /
+  online / offline badge) plus Install / Uninstall buttons wired to
+  `AppViewModel.installMihomoService()` / `uninstallMihomoService()` /
+  `refreshMihomoServiceStatus()`.
+- **Tests.** `MihomoServiceTests.swift`: HTTP primitive round-trips, path
+  policy, supervisor lifecycle against a stub core, full client↔server
+  protocol round-trip (the daemon `main.swift` wiring is covered by
+  exercising the same routes), installer script/plist shapes, and launch
+  strategy ordering.
+
+### Changed
+
+- **`Package.swift` declares the Swift 5 language mode once at the package
+  level** (`swiftLanguageVersions: [.v5]`) instead of per-target
+  `.swiftLanguageMode(.v5)` settings. Semantics are unchanged on Xcode 16
+  toolchains; the per-target API is unavailable in some CommandLineTools
+  SwiftPM builds (mismatched `PackageDescription` dylib/interface).
+
+### Known limitations
+
+- The sing-box TUN runtime (`GoCoreTunnelRuntime`) remains the app's default
+  manager; service mode currently benefits the mihomo runtime path (CLI and
+  kernel-switching scenarios). Switching the app's default runtime to
+  mihomo service mode is planned for v3.0.
+- If the daemon crashes while a core is running, the orphaned core keeps
+  running (launchd restarts the daemon, which starts with empty state);
+  a `start` will fail with a port conflict until the core is reaped. A
+  boot-time orphan sweep is tracked for a follow-up.
+- `external-controller` remains on `127.0.0.1:9090` (TCP) so the existing
+  `MihomoAPIClient` works unchanged; switching to
+  `external-controller-unix` + a UDS-capable API client is future work.
+
 ## [2.8.0] — 2026-06-18
 
 > **macOS — UI/UX modernization overhaul.** Migrates the app from a flat 8-tab `TabView` to `NavigationSplitView` sidebar navigation, adds a proper `Settings` scene (⌘,), introduces a complete design token system (spacing, typography, shadow, animation), migrates all view models to `@Observable`, replaces ~50 hardcoded colors with semantic tokens, adds `.inspector` for connection details, `.symbolEffect` animations across 11 locations, and `.refreshable` / `AnyLayout` / `.contentMargins` modern SwiftUI features. macOS-only; Windows/Linux unchanged.
