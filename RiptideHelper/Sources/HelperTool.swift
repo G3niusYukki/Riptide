@@ -100,7 +100,7 @@ final class HelperTool: NSObject {
     /// `Sendable` immutable struct, so concurrent reads/writes from the
     /// `nonisolated` `listener` callback are safe.
     nonisolated(unsafe) private var validator: HelperCallerValidator = HelperCallerValidator(
-        policy: CallerPolicy(allowedTeamID: "YOUR_TEAM_ID", allowedBundleID: "com.riptide.client")
+        policy: CallerPolicy(allowedTeamID: "39Q4M52XNQ", allowedBundleID: "com.riptide.app")
     )
 
     // MARK: - Main Entry
@@ -534,8 +534,8 @@ extension HelperTool: HelperToolProtocol {
     nonisolated private func loadCallerPolicy() -> CallerPolicy {
         let policyURL = URL(fileURLWithPath: "/Library/Application Support/Riptide/audit-policy.plist")
         let fallbackPolicy = CallerPolicy(
-            allowedTeamID: "YOUR_TEAM_ID",
-            allowedBundleID: "com.riptide.client"
+            allowedTeamID: "39Q4M52XNQ",
+            allowedBundleID: "com.riptide.app"
         )
         guard let data = try? Data(contentsOf: policyURL),
               let policy = try? PropertyListDecoder().decode(CallerPolicy.self, from: data) else {
@@ -580,5 +580,5 @@ extension HelperTool: HelperToolProtocol {
 
     /// Anchor requirement the helper expects from its callers.
     nonisolated static let clientRequirement: String? =
-        "anchor apple generic and identifier \"com.riptide.client\""
+        "anchor apple generic and identifier \"com.riptide.app\""
 }

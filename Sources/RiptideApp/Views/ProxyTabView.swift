@@ -26,7 +26,7 @@ struct ProxyTabView: View {
                 }
                 .padding()
             }
-            .background(Theme.backgroundGradient.ignoresSafeArea())
+            .background(Theme.canvas.ignoresSafeArea())
             .refreshable {
                 await vm.testDelay()
             }
@@ -159,8 +159,12 @@ struct ProxyGroupCard: View {
                 }
             }
         }
-        .background(.ultraThinMaterial)
+        .background(Theme.activityCard)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .stroke(Theme.cardBorder.opacity(0.35), lineWidth: 0.5)
+        )
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isExpanded)
     }
 }

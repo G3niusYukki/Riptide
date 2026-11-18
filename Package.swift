@@ -59,6 +59,7 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
+            exclude: ["Design/design-tokens.json"],
             resources: [
                 .process("Assets.xcassets"),
             ],

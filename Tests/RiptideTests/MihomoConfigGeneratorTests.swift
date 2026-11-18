@@ -156,6 +156,32 @@ struct MihomoConfigGeneratorTests {
         #expect(yaml.contains("auto-detect-interface: true"))
         #expect(yaml.contains("dns-hijack:"))
         #expect(yaml.contains("any:53"))
+        #expect(yaml.contains("mtu: 1500"))
+        #expect(yaml.contains("enhanced-mode: fake-ip"))
+        #expect(yaml.contains("fake-ip-range: 198.18.0.0/16"))
+    }
+
+    @Test("TUN options override strict-route, mtu and route excludes")
+    func testGenerateTUNModeCustomOptions() throws {
+        let config = RiptideConfig(
+            mode: .rule,
+            proxies: [],
+            rules: [.final(policy: .direct)],
+            dnsPolicy: DNSPolicy(fakeIPEnabled: false, fakeIPCIDR: "198.18.0.1/16")
+        )
+        let options = MihomoConfigGenerator.GenerationOptions(
+            mode: .tun,
+            strictRoute: false,
+            tunMTU: 1400,
+            routeAddressExclude: ["10.0.0.0/8"]
+        )
+        let yaml = try MihomoConfigGenerator.generate(config: config, options: options)
+        #expect(yaml.contains("strict-route: false"))
+        #expect(yaml.contains("mtu: 1400"))
+        #expect(yaml.contains("10.0.0.0/8"))
+        #expect(!yaml.contains("192.168.0.0/16"))
+        #expect(yaml.contains("enhanced-mode: redir-host"))
+        #expect(!yaml.contains("fake-ip-range:"))
     }
 
     @Test("generates TUN mode config with custom device name")

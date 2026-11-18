@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   lang: 'en',
   title: 'Riptide',
-  description: 'Cross-platform proxy client — macOS + Windows + Linux',
+  description: 'macOS proxy client',
 
   themeConfig: {
     nav: [

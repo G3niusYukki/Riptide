@@ -1,5 +1,33 @@
 # Changelog
 
+Riptide is macOS-only from 2.10.0. Older entries may mention Windows or Linux. That code has been removed.
+
+## [2.10.0] — 2026-11-18
+
+> macOS-only. See `docs/decisions/0012-macos-only-direction-and-signing-identity.md`.
+
+### Added
+
+- macOS-only direction spec and ADR-0012; `docs/superpowers/specs/*.md` is now tracked.
+- `HelperTrustConfigurationTests` — pins the shipped helper trust values and fails if a placeholder returns.
+
+### Fixed
+
+- `RiptideHelper` caller policy: `YOUR_TEAM_ID` → project-owned Team ID `39Q4M52XNQ`; `allowedBundleID` aligned to `com.riptide.app`; `SMAuthorizedClients` pins `subject.OU` instead of a personal CN. **No certificate, private key, p12 or personal CN is committed.**
+- Docs rewritten for macOS only. The Windows tree, its CI jobs, and the old planning docs are removed.
+- `.gitignore` now ignores `*.p12`, `*.pfx`, `*.cer`, `*.mobileprovision`.
+
+### Changed
+
+- TUN starts only through `riptide-mihomo-service`. The sing-box locate check and the sudo / `networksetup` fallback are no longer on the start path. Mode changes go through `ModeCoordinator.switchMode`.
+- TUN YAML accepts `strict-route`, `mtu` and `route-address-exclude`. DNS for TUN is emitted inside mihomo (`fake-ip` by default, `append-system-dns` is not used).
+- Dashboard first screen is a hero, three metrics, a traffic card and recent connections. Secondary cards sit under「更多」.
+- CI and release publish only the macOS app (DMG + ZIP).
+
+### Known limitations
+
+- The installed identity is **Apple Development**, not Developer ID Application. A local 2.10.0 build can be signed with that identity; notarised public distribution still needs a separate Developer ID certificate and CI secrets. No certificate is committed.
+
 ## [2.9.0] — 2026-10-10
 
 > **macOS — mihomo Service Mode (Clash Verge-style privileged service).** Adds

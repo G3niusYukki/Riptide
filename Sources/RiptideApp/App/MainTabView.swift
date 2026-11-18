@@ -24,11 +24,11 @@ enum SidebarItem: Int, Hashable, CaseIterable {
     var systemImage: String {
         switch self {
         case .dashboard:   return "square.grid.2x2"
-        case .proxy:       return "server.rack"
+        case .proxy:       return "point.3.connected.trianglepath.dotted"
         case .config:      return "doc.text"
-        case .traffic:     return "chart.bar"
+        case .traffic:     return "chart.xyaxis.line"
         case .rules:       return "list.bullet"
-        case .logs:        return "terminal"
+        case .logs:        return "text.alignleft"
         case .diagnostics: return "stethoscope"
         }
     }
@@ -44,6 +44,13 @@ enum SidebarItem: Int, Hashable, CaseIterable {
         case .diagnostics: return A11yID.Tab.diagnostics
         }
     }
+
+    var section: String {
+        switch self {
+        case .dashboard, .proxy, .config: return "工作"
+        default: return "观察"
+        }
+    }
 }
 
 struct MainTabView: View {
@@ -51,40 +58,101 @@ struct MainTabView: View {
     @State private var selection: SidebarItem? = .dashboard
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                Section("主要") {
-                    Label(SidebarItem.dashboard.title, systemImage: SidebarItem.dashboard.systemImage)
-                        .tag(SidebarItem.dashboard)
-                        .accessibilityIdentifier(SidebarItem.dashboard.accessibilityID)
-                    Label(SidebarItem.proxy.title, systemImage: SidebarItem.proxy.systemImage)
-                        .tag(SidebarItem.proxy)
-                        .accessibilityIdentifier(SidebarItem.proxy.accessibilityID)
-                    Label(SidebarItem.config.title, systemImage: SidebarItem.config.systemImage)
-                        .tag(SidebarItem.config)
-                        .accessibilityIdentifier(SidebarItem.config.accessibilityID)
-                }
-                Section("监控") {
-                    Label(SidebarItem.traffic.title, systemImage: SidebarItem.traffic.systemImage)
-                        .tag(SidebarItem.traffic)
-                        .accessibilityIdentifier(SidebarItem.traffic.accessibilityID)
-                    Label(SidebarItem.rules.title, systemImage: SidebarItem.rules.systemImage)
-                        .tag(SidebarItem.rules)
-                        .accessibilityIdentifier(SidebarItem.rules.accessibilityID)
-                    Label(SidebarItem.logs.title, systemImage: SidebarItem.logs.systemImage)
-                        .tag(SidebarItem.logs)
-                        .accessibilityIdentifier(SidebarItem.logs.accessibilityID)
-                    Label(SidebarItem.diagnostics.title, systemImage: SidebarItem.diagnostics.systemImage)
-                        .tag(SidebarItem.diagnostics)
-                        .accessibilityIdentifier(SidebarItem.diagnostics.accessibilityID)
-                }
-            }
-            .navigationTitle("Riptide")
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-        } detail: {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
             detailView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.canvas.ignoresSafeArea())
         }
         .tint(Theme.accent)
+        .background(Theme.canvas.ignoresSafeArea())
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("RIPTIDE")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .tracking(1.6)
+                    .foregroundStyle(Theme.subtext)
+                Text(vm.activeProfile?.name ?? "未选择配置")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            sidebarSection("工作", items: [.dashboard, .proxy, .config])
+            sidebarSection("观察", items: [.traffic, .rules, .logs, .diagnostics])
+
+            Spacer(minLength: 12)
+
+            sidebarStatus
+                .padding(12)
+        }
+        .frame(width: 216)
+        .background(Theme.sidebar.ignoresSafeArea())
+    }
+
+    private func sidebarSection(_ title: String, items: [SidebarItem]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.textTertiary)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+            ForEach(items, id: \.self) { item in
+                sidebarRow(item)
+            }
+        }
+    }
+
+    private func sidebarRow(_ item: SidebarItem) -> some View {
+        let selected = selection == item
+        return Button {
+            selection = item
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: item.systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 18)
+                Text(item.title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                Spacer()
+            }
+            .foregroundStyle(selected ? Theme.accent : Theme.text)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(selected ? Theme.accent.opacity(0.12) : Color.clear)
+            )
+            .padding(.horizontal, 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(item.accessibilityID)
+    }
+
+    private var sidebarStatus: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(vm.tunnelState == .running ? Theme.success : Theme.textTertiary)
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(vm.tunnelState == .running ? "已连接" : "未连接")
+                    .font(.system(size: 12, weight: .medium))
+                Text(vm.connectionMode == .tun ? "TUN" : "系统代理")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.subtext)
+            }
+            Spacer()
+        }
+        .padding(10)
+        .background(Theme.activityCard.opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
     }
 
     @ViewBuilder

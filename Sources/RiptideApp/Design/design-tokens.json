@@ -1,0 +1,16 @@
+{
+  "name": "Riptide",
+  "version": "2.10.0",
+  "color": {
+    "accent": { "light": "1F6F6A", "dark": "8FCFC6" },
+    "success": { "light": "2F6B45", "dark": "8FCB9B" },
+    "danger": { "light": "A33B32", "dark": "E7A39C" },
+    "warning": { "light": "9A6700", "dark": "E3C07A" },
+    "surface-start": { "light": "F4F1EA", "dark": "121418" },
+    "surface-end": { "light": "EBE6DC", "dark": "181C22" },
+    "activity-card": { "light": "FFFCF7", "dark": "1C2128" }
+  },
+  "space": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "xxl": 32 },
+  "radius": { "small": 6, "button": 8, "card": 14, "large": 18 },
+  "motionMs": { "fast": 150, "normal": 200, "slow": 300 }
+}

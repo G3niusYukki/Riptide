@@ -17,7 +17,14 @@ DerivedData/
 .deepseek/
 .opencode/
 .qwen/
-docs/superpowers/
+.codex/
+# Internal planning docs (not user-facing). Accepted specs under specs/ are
+# kept in git so AGENTS.md section 14's design -> plan -> implementation chain
+# is traceable from a fresh clone.
+docs/superpowers/*
+!docs/superpowers/specs/
+docs/superpowers/specs/*
+!docs/superpowers/specs/*.md
 docs/stage-plans/
 docs/analysis/
 # Per-developer AI assistant context (not shared project content)
@@ -62,3 +69,10 @@ node_modules/
 
 # Mavis plan / decision scratch files (transient, regenerated on each run)
 .mavis/
+
+# Code-signing private material — never commit certificates or keys.
+# (Public Team IDs and requirement strings are committed by design.)
+*.p12
+*.pfx
+*.cer
+*.mobileprovision

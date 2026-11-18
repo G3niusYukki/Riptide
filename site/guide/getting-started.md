@@ -1,64 +1,28 @@
-# Getting Started
+# Getting started
 
-## Installation
+Riptide runs on macOS 14 or later.
 
-### macOS
+## Install
 
-```bash
-brew install riptide
-```
-
-Or download the latest `Riptide.dmg` from
-[GitHub Releases](https://github.com/riptide/riptide/releases).
-
-Requirements: macOS 14+ (Sonoma or later).
-
-### Windows
+Download `Riptide.dmg` from GitHub Releases, or build it:
 
 ```bash
-winget install Riptide
+git clone https://github.com/G3niusYukki/Riptide.git
+cd Riptide
+swift run RiptideApp
 ```
 
-Or download `Riptide.msi` / `RiptideSetup.exe` from
-[GitHub Releases](https://github.com/riptide/riptide/releases).
+A packaged app:
 
-Requirements: Windows 10+ with WebView2.
+```bash
+./Scripts/build-release.sh
+open .build/release-dmg/RiptideApp.app
+```
 
-### Linux
+## First launch
 
-Support coming in Riptide v3.0. Target: Ubuntu 24.04+.
+1. Import a Clash subscription or a YAML config.
+2. Pick a node.
+3. Choose System Proxy or TUN, then connect.
 
-## First Launch
-
-1. **Open Riptide** — a menu bar icon (macOS) or system tray icon (Windows) appears.
-2. **Add a profile** — paste a Clash-compatible subscription URL or import a YAML config file.
-3. **Select a proxy** — pick a node from the proxy group.
-4. **Turn on** — switch to System Proxy or TUN mode.
-
-> **TUN mode on macOS:** enabling TUN the first time installs a small launchd
-> daemon (one administrator-password prompt); toggling TUN afterwards needs no
-> further prompts. v2.9.0 additionally ships **mihomo Service Mode** — a
-> Clash Verge-style privileged service (`riptide-mihomo-service`) that runs the
-> mihomo core as root and is controlled over a Unix-socket HTTP API. Manage it
-> from Settings → 内核管理 → 特权服务.
-
-## Quick Tour
-
-| Feature | Where |
-|---|---|
-| Dashboard | Home tab — speed, connections, subscriptions |
-| Proxies | Proxies tab — node list, groups, latency |
-| Profiles | Profiles tab — manage/switch config profiles |
-| Rules | Rules tab — view/edit routing rules |
-| Logs | Logs tab — real-time connection log |
-| Settings | Settings → proxy mode, MITM, DNS, sync |
-
-## Importing a Subscription
-
-1. Go to **Profiles → Subscriptions**.
-2. Click **Add Subscription**.
-3. Paste your subscription URL.
-4. Set auto-update interval (recommended: 6 hours).
-5. Click **Import**.
-
-Riptide parses Clash-compatible subscription formats — Base64-encoded proxy lists, SIP008, and Clash YAML.
+The first TUN start installs `riptide-mihomo-service` and asks for an administrator password once. Later toggles do not.

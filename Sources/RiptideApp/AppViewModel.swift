@@ -205,17 +205,9 @@ public final class AppViewModel: @unchecked Sendable {
     /// `stop()` halts the runtime.
     private func cycleConnectionMode() async {
         let wasRunning = tunnelState == .running
-        let next: ConnectionMode?
-        switch connectionMode {
-        case .systemProxy: next = .tun
-        case .tun:        next = .systemProxy  // wrap back to systemProxy (no explicit "off" in ConnectionMode)
-        }
-        if let next {
-            connectionMode = next
-            if wasRunning {
-                await stop()
-                await start()
-            }
+        connectionMode = connectionMode == .systemProxy ? .tun : .systemProxy
+        if wasRunning {
+            await restartThroughCoordinator()
         }
     }
 
@@ -234,9 +226,28 @@ public final class AppViewModel: @unchecked Sendable {
         } else {
             connectionMode = .systemProxy
             if wasRunning {
-                await stop()
-                await start()
+                await restartThroughCoordinator()
             }
+        }
+    }
+
+    /// Restarts the live runtime in `connectionMode` through `ModeCoordinator`.
+    /// Callers must not `stop()` + `start()` themselves.
+    private func restartThroughCoordinator() async {
+        guard let profile = activeProfile else {
+            lastError = "No active profile selected"
+            return
+        }
+        let runtimeMode: RuntimeMode = connectionMode == .tun ? .tun : .systemProxy
+        do {
+            try await modeCoordinator.switchMode(to: runtimeMode, profile: profile.tunnelProfile)
+            tunnelState = .running
+            startStatsPolling()
+            lastError = nil
+        } catch {
+            tunnelState = .stopped
+            stopStatsPolling()
+            lastError = String(describing: error)
         }
     }
 
@@ -262,14 +273,6 @@ public final class AppViewModel: @unchecked Sendable {
         }
 
         let runtimeMode: RuntimeMode = connectionMode == .tun ? .tun : .systemProxy
-
-        // TUN mode pre-check: the standalone sing-box core must be locatable. It
-        // runs as root via a launchd daemon (see TunDaemonController); the first
-        // TUN start shows one administrator-password prompt to install that daemon.
-        if runtimeMode == .tun && SingBoxBinaryLocator.locate() == nil {
-            lastError = "TUN 模式需要 riptide-singbox 核心（打包缺失）。开发时先运行 Scripts/build-singbox-bin.sh。"
-            return
-        }
 
         do {
             try await modeCoordinator.start(mode: runtimeMode, profile: profile.tunnelProfile)

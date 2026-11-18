@@ -104,7 +104,6 @@ echo "| Platform | File |" >> $OUTPUT
 echo "|----------|------|" >> $OUTPUT
 echo "| macOS Universal | Riptide-macos-universal.zip |" >> $OUTPUT
 echo "| macOS DMG | Riptide.dmg |" >> $OUTPUT
-echo "| Windows x64 | Riptide-windows-x64.msi |" >> $OUTPUT
 echo "" >> $OUTPUT
 
 # Checksums placeholder - will be populated by CI
@@ -114,7 +113,6 @@ echo "| File | SHA256 |" >> $OUTPUT
 echo "|------|--------|" >> $OUTPUT
 echo "| Riptide-macos-universal.zip | (will be populated by CI) |" >> $OUTPUT
 echo "| Riptide.dmg | (will be populated by CI) |" >> $OUTPUT
-echo "| Riptide-windows-x64.msi | (will be populated by CI) |" >> $OUTPUT
 echo "" >> $OUTPUT
 
 # Installation notes
@@ -125,17 +123,9 @@ echo "1. Download the DMG or ZIP file" >> $OUTPUT
 echo "2. Open the DMG and drag Riptide to Applications, or extract the ZIP" >> $OUTPUT
 echo "3. On first launch, you may need to right-click and select 'Open' to bypass Gatekeeper" >> $OUTPUT
 echo "" >> $OUTPUT
-echo "### Windows" >> $OUTPUT
-echo "1. Download the MSI installer" >> $OUTPUT
-echo "2. Run the installer and follow the prompts" >> $OUTPUT
-echo "3. Launch Riptide from the Start menu or desktop shortcut" >> $OUTPUT
-echo "" >> $OUTPUT
-
-# Requirements
 echo "## 📋 System Requirements" >> $OUTPUT
 echo "" >> $OUTPUT
 echo "- **macOS**: macOS 14.0+ (Sonoma)" >> $OUTPUT
-echo "- **Windows**: Windows 10/11 64-bit" >> $OUTPUT
 echo "" >> $OUTPUT
 
 echo "Release notes generated: $OUTPUT"

@@ -504,9 +504,16 @@ struct MihomoLaunchStrategyTests {
         #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: true, helperInstalled: false) == .service)
     }
 
-    @Test("helper is preferred over sudo when the service is absent")
-    func helperBeforeSudo() {
+    @Test("helper is used for system proxy when the service is absent")
+    func helperBeforeUnavailable() {
         #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: false, helperInstalled: true) == .helper)
-        #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: false, helperInstalled: false) == .sudo)
+        #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: false, helperInstalled: false) == nil)
+    }
+
+    @Test("TUN refuses helper and sudo; only the service daemon is accepted")
+    func tunIsServiceOnly() {
+        #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: true, helperInstalled: false, mode: .tun) == .service)
+        #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: false, helperInstalled: true, mode: .tun) == nil)
+        #expect(MihomoRuntimeManager.resolveLaunchStrategy(serviceAvailable: false, helperInstalled: false, mode: .tun) == nil)
     }
 }

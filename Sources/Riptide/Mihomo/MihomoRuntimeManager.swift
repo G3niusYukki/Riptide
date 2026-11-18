@@ -202,15 +202,25 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         case sudo
     }
 
-    /// Picks the launch strategy: service mode first (prompt-free after the
-    /// one-time daemon install), then the XPC helper, then sudo.
+    /// Picks the launch strategy.
+    ///
+    /// TUN only accepts the launchd service (`riptide-mihomo-service`).
+    /// System proxy accepts the service or the XPC helper. Neither mode
+    /// falls back to `sudo` / `networksetup`.
+    /// Returns `nil` when no allowed launcher is available.
     public static func resolveLaunchStrategy(
         serviceAvailable: Bool,
-        helperInstalled: Bool
-    ) -> MihomoLaunchStrategy {
-        if serviceAvailable { return .service }
-        if helperInstalled { return .helper }
-        return .sudo
+        helperInstalled: Bool,
+        mode: RuntimeMode = .systemProxy
+    ) -> MihomoLaunchStrategy? {
+        switch mode {
+        case .tun:
+            return serviceAvailable ? .service : nil
+        case .systemProxy:
+            if serviceAvailable { return .service }
+            if helperInstalled { return .helper }
+            return nil
+        }
     }
 
     // MARK: - Setup
@@ -276,10 +286,16 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
         //    after a one-time daemon install), then XPC helper, then sudo.
         let serviceAvailable = await serviceClient.ping()
         let helperInstalled = await helperConnection.isHelperInstalled()
-        let strategy = Self.resolveLaunchStrategy(
+        guard let strategy = Self.resolveLaunchStrategy(
             serviceAvailable: serviceAvailable,
-            helperInstalled: helperInstalled
-        )
+            helperInstalled: helperInstalled,
+            mode: mode
+        ) else {
+            let message = mode == .tun
+                ? "TUN 需要已安装的 riptide-mihomo-service（一次管理员授权）。不会回退到 sudo。"
+                : "系统代理需要 service 或 helper。不会使用 sudo networksetup。"
+            throw RuntimeError.launchFailed(message)
+        }
 
         // 3. Setup directories
         do {
@@ -401,7 +417,11 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
                     print("[MihomoRuntimeManager] Warning: failed to set system proxy: \(proxyError.localizedDescription)")
                 }
             } else {
-                try? await sudoEnableSystemProxy()
+                print("[MihomoRuntimeManager] System proxy helper is not installed; refusing sudo networksetup fallback")
+                eventHandler?(.error(RuntimeErrorSnapshot(
+                    code: "E_SYSTEM_PROXY_HELPER",
+                    message: "系统代理需要已安装的 helper，已拒绝 sudo networksetup 回退。"
+                )))
             }
         }
 
@@ -516,12 +536,8 @@ public actor MihomoRuntimeManager: MihomoRuntimeManaging {
 
         // 2. Clear system proxy first (before killing mihomo)
         if currentMode == .systemProxy {
-            if !launchedViaSudo {
-                let service = await detectPrimaryService()
-                _ = await helperConnection.disableSystemProxy(service: service)
-            } else {
-                try? await sudoDisableSystemProxy()
-            }
+            let service = await detectPrimaryService()
+            _ = await helperConnection.disableSystemProxy(service: service)
         }
 
         // 3. Terminate mihomo

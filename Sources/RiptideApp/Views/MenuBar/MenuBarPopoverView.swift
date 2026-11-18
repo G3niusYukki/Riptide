@@ -26,8 +26,8 @@ public struct MenuBarPopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 360, height: 400)
-        .background(.regularMaterial)
+        .frame(width: 340, height: 420)
+        .background(Theme.canvas)
         .accessibilityIdentifier(A11yID.MenuBar.popover)
     }
 

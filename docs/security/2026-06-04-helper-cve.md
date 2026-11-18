@@ -27,8 +27,10 @@ CVE-2018-4032..4037 + CVE-2019-5011 (CleanMyMac) pattern:
    or foreign callers via an explicit allowlist.
 2. **`SMAuthorizedClients` allowlist** —
    `RiptideHelper/Resources/audit-policy.plist` declares the
-   caller allowlist; the real Apple Developer Team ID replaces the
-   `YOUR_TEAM_ID` placeholder before shipping.
+   caller allowlist; the `YOUR_TEAM_ID` placeholder was resolved to the
+   project-owned Team ID on 2026-11-18 (see ADR-0012). Only the public
+   Team ID and code-signing requirement strings are committed — no
+   certificate or private key.
 3. **Client-side `setCodeSigningRequirement`** — the host app
    declares its signing requirement on the outgoing
    `NSXPCConnection`, closing the reverse-direction gap.

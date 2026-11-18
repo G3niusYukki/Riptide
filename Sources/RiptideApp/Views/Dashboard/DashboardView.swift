@@ -6,7 +6,6 @@ import SwiftUI
 struct DashboardView: View {
     @Bindable var vm: AppViewModel
     @State private var showDiagnostics = false
-    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var currentSelectedNode: String {
         // Find the currently selected proxy from the first non-direct group
@@ -25,34 +24,39 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // MARK: - Top Status Cards
-                statusCardsRow
-
-                // MARK: - Speed Card
-                speedCard
-
-                // MARK: - Mini Traffic Chart
-                miniTrafficChart
-
-                // MARK: - Traffic History (Today / Week / Month)
-                TrafficHistoryCard(vm: vm)
-
-                // MARK: - Node Health
-                NodeHealthCard(vm: vm)
-
-                // MARK: - Quick Actions
-                QuickActionsRow(vm: vm)
-
-                // MARK: - Subscription Info
-                subscriptionSection
-
-                // MARK: - Recent Connections
+            VStack(alignment: .leading, spacing: 22) {
+                pageTitle
+                heroCard
+                metricsRow
+                activitySection
                 recentConnectionsSection
+
+                DisclosureGroup {
+                    VStack(spacing: Theme.Spacing.md) {
+                        TrafficHistoryCard(vm: vm)
+                        NodeHealthCard(vm: vm)
+                        QuickActionsRow(vm: vm)
+                        subscriptionSection
+                    }
+                    .padding(.top, Theme.Spacing.sm)
+                } label: {
+                    Label("更多", systemImage: "ellipsis.circle")
+                        .font(Theme.Typography.headline)
+                        .foregroundStyle(Theme.text)
+                }
+                .padding(Theme.Spacing.md)
+                .background(Theme.activityCard, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.cardRadius)
+                        .stroke(Theme.cardBorder.opacity(0.35), lineWidth: 0.5)
+                )
             }
+            .frame(maxWidth: 980, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
-        .contentMargins(.all, Theme.Spacing.lg, for: .scrollContent)
-        .background(Theme.backgroundGradient.ignoresSafeArea())
+        .contentMargins(.horizontal, 28, for: .scrollContent)
+        .contentMargins(.vertical, 22, for: .scrollContent)
+        .background(Theme.canvas.ignoresSafeArea())
         .refreshable {
             await vm.refreshStats()
             await vm.loadSubscriptionsFromBackend()
@@ -63,68 +67,99 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Status Cards Row
+    // MARK: - Hero
 
-    private var statusCardsRow: some View {
-        let layout = typeSize >= .accessibility1
-            ? AnyLayout(VStackLayout(spacing: Theme.Spacing.md))
-            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
-
-        return layout {
-            StatusCard(
-                icon: modeIcon,
-                iconColor: modeColor,
-                title: "运行模式",
-                value: modeDisplayName,
-                subtitle: vm.activeProfile?.name ?? "无配置"
-            )
-            .accessibilityIdentifier(A11yID.Dashboard.modeCard)
-
-            StatusCard(
-                icon: "antenna.radiowaves.left.and.right",
-                iconColor: Theme.success,
-                title: "当前节点",
-                value: currentSelectedNode,
-                subtitle: proxyModeDisplay
-            )
-            .accessibilityIdentifier(A11yID.Dashboard.nodeCard)
-
-            StatusCard(
-                icon: isRunning ? "circle.fill" : "circle",
-                iconColor: isRunning ? Theme.success : Theme.danger,
-                title: "状态",
-                value: isRunning ? "运行中" : "已停止",
-                subtitle: totalTrafficSummary,
-                isActive: isRunning
-            )
+    private var pageTitle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("概览")
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.text)
+            Text(vm.activeProfile?.name ?? "还没有配置。导入一个订阅后再连接。")
+                .font(Theme.Typography.callout)
+                .foregroundStyle(Theme.subtext)
         }
     }
 
-    // MARK: - Speed Card
+    private var heroCard: some View {
+        HStack(alignment: .center, spacing: Theme.Spacing.xl) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(isRunning ? "已连接" : "未连接")
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.text)
+                Text(isRunning ? "流量正在经过当前节点" : "连接后才会改系统代理或 TUN")
+                    .font(Theme.Typography.callout)
+                    .foregroundStyle(Theme.subtext)
+                HStack(spacing: Theme.Spacing.sm) {
+                    StatusPill(title: modeDisplayName, systemImage: modeIcon, tint: modeColor)
+                    StatusPill(title: proxyModeDisplay, systemImage: "arrow.triangle.branch", tint: Theme.accent)
+                }
+            }
+            Spacer(minLength: Theme.Spacing.lg)
+            VStack(alignment: .trailing, spacing: 10) {
+                Picker("连接方式", selection: $vm.connectionMode) {
+                    Text("系统代理").tag(ConnectionMode.systemProxy)
+                    Text("TUN").tag(ConnectionMode.tun)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .disabled(isRunning)
+                Button {
+                    Task { await vm.toggleTunnel() }
+                } label: {
+                    Text(isRunning ? "断开" : "连接")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 180, height: 32)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(isRunning ? Theme.danger : Theme.accent)
+            }
+        }
+        .padding(22)
+        .background(Theme.activityCard, in: RoundedRectangle(cornerRadius: Theme.largeRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.largeRadius)
+                .stroke(Theme.cardBorder.opacity(0.35), lineWidth: 0.5)
+        )
+        .accessibilityIdentifier(A11yID.Dashboard.modeCard)
+        .background {
+            Color.clear.accessibilityIdentifier(A11yID.Dashboard.hero)
+        }
+    }
 
-    private var speedCard: some View {
-        HStack(spacing: 12) {
-            SpeedBox(
-                title: "↑ 上传",
-                speed: vm.currentSpeedUp,
-                color: Theme.accent
+    private var metricsRow: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            MetricTile(
+                title: "当前节点",
+                value: currentSelectedNode,
+                caption: proxyModeDisplay,
+                tint: Theme.accent
             )
-            SpeedBox(
-                title: "↓ 下载",
-                speed: vm.currentSpeedDown,
-                color: Theme.success
+            .accessibilityIdentifier(A11yID.Dashboard.nodeCard)
+            MetricTile(
+                title: "上传",
+                value: formatSpeed(vm.currentSpeedUp),
+                caption: "实时",
+                tint: Theme.accent
+            )
+            MetricTile(
+                title: "下载",
+                value: formatSpeed(vm.currentSpeedDown),
+                caption: totalTrafficSummary,
+                tint: Theme.success
             )
         }
         .accessibilityIdentifier(A11yID.Dashboard.speedCard)
+        .background {
+            Color.clear.accessibilityIdentifier(A11yID.Dashboard.metrics)
+        }
     }
 
-    // MARK: - Mini Traffic Chart
-
-    private var miniTrafficChart: some View {
-        MiniTrafficChart(vm: vm)
-            .padding()
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+    private var activitySection: some View {
+        ActivityCard(title: "流量", systemImage: "chart.xyaxis.line") {
+            MiniTrafficChart(vm: vm)
+                .frame(height: 88)
+        }
+        .accessibilityIdentifier(A11yID.Dashboard.activity)
     }
 
     // MARK: - Subscription Section
@@ -182,7 +217,10 @@ struct DashboardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
             } else {
                 ForEach(recentConnections) { conn in
-                    RecentConnectionRow(conn: conn)
+                    ActivityConnectionRow(host: conn.host, proxyName: conn.proxyName)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, Theme.Spacing.sm)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.smallRadius))
                 }
             }
         }

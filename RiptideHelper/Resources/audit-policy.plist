@@ -7,12 +7,11 @@
 
   Fields:
     allowedTeamID     — Apple Developer Team ID of the calling app.
-                        Placeholder "YOUR_TEAM_ID" until Apple Developer
-                        enrollment is complete. The validator still runs
-                        software-side checks; the TeamID is the only piece
-                        that requires Apple infrastructure.
+                        Resolved to the project-owned development team
+                        (39Q4M52XNQ). No certificate or private key is
+                        stored in this repository.
     allowedBundleID   — Bundle identifier of the calling app.
-                        Must be "com.riptide.client" in production.
+                        Must match the shipped app: com.riptide.app.
 
   To roll out: ship the binary with this file; the validator in
   HelperCallerValidator.swift loads it on helper startup. A signed helper
@@ -22,8 +21,8 @@
 <plist version="1.0">
 <dict>
     <key>allowedTeamID</key>
-    <string>YOUR_TEAM_ID</string>
+    <string>39Q4M52XNQ</string>
     <key>allowedBundleID</key>
-    <string>com.riptide.client</string>
+    <string>com.riptide.app</string>
 </dict>
 </plist>

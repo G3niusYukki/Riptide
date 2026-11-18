@@ -27,6 +27,9 @@ public enum A11yID {
         public static let trafficHistory = "dashboard.traffic-history"
         public static let nodeHealth = "dashboard.node-health"
         public static let quickActions = "dashboard.quick-actions"
+        public static let hero = "dashboard.hero"
+        public static let metrics = "dashboard.metrics"
+        public static let activity = "dashboard.activity"
     }
 
     public enum Config {

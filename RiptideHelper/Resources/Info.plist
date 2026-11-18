@@ -28,18 +28,18 @@
     </dict>
 
     <!--
-        SMAuthorizedClients placeholder.
+        SMAuthorizedClients — clients allowed to install/connect to the helper.
 
         Software-side caller validation is implemented in
         Sources/Riptide/XPC/HelperCallerValidator.swift and reads
-        audit-policy.plist. The Team ID is required by macOS SMJobBless at
-        install/update time only (not at XPC connect time). Once Apple
-        Developer enrollment is complete, replace YOUR_TEAM_ID with the
-        real Team ID and merge the canonical TeamID into audit-policy.plist.
+        audit-policy.plist. This requirement pins the client to the
+        project-owned Apple Developer Team ID (subject.OU), which works for
+        both Apple Development and Developer ID Application certificates.
+        No certificate, private key, or personal CN is stored in the repo.
     -->
     <key>SMAuthorizedClients</key>
     <array>
-        <string>identifier com.riptide.app and anchor apple generic and anchor apple generic and cert leaf[subject.CN] = "Apple Development: YOUR_TEAM_ID" and cert leaf[field.1.2.840.113635.100.6.1.13] /* exists */</string>
+        <string>identifier com.riptide.app and anchor apple generic and cert leaf[subject.OU] = "39Q4M52XNQ"</string>
     </array>
 
     <!-- Minimum required macOS version -->

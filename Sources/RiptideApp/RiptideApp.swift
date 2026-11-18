@@ -51,7 +51,7 @@ struct RiptideApp: App {
                     MainTabView(vm: appVM)
                         .accessibilityIdentifier(A11yID.App.mainWindow)
                         .preferredColorScheme(colorScheme)
-                        .frame(minWidth: 800, minHeight: 500)
+                        .frame(minWidth: 960, minHeight: 640)
                 } else {
                     OnboardingView(isPresented: Binding(
                         get: { !hasCompletedOnboarding },
@@ -113,7 +113,7 @@ struct RiptideApp: App {
                 }
             }
         }
-        .defaultSize(width: 900, height: 600)
+        .defaultSize(width: 1120, height: 740)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("检查更新…") {

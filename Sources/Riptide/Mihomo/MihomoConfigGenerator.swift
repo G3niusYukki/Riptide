@@ -52,7 +52,19 @@ public enum MihomoConfigGenerator {
         /// Enable IPv6 (default: true).
         public let ipv6: Bool
         /// TUN device name (default: "utun120"). Only used when mode is .tun.
+        /// Kept distinct from Clash Verge's observed `utun1024` so the two
+        /// apps can run on the same Mac without grabbing the same utun.
         public let tunDeviceName: String
+        /// When true, mihomo drops traffic that does not match a route.
+        /// Default `true` is a Riptide choice (leak resistance). Clash Verge
+        /// 2.4.7 was observed with `strict-route: false`; pass `false` to match.
+        public let strictRoute: Bool
+        /// TUN MTU. 1500 matches typical Ethernet; raise it only when the
+        /// path is known to carry jumbo frames.
+        public let tunMTU: Int
+        /// Destination prefixes excluded from auto-route. Defaults to RFC1918,
+        /// link-local, multicast and broadcast.
+        public let routeAddressExclude: [String]
 
         public init(
             mode: RuntimeMode,
@@ -61,7 +73,10 @@ public enum MihomoConfigGenerator {
             logLevel: String = "info",
             allowLAN: Bool = false,
             ipv6: Bool = true,
-            tunDeviceName: String = "utun120"
+            tunDeviceName: String = "utun120",
+            strictRoute: Bool = true,
+            tunMTU: Int = 1500,
+            routeAddressExclude: [String] = MihomoConfigGenerator.defaultRouteExcludes
         ) {
             self.mode = mode
             self.mixedPort = mixedPort
@@ -70,8 +85,22 @@ public enum MihomoConfigGenerator {
             self.allowLAN = allowLAN
             self.ipv6 = ipv6
             self.tunDeviceName = tunDeviceName
+            self.strictRoute = strictRoute
+            self.tunMTU = tunMTU
+            self.routeAddressExclude = routeAddressExclude
         }
     }
+
+    /// LAN / link-local / multicast prefixes left on the physical interface.
+    public static let defaultRouteExcludes: [String] = [
+        "192.168.0.0/16",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "224.0.0.0/4",
+        "255.255.255.255/32",
+    ]
 
     /// Generates a mihomo-compatible YAML configuration.
     /// - Parameters:
@@ -109,19 +138,20 @@ public enum MihomoConfigGenerator {
         lines.append("  dns-hijack:")
         lines.append("    - any:53")
         lines.append("  auto-route: \(options.mode == .tun)")
-        lines.append("  strict-route: \(options.mode == .tun)")
+        lines.append("  strict-route: \(options.mode == .tun && options.strictRoute)")
         lines.append("  auto-detect-interface: \(options.mode == .tun)")
         if options.mode == .tun {
+            lines.append("  mtu: \(options.tunMTU)")
             lines.append("  route-address-exclude:")
-            lines.append("    - 192.168.0.0/16")
-            lines.append("    - 10.0.0.0/8")
-            lines.append("    - 172.16.0.0/12")
-            lines.append("    - 127.0.0.0/8")
-            lines.append("    - 169.254.0.0/16")
-            lines.append("    - 224.0.0.0/4")
-            lines.append("    - 255.255.255.255/32")
+            for prefix in options.routeAddressExclude {
+                lines.append("    - \(prefix)")
+            }
         }
         lines.append("")
+
+        if options.mode == .tun {
+            appendDNS(policy: config.dnsPolicy, to: &lines)
+        }
 
         // Proxies section
         lines.append("proxies:")
@@ -170,6 +200,35 @@ public enum MihomoConfigGenerator {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// mihomo DNS for TUN. Fake-IP stays inside the core so we never rewrite
+    /// system DNS with `networksetup -setdnsservers`.
+    private static func appendDNS(policy: DNSPolicy, to lines: inout [String]) {
+        lines.append("dns:")
+        lines.append("  enable: true")
+        lines.append("  listen: 0.0.0.0:53")
+        if policy.fakeIPEnabled {
+            lines.append("  enhanced-mode: fake-ip")
+            lines.append("  fake-ip-range: \(policy.fakeIPCIDR)")
+        } else {
+            lines.append("  enhanced-mode: redir-host")
+        }
+        lines.append("  fake-ip-filter:")
+        lines.append("    - '*.lan'")
+        lines.append("    - '*.local'")
+        lines.append("  nameserver:")
+        let servers = policy.primaryResolvers.map { endpoint -> String in
+            if endpoint.kind == .doh {
+                return endpoint.dohURL ?? endpoint.address
+            }
+            return endpoint.address
+        }
+        let resolved = servers.isEmpty ? ["1.1.1.1", "8.8.8.8"] : servers
+        for server in resolved {
+            lines.append("    - \(yamlEscape(server))")
+        }
+        lines.append("")
     }
 
     /// Maps Riptide ProxyKind to mihomo type string.

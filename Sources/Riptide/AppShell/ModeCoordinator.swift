@@ -55,6 +55,7 @@ public actor ModeCoordinator {
             Task { await self?.emit(event) }
         })
 
+        emit(.stateChanged(.starting))
         do {
             try await mihomoManager.start(mode: mode, profile: profile)
             activeMode = mode
@@ -97,6 +98,7 @@ public actor ModeCoordinator {
     }
 
     public func stop() async throws {
+        emit(.stateChanged(.stopping))
         // Stop sleep/wake observer
         stopSleepWakeObserver()
 

@@ -38,24 +38,7 @@ if [ -f "Package.swift" ] && grep -q "$CURRENT_VERSION" Package.swift 2>/dev/nul
     echo "✓ Updated Package.swift"
 fi
 
-if [ -f "riptide-windows/package.json" ]; then
-    sed -i.bak "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/g" riptide-windows/package.json && rm -f riptide-windows/package.json.bak
-    echo "✓ Updated riptide-windows/package.json"
-fi
-
-# Update version in Cargo.toml for Windows
-if [ -f "riptide-windows/src-tauri/Cargo.toml" ]; then
-    sed -i.bak "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" riptide-windows/src-tauri/Cargo.toml && rm -f riptide-windows/src-tauri/Cargo.toml.bak
-    echo "✓ Updated riptide-windows/src-tauri/Cargo.toml"
-fi
-
-# Update tauri.conf.json
-if [ -f "riptide-windows/src-tauri/tauri.conf.json" ]; then
-    sed -i.bak "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" riptide-windows/src-tauri/tauri.conf.json && rm -f riptide-windows/src-tauri/tauri.conf.json.bak
-    echo "✓ Updated riptide-windows/src-tauri/tauri.conf.json"
-fi
-
-# Update build-release.sh version in Info.plist template
+# build-release.sh reads .version at runtime.
 if [ -f "Scripts/build-release.sh" ] && grep -q "$CURRENT_VERSION" Scripts/build-release.sh 2>/dev/null; then
     sed -i.bak "s/$CURRENT_VERSION/$NEW_VERSION/g" Scripts/build-release.sh && rm -f Scripts/build-release.sh.bak
     echo "✓ Updated Scripts/build-release.sh"

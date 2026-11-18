@@ -5,7 +5,11 @@ set -e
 # Builds an arm64 DMG for macOS distribution
 
 APP_NAME="RiptideApp"
-BUILD_DIR=".build/arm64-apple-macosx/release"
+# SwiftPM 6.2 writes to .build/out/Products; older toolchains use the triple path.
+BUILD_DIR=".build/out/Products/Release"
+if [ ! -d "$BUILD_DIR" ] && [ -d ".build/arm64-apple-macosx/release" ]; then
+    BUILD_DIR=".build/arm64-apple-macosx/release"
+fi
 OUTPUT_DIR=".build/release-dmg"
 DMG_NAME="Riptide.dmg"
 VOLUME_NAME="Riptide"
@@ -22,6 +26,10 @@ swift build --product "$APP_NAME" -c release --arch arm64
 
 echo "Build complete"
 
+if [ ! -f "$BUILD_DIR/$APP_NAME" ] && [ -f ".build/arm64-apple-macosx/release/$APP_NAME" ]; then
+    BUILD_DIR=".build/arm64-apple-macosx/release"
+fi
+
 # Check binary
 if [ ! -f "$BUILD_DIR/$APP_NAME" ]; then
     echo "Binary not found at $BUILD_DIR/$APP_NAME"
@@ -36,15 +44,14 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/"
 
-# Bundle the standalone sing-box core used for TUN mode. It is launched as root
-# via a launchd daemon (see TunDaemonController); the in-process core handles
-# system-proxy mode. Build it if the committed universal binary is missing.
-if [ ! -f "Binaries/riptide-singbox" ]; then
-    echo "riptide-singbox missing — building it..."
-    ./Scripts/build-singbox-bin.sh
+# sing-box is no longer on the TUN path (mihomo service mode owns TUN).
+# Copy the binary only when it is already present; do not build it here.
+if [ -f "Binaries/riptide-singbox" ]; then
+    cp "Binaries/riptide-singbox" "$APP_DIR/Contents/Resources/riptide-singbox"
+    chmod +x "$APP_DIR/Contents/Resources/riptide-singbox"
+else
+    echo "riptide-singbox not bundled (experimental; TUN uses riptide-mihomo-service)."
 fi
-cp "Binaries/riptide-singbox" "$APP_DIR/Contents/Resources/riptide-singbox"
-chmod +x "$APP_DIR/Contents/Resources/riptide-singbox"
 
 # Bundle the mihomo service-mode daemon (v2.9.0). The GUI installs it as a
 # root launchd daemon via MihomoServiceInstaller; MihomoServiceBinaryLocator
@@ -58,6 +65,9 @@ chmod +x "$APP_DIR/Contents/Resources/riptide-mihomo-service"
 # with "Library not loaded: @rpath/Sparkle.framework". Copy it into Frameworks/
 # and add the matching rpath (the binary ships with @loader_path only).
 SPARKLE_SRC="$BUILD_DIR/Sparkle.framework"
+if [ ! -d "$SPARKLE_SRC" ] && [ -d ".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" ]; then
+    SPARKLE_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+fi
 if [ -d "$SPARKLE_SRC" ]; then
     mkdir -p "$APP_DIR/Contents/Frameworks"
     cp -R "$SPARKLE_SRC" "$APP_DIR/Contents/Frameworks/"
@@ -124,9 +134,45 @@ cat > "$APP_DIR/Contents/Info.plist" << PLIST
 </plist>
 PLIST
 
-# Ad-hoc sign
-echo "Ad-hoc signing..."
-codesign --sign - --deep --force "$APP_DIR"
+# Sign with a local identity when one is installed.
+# Preference: $SIGN_IDENTITY, then Developer ID Application, then any
+# codesigning identity whose TeamIdentifier is the public project team
+# 39Q4M52XNQ. The certificate CN is never written into the repo.
+# Falls back to ad-hoc. This does not notarize; Developer ID + notarytool
+# secrets are still required for public distribution.
+sign_app() {
+    local app="$1"
+    local identity=""
+    local candidate team tmp
+    if [ -n "${SIGN_IDENTITY:-}" ]; then
+        identity="$SIGN_IDENTITY"
+    else
+        identity=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
+        if [ -z "$identity" ]; then
+            tmp=$(mktemp)
+            printf 'probe' > "$tmp"
+            while IFS= read -r candidate; do
+                [ -z "$candidate" ] && continue
+                if codesign --sign "$candidate" --force "$tmp" >/dev/null 2>&1; then
+                    team=$(codesign -dvvv "$tmp" 2>&1 | awk -F= '/^TeamIdentifier=/{print $2; exit}')
+                    if [ "$team" = "39Q4M52XNQ" ]; then
+                        identity="$candidate"
+                        break
+                    fi
+                fi
+            done < <(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(.*\)"/\1/p')
+            rm -f "$tmp"
+        fi
+    fi
+    if [ -n "$identity" ]; then
+        echo "Signing with an installed project identity (Developer ID, or team 39Q4M52XNQ)."
+        codesign --sign "$identity" --force --deep "$app"
+    else
+        echo "No project signing identity found; ad-hoc signing."
+        codesign --sign - --deep --force "$app"
+    fi
+}
+sign_app "$APP_DIR"
 
 # Create DMG
 echo "Creating DMG..."
